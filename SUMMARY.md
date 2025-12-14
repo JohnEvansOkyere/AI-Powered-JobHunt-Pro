@@ -17,7 +17,6 @@ AI-Powered-JobHunt-Pro/
 │   │   ├── ai/                 # AI router & providers (all 4 providers)
 │   │   ├── scrapers/           # Job scraping modules (ready)
 │   │   └── tasks/              # Celery background tasks
-│   ├── alembic/                # Database migrations
 │   └── requirements.txt        # Python dependencies
 │
 ├── frontend/                   # Next.js frontend
@@ -55,7 +54,6 @@ AI-Powered-JobHunt-Pro/
   - Groq (Fast inference)
 - ✅ Celery configuration for background jobs
 - ✅ API router structure ready
-- ✅ Alembic migrations setup
 
 #### Frontend (Next.js)
 - ✅ Next.js 14 with App Router
@@ -111,7 +109,7 @@ AI-Powered-JobHunt-Pro/
 
 4. **Grok Provider**: Currently uses a placeholder implementation. Update when xAI releases official API.
 
-5. **Database Migrations**: Alembic is configured but you'll need to create initial migration after connecting to your database.
+5. **Database Schema**: Use Supabase SQL Editor to run `docs/SUPABASE_SCHEMA.sql` for initial setup. For future changes, create SQL files and run them in Supabase SQL Editor.
 
 ### 🎯 Ready to Continue?
 

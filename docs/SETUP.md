@@ -72,18 +72,19 @@ SECRET_KEY=generate_a_random_secret_key_here
 REDIS_URL=redis://localhost:6379/0
 ```
 
-### Run Database Migrations
+### Verify Database Schema
 
-```bash
-# Initialize Alembic (if not already done)
-alembic init alembic
+After running the SQL schema in Supabase, verify that all tables are created:
+- Go to Supabase Dashboard → Table Editor
+- You should see: `user_profiles`, `cvs`, `jobs`, `job_matches`, `applications`, `scraping_jobs`
 
-# Create initial migration
-alembic revision --autogenerate -m "Initial migration"
+### Future Schema Changes
 
-# Apply migrations
-alembic upgrade head
-```
+For any future database schema changes:
+1. Create a new SQL file in `docs/` (e.g., `docs/migrations/001_add_new_column.sql`)
+2. Run the SQL in Supabase SQL Editor
+3. Update your SQLAlchemy models in `backend/app/models/` to match
+4. Commit both the SQL file and model changes to Git
 
 ### Start Backend Server
 
