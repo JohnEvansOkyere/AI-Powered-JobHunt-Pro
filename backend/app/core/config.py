@@ -39,6 +39,22 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(..., description="PostgreSQL database connection URL")
+    
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Validate DATABASE_URL format."""
+        if not v or v.strip() == "":
+            raise ValueError("DATABASE_URL cannot be empty")
+        
+        # Basic validation - should start with postgresql://
+        if not v.startswith("postgresql://") and not v.startswith("postgresql+psycopg2://"):
+            raise ValueError(
+                "DATABASE_URL must start with 'postgresql://' or 'postgresql+psycopg2://'. "
+                f"Got: {v[:20]}..."
+            )
+        
+        return v
 
     # AI Provider API Keys
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key")

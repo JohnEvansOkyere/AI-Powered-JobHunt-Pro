@@ -26,6 +26,18 @@ Complete setup instructions for the AI-Powered Job Application Platform.
 3. Execute the SQL script
 4. Verify tables are created in the Table Editor
 
+### Create Public Users Table
+
+1. In Supabase SQL Editor, run `docs/SUPABASE_USERS_TABLE.sql`
+2. This creates a `public.users` table that syncs with `auth.users`
+3. Allows you to access user data via SQLAlchemy and add custom fields
+
+### Enable Auto-Profile Creation
+
+1. In Supabase SQL Editor, run `docs/SUPABASE_AUTO_PROFILE.sql`
+2. This creates a trigger that automatically creates a user profile when a user signs up
+3. For existing users without profiles, the trigger will create them on next login, or you can manually run the migration query in the file
+
 ### Configure Storage
 
 1. Go to Storage in Supabase dashboard
@@ -57,7 +69,10 @@ SUPABASE_SERVICE_KEY=your_service_key
 SUPABASE_STORAGE_BUCKET=cvs
 
 # Database (from Supabase project settings)
-DATABASE_URL=postgresql://postgres:[password]@[host]:5432/postgres
+# Use Connection Pooler (recommended) - port 6543
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[password]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true
+# OR Direct Connection (if pooler doesn't work) - port 5432
+# DATABASE_URL=postgresql://postgres:[password]@db.[PROJECT-REF].supabase.co:5432/postgres
 
 # AI Providers (at least one required)
 OPENAI_API_KEY=sk-...

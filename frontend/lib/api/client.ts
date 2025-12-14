@@ -4,22 +4,24 @@
  * Handles HTTP requests to the FastAPI backend.
  */
 
+import { getCurrentSession } from '../auth'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export class ApiClient {
   private baseUrl: string
-  private token: string | null = null
 
   constructor(baseUrl: string = API_URL) {
     this.baseUrl = baseUrl
   }
 
-  setToken(token: string) {
-    this.token = token
-  }
-
-  clearToken() {
-    this.token = null
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      const session = await getCurrentSession()
+      return session?.access_token || null
+    } catch {
+      return null
+    }
   }
 
   private async request<T>(
@@ -27,13 +29,15 @@ export class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
+    const token = await this.getAuthToken()
+    
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     }
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
     }
 
     const response = await fetch(url, {
@@ -45,7 +49,10 @@ export class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }))
-      throw new Error(error.detail || 'Request failed')
+      const errorMessage = error.detail || error.message || response.statusText || 'Request failed'
+      const errorWithStatus = new Error(errorMessage)
+      ;(errorWithStatus as any).status = response.status
+      throw errorWithStatus
     }
 
     return response.json()

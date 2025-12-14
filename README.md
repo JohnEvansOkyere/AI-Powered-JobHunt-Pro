@@ -43,9 +43,33 @@ AI-Powered-JobHunt-Pro/
 
 See [docs/SETUP.md](docs/SETUP.md) for detailed setup instructions.
 
+### Troubleshooting
+
+Encountering errors? Check our comprehensive guides:
+- [Errors and Solutions](docs/ERRORS_AND_SOLUTIONS.md) - Complete error catalog with solutions
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and fixes
+
 ## 📝 Development Phases
 
 See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the complete development roadmap.
+
+### Completed Phases
+
+- ✅ **Phase 1**: Project Foundation & Infrastructure - [Documentation](docs/PHASE1_FOUNDATION.md)
+- ✅ **Phase 2**: Authentication & User Management - [Documentation](docs/PHASE2_AUTH.md)
+- ✅ **Phase 3**: User Profile System - [Documentation](docs/PHASE3_PROFILE.md)
+
+### Remaining Phases
+
+- ⏳ **Phase 4**: CV Management
+- ⏳ **Phase 5**: AI Model Router & Integration
+- ⏳ **Phase 6**: Job Scraping System
+- ⏳ **Phase 7**: AI Job Matching
+- ⏳ **Phase 8**: AI Application Generation
+- ⏳ **Phase 9**: Frontend Dashboard & UI
+- ⏳ **Phase 10**: Production Readiness
+
+See [Phases Summary](docs/PHASES_SUMMARY.md) for detailed progress.
 
 ## 🎨 Design System
 
