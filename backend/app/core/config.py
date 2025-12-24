@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     GROK_API_KEY: str = Field(default="", description="Grok API key")
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
+    SERPAPI_API_KEY: str = Field(default="", description="SerpAPI key for Google Jobs")
 
     # Celery & Redis
     REDIS_URL: str = Field(

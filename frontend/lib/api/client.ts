@@ -32,8 +32,12 @@ export class ApiClient {
     const token = await this.getAuthToken()
     
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
       ...options.headers,
+    }
+
+    // Only set Content-Type for JSON, not for FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json'
     }
 
     if (token) {
@@ -62,10 +66,14 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<T> {
+    const isFormData = data instanceof FormData
+    const body = isFormData ? data : JSON.stringify(data)
+    
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body,
+      ...options,
     })
   }
 

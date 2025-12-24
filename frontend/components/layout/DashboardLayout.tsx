@@ -25,6 +25,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { name: 'Applications', href: '/dashboard/applications', icon: FileText },
+  { name: 'CV Management', href: '/dashboard/cv', icon: FileText },
   { name: 'Profile', href: '/profile/setup', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]

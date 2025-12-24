@@ -43,7 +43,9 @@ Complete setup instructions for the AI-Powered Job Application Platform.
 1. Go to Storage in Supabase dashboard
 2. Create a bucket named `cvs` (or update `SUPABASE_STORAGE_BUCKET` in backend config)
 3. Set bucket to **Private** (RLS enabled)
-4. Add storage policy to allow users to upload their own files
+4. Run storage policies SQL:
+   - In Supabase SQL Editor, run `docs/SUPABASE_STORAGE_POLICIES.sql`
+   - This creates RLS policies allowing users to manage their own CV files
 
 ## 2. Backend Setup
 

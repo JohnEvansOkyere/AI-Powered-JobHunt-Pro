@@ -17,6 +17,7 @@ class TaskType(Enum):
     EMAIL_DRAFTING = "email_drafting"
     JOB_ANALYSIS = "job_analysis"
     FAST_SUMMARY = "fast_summary"
+    CV_PARSING = "cv_parsing"  # CV/resume parsing and extraction
 
 
 class AIProvider(ABC):

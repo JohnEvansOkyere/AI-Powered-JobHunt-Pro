@@ -484,6 +484,342 @@ HTTPException: 404 Not Found - Profile not found
 
 ---
 
+### Error: "cannot import name 'get_current_user' from 'app.core.security'"
+
+**Error Message:**
+```
+ImportError: cannot import name 'get_current_user' from 'app.core.security'
+```
+
+**Cause:**
+- `get_current_user` is located in `app.api.v1.dependencies`, not `app.core.security`
+- Wrong import path in CV endpoints file
+
+**Solution:**
+```python
+# ❌ Wrong
+from app.core.security import get_current_user
+
+# ✅ Correct
+from app.api.v1.dependencies import get_current_user
+```
+
+**Fixed in**: `backend/app/api/v1/endpoints/cvs.py`
+
+---
+
+### Error: "cannot import name 'get_model_router' from 'app.ai.router'"
+
+**Error Message:**
+```
+ImportError: cannot import name 'get_model_router' from 'app.ai.router'
+```
+
+**Cause:**
+- Function `get_model_router()` was not defined in the router module
+- CV parser was trying to use a function that didn't exist
+
+**Solution:**
+Added `get_model_router()` function to `backend/app/ai/router.py`:
+```python
+def get_model_router() -> ModelRouter:
+    """Get or create the global model router instance."""
+    global _model_router
+    if _model_router is None:
+        _model_router = ModelRouter()
+    return _model_router
+```
+
+Also updated router to handle missing AI provider dependencies gracefully with try/except imports.
+
+---
+
+### Error: "ModuleNotFoundError: No module named 'groq'"
+
+**Error Message:**
+```
+ModuleNotFoundError: No module named 'groq'
+```
+
+**Cause:**
+- AI provider dependencies not installed
+- Router tries to import all providers at module level
+
+**Solution:**
+1. **Install missing dependencies:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+2. **Or make imports optional** (already done):
+   - Router now uses try/except for provider imports
+   - Providers are only initialized if dependencies are installed
+   - System works with any combination of available providers
+
+---
+
+## CV Upload Errors
+
+### Error: "cannot access local variable 'json' where it is not associated with a value"
+
+**Error Message:**
+```
+Error parsing CV: cannot access local variable 'json' where it is not associated with a value
+```
+
+**Cause:**
+- `json` module was imported inside a try block in `cv_parser.py`
+- If an exception occurred before the import, `json` wasn't available in the except block
+- The except block tried to catch `json.JSONDecodeError` but `json` wasn't in scope
+
+**Solution:**
+Move `json` import to the top of the file:
+```python
+# ✅ Correct - import at top
+import json
+from typing import Dict, Any, Optional
+
+# ❌ Wrong - import inside try block
+try:
+    import json  # This might not be available in except block
+    ...
+except json.JSONDecodeError:  # Error: json not defined
+    ...
+```
+
+**Fixed in**: `backend/app/services/cv_parser.py`
+
+---
+
+### Error: "2 validation errors for CVResponse - created_at/updated_at"
+
+**Error Message:**
+```
+2 validation errors for CVResponse
+created_at
+  Input should be a valid string [type=string_type, input_value=datetime.datetime(...), input_type=datetime]
+updated_at
+  Input should be a valid string [type=string_type, input_value=datetime.datetime(...), input_type=datetime]
+```
+
+**Cause:**
+- SQLAlchemy returns `datetime` objects for `created_at` and `updated_at`
+- Pydantic model expected strings but received datetime objects
+- `from_attributes=True` doesn't automatically serialize datetime to string
+
+**Solution:**
+Use Pydantic's `field_serializer` to convert datetime to ISO format string:
+```python
+from datetime import datetime
+from pydantic import BaseModel, field_serializer
+
+class CVResponse(BaseModel):
+    created_at: datetime
+    updated_at: datetime
+    
+    @field_serializer('created_at', 'updated_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime to ISO format string."""
+        return dt.isoformat() if dt else None
+    
+    class Config:
+        from_attributes = True
+```
+
+**Fixed in**: `backend/app/api/v1/endpoints/cvs.py`
+
+---
+
+### Error: "No available provider for task: TaskType.JOB_ANALYSIS"
+
+**Error Message:**
+```
+No available provider for task: TaskType.JOB_ANALYSIS
+No provider available for task: TaskType.JOB_ANALYSIS
+```
+
+**Cause:**
+- CV parser was using wrong task type (`TaskType.JOB_ANALYSIS` instead of `TaskType.CV_PARSING`)
+- No AI provider configured or API keys not set
+- Router couldn't find appropriate provider for the task
+
+**Solutions:**
+
+1. **Use Correct Task Type:**
+   ```python
+   # ✅ Correct
+   response = await self.ai_router.generate(
+       task_type=TaskType.CV_PARSING,  # Use CV_PARSING, not JOB_ANALYSIS
+       prompt=prompt,
+   )
+   ```
+
+2. **Configure AI Provider:**
+   - Set at least one AI provider API key in `.env`:
+     ```env
+     OPENAI_API_KEY=your_key_here
+     # OR
+     GEMINI_API_KEY=your_key_here
+     # OR
+     GROQ_API_KEY=your_key_here
+     ```
+   - Install required dependencies:
+     ```bash
+     pip install openai google-generativeai groq
+     ```
+
+3. **Handle Missing Providers Gracefully:**
+   - CV parser already has fallback logic
+   - If AI parsing fails, it returns basic structure
+   - CV upload still succeeds, just without AI-extracted data
+
+**Fixed in**: `backend/app/services/cv_parser.py`
+
+---
+
+### Error: "'UploadResponse' object has no attribute 'get'"
+
+**Error Message:**
+```
+Error uploading CV: 'UploadResponse' object has no attribute 'get'
+```
+
+**Cause:**
+- Supabase Python client's `upload()` method returns an `UploadResponse` object, not a dictionary
+- Code was trying to use `.get("error")` on an object that doesn't have that method
+- Similar issue with `create_signed_url()` response
+
+**Solution:**
+Handle both object and dict responses:
+```python
+# Upload to Supabase Storage
+storage_response = supabase.storage.from_(bucket).upload(...)
+
+# Check for errors - handle both object and dict
+error_msg = None
+if hasattr(storage_response, 'error') and storage_response.error:
+    error_msg = str(storage_response.error)
+elif isinstance(storage_response, dict) and storage_response.get("error"):
+    error_msg = storage_response.get("error")
+
+if error_msg:
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Failed to upload file: {error_msg}"
+    )
+```
+
+**Fixed in**: `backend/app/api/v1/endpoints/cvs.py`
+
+---
+
+### Error: "400 Bad Request" on CV Upload
+
+**Error Message:**
+```
+INFO: "POST /api/v1/cvs/upload HTTP/1.1" 400 Bad Request
+```
+
+**Common Causes:**
+
+1. **File has no extension**
+   - File must have `.pdf` or `.docx` extension
+   - Check filename includes extension
+
+2. **Invalid file type**
+   - Only PDF and DOCX are supported
+   - `.doc` files are not supported (must convert to `.docx`)
+
+3. **File too large**
+   - Maximum size is 10MB
+   - Compress or reduce file size
+
+4. **Empty file**
+   - File has 0 bytes
+   - Ensure file has content
+
+5. **Content-Type header issue** (Frontend)
+   - Don't manually set `Content-Type: multipart/form-data`
+   - Browser must set it automatically with boundary parameter
+
+**Solutions:**
+
+1. **Check File Extension:**
+   ```bash
+   # Ensure file has .pdf or .docx extension
+   ls -la resume.pdf  # Should show .pdf
+   ```
+
+2. **Check File Size:**
+   ```bash
+   # Check file size (must be < 10MB)
+   ls -lh resume.pdf
+   ```
+
+3. **Frontend Fix:**
+   ```typescript
+   // ❌ Wrong - manually setting Content-Type
+   const formData = new FormData()
+   formData.append('file', file)
+   await apiClient.post('/api/v1/cvs/upload', formData, {
+     headers: {
+       'Content-Type': 'multipart/form-data',  // Don't do this!
+     }
+   })
+   
+   // ✅ Correct - let browser set Content-Type
+   const formData = new FormData()
+   formData.append('file', file)
+   await apiClient.post('/api/v1/cvs/upload', formData)  // No headers!
+   ```
+
+4. **Check Backend Logs:**
+   - Backend logs show exact validation failure
+   - Look for: "CV upload request received - filename: ..."
+   - Check which validation failed
+
+**See Also**: [CV_UPLOAD_TROUBLESHOOTING.md](./CV_UPLOAD_TROUBLESHOOTING.md)
+
+---
+
+## AI Router Errors
+
+### Error: "ModuleNotFoundError: No module named 'tiktoken'"
+
+**Error Message:**
+```
+ModuleNotFoundError: No module named 'tiktoken'
+```
+
+**Cause:**
+- `tiktoken` package not installed in the virtual environment
+- Required for accurate token counting in the AI router
+
+**Solutions:**
+
+1. **Install tiktoken:**
+   ```bash
+   cd backend
+   source venv/bin/activate  # Activate virtual environment
+   pip install tiktoken
+   ```
+
+2. **Or install from requirements:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+3. **Fallback Available:**
+   - The router has a fallback token estimation (1 token ≈ 4 characters)
+   - Works without tiktoken, but less accurate
+   - Router will log a warning but continue to function
+
+**Note:** The router is designed to work without tiktoken, but accuracy is better with it installed.
+
+---
+
 ## Quick Diagnostic Commands
 
 ### Test Database Connection

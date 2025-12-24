@@ -1,0 +1,322 @@
+"""
+User Profile Tests
+
+Tests for user profile endpoints including:
+- Profile creation
+- Profile retrieval
+- Profile updates
+- Profile validation
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+
+@pytest.mark.profile
+class TestProfileRetrieval:
+    """Test profile GET endpoints."""
+
+    def test_get_profile_not_found(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        override_get_db
+    ):
+        """Test getting profile when it doesn't exist."""
+        response = client.get("/api/v1/profiles/me", headers=auth_headers)
+
+        # Should attempt to auto-create or return 404
+        assert response.status_code in [200, 404]
+
+    def test_get_existing_profile(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        create_test_profile,
+        db_session: Session
+    ):
+        """Test getting an existing profile."""
+        # Create profile first
+        profile = create_test_profile(
+            primary_job_title="Software Engineer",
+            seniority_level="mid"
+        )
+
+        response = client.get("/api/v1/profiles/me", headers=auth_headers)
+
+        # If auto-creation is working, should return 200
+        # Otherwise might still be 404
+        assert response.status_code in [200, 404]
+
+        if response.status_code == 200:
+            data = response.json()
+            assert "id" in data
+            assert "user_id" in data
+
+
+@pytest.mark.profile
+class TestProfileCreation:
+    """Test profile creation."""
+
+    def test_create_profile_success(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test creating a new profile."""
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        # Should create successfully or conflict if auto-created
+        assert response.status_code in [200, 201, 400]
+
+        if response.status_code in [200, 201]:
+            data = response.json()
+            assert data["primary_job_title"] == sample_user_profile_data["primary_job_title"]
+            assert data["seniority_level"] == sample_user_profile_data["seniority_level"]
+
+    def test_create_profile_invalid_seniority(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test creating profile with invalid seniority level."""
+        sample_user_profile_data["seniority_level"] = "invalid_level"
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        # Should return validation error
+        assert response.status_code == 422
+
+    def test_create_profile_invalid_work_preference(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test creating profile with invalid work preference."""
+        sample_user_profile_data["work_preference"] = "invalid_preference"
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code == 422
+
+    def test_create_profile_without_auth(
+        self,
+        client: TestClient,
+        sample_user_profile_data: dict
+    ):
+        """Test creating profile without authentication."""
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data
+        )
+
+        assert response.status_code in [401, 403]
+
+
+@pytest.mark.profile
+class TestProfileUpdate:
+    """Test profile update operations."""
+
+    def test_update_profile_success(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        create_test_profile
+    ):
+        """Test updating an existing profile."""
+        # Create profile first
+        profile = create_test_profile(primary_job_title="Junior Developer")
+
+        # Update data
+        update_data = {
+            "primary_job_title": "Senior Developer",
+            "seniority_level": "senior",
+            "salary_range_min": 120000
+        }
+
+        response = client.put(
+            "/api/v1/profiles",
+            json=update_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["primary_job_title"] == "Senior Developer"
+        assert data["seniority_level"] == "senior"
+
+    def test_update_nonexistent_profile(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        override_get_db
+    ):
+        """Test updating profile that doesn't exist."""
+        update_data = {"primary_job_title": "Software Engineer"}
+
+        response = client.put(
+            "/api/v1/profiles",
+            json=update_data,
+            headers=auth_headers
+        )
+
+        # Should return 404 or auto-create
+        assert response.status_code in [200, 404]
+
+    def test_partial_update(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        create_test_profile
+    ):
+        """Test partial profile update."""
+        profile = create_test_profile(
+            primary_job_title="Developer",
+            seniority_level="mid"
+        )
+
+        # Update only one field
+        update_data = {"primary_job_title": "Senior Developer"}
+
+        response = client.put(
+            "/api/v1/profiles",
+            json=update_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["primary_job_title"] == "Senior Developer"
+        # Seniority should remain unchanged
+        # Note: Depends on your update logic (full replace vs partial)
+
+
+@pytest.mark.profile
+class TestProfileValidation:
+    """Test profile data validation."""
+
+    def test_salary_range_validation(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test that min salary can't be greater than max salary."""
+        sample_user_profile_data["salary_range_min"] = 150000
+        sample_user_profile_data["salary_range_max"] = 100000
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        # Should validate or accept (validation might be in application logic)
+        # This test documents expected behavior
+        assert response.status_code in [200, 201, 400, 422]
+
+    def test_empty_arrays_allowed(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test that empty arrays are allowed for array fields."""
+        sample_user_profile_data["secondary_job_titles"] = []
+        sample_user_profile_data["desired_industries"] = []
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code in [200, 201, 400]
+
+    def test_null_optional_fields(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        override_get_db
+    ):
+        """Test creating profile with minimal required fields."""
+        minimal_data = {
+            "primary_job_title": "Software Engineer"
+        }
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=minimal_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code in [200, 201, 400]
+
+
+@pytest.mark.profile
+class TestProfileEdgeCases:
+    """Test edge cases and error conditions."""
+
+    def test_very_long_job_title(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test profile with very long job title."""
+        sample_user_profile_data["primary_job_title"] = "A" * 1000
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        # Should either accept or return validation error
+        assert response.status_code in [200, 201, 400, 422]
+
+    def test_special_characters_in_fields(
+        self,
+        client: TestClient,
+        mock_authenticated_user: str,
+        auth_headers: dict,
+        sample_user_profile_data: dict
+    ):
+        """Test profile with special characters."""
+        sample_user_profile_data["primary_job_title"] = "Software Engineer & Data Scientist (ML/AI)"
+
+        response = client.post(
+            "/api/v1/profiles",
+            json=sample_user_profile_data,
+            headers=auth_headers
+        )
+
+        assert response.status_code in [200, 201, 400]

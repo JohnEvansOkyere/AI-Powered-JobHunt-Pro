@@ -43,37 +43,47 @@ This document provides an overview of all completed phases in the AI-Powered Job
 - Type-safe TypeScript interfaces
 - Complete profile data structure
 
-## Remaining Phases
+### ✅ Phase 4: CV Management
+**Status**: Complete  
+**Documentation**: [PHASE4_CV_MANAGEMENT.md](./PHASE4_CV_MANAGEMENT.md)
 
-### ⏳ Phase 4: CV Management
-**Status**: Pending
-
-**Planned Features**:
-- CV upload (PDF/DOCX)
-- CV parsing and extraction
-- CV preview and management
-- Structured data extraction
+**Key Achievements**:
+- CV upload functionality (PDF/DOCX)
 - Supabase Storage integration
+- CV parsing with AI extraction
+- CV preview and management UI
+- Structured data extraction
+- Full CRUD API endpoints
+- Download and delete functionality
 
-### ⏳ Phase 5: AI Model Router & Integration
-**Status**: Pending (Router exists, needs wiring)
+### ✅ Phase 5: AI Model Router & Integration
+**Status**: Complete  
+**Documentation**: [PHASE5_AI_ROUTER.md](./PHASE5_AI_ROUTER.md)
 
-**Planned Features**:
-- Wire up AI router to services
-- Cost tracking
-- Rate limiting
-- Task-specific model selection
-- Fallback handling
+**Key Achievements**:
+- Cost tracking and analytics
+- Rate limiting per user/provider
+- Usage statistics API
+- High-level AI service layer
+- Cost optimization strategies
+- Token counting with tiktoken
+- Enhanced error handling
+- Provider fallback logic
 
-### ⏳ Phase 6: Job Scraping System
-**Status**: Pending
+### ✅ Phase 6: Job Scraping System
+**Status**: Complete  
+**Documentation**: [PHASE6_JOB_SCRAPING.md](./PHASE6_JOB_SCRAPING.md)
 
-**Planned Features**:
-- Job board integrations
-- Scraping infrastructure
-- Job data normalization
-- Background job processing
-- Job storage and deduplication
+**Key Achievements**:
+- Multi-source job scraping (LinkedIn, Indeed, AI-assisted)
+- Job data normalization and enrichment
+- Background job processing with Celery
+- Job deduplication logic
+- Job search and filtering API
+- Scraping job status tracking
+- Frontend job search integration
+
+## Remaining Phases
 
 ### ⏳ Phase 7: AI Job Matching
 **Status**: Pending
@@ -118,9 +128,9 @@ This document provides an overview of all completed phases in the AI-Powered Job
 
 ## Progress Overview
 
-**Completed**: 3/10 phases (30%)  
+**Completed**: 6/10 phases (60%)  
 **In Progress**: 0 phases  
-**Pending**: 7 phases
+**Pending**: 4 phases
 
 ## Architecture Summary
 
@@ -151,23 +161,32 @@ This document provides an overview of all completed phases in the AI-Powered Job
 
 ✅ User authentication (email + OAuth)  
 ✅ User profiles (comprehensive)  
+✅ CV upload and management  
+✅ CV parsing with AI extraction  
+✅ Supabase Storage integration  
+✅ AI cost tracking and analytics  
+✅ Rate limiting  
+✅ Usage statistics API  
+✅ High-level AI service layer  
+✅ Cost optimization  
 ✅ Protected routes  
 ✅ API structure  
-✅ AI model router  
+✅ AI model router (enhanced)  
 ✅ Database schema  
 ✅ Background jobs setup  
 ✅ Type-safe frontend  
 ✅ Responsive UI  
+✅ Job scraping system  
+✅ Multi-source job collection  
+✅ Job search and filtering  
+✅ Job data normalization  
 
 ## Next Steps
 
-1. **Phase 4**: Implement CV upload and parsing
-2. **Phase 5**: Wire up AI router to services
-3. **Phase 6**: Build job scraping system
-4. **Phase 7**: Implement job matching
-5. **Phase 8**: Build application generation
-6. **Phase 9**: Complete dashboard UI
-7. **Phase 10**: Production hardening
+1. **Phase 7**: Implement AI job matching
+2. **Phase 8**: Build application generation
+3. **Phase 9**: Complete dashboard UI
+4. **Phase 10**: Production hardening
 
 ## Documentation Index
 
@@ -178,6 +197,9 @@ This document provides an overview of all completed phases in the AI-Powered Job
 - [Phase 1: Foundation](./PHASE1_FOUNDATION.md)
 - [Phase 2: Authentication](./PHASE2_AUTH.md)
 - [Phase 3: Profile System](./PHASE3_PROFILE.md)
+- [Phase 4: CV Management](./PHASE4_CV_MANAGEMENT.md)
+- [Phase 5: AI Router & Integration](./PHASE5_AI_ROUTER.md)
+- [Phase 6: Job Scraping System](./PHASE6_JOB_SCRAPING.md)
 
 ## Notes
 
