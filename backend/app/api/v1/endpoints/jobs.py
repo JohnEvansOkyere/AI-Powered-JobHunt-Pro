@@ -19,6 +19,7 @@ from app.models.scraping_job import ScrapingJob
 from app.models.job_match import JobMatch
 from app.services.job_scraper_service import JobScraperService
 from app.services.job_matching_service import JobMatchingService
+from app.services.job_matching_service_optimized import get_optimized_matching_service
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, field_serializer
 
@@ -26,6 +27,7 @@ router = APIRouter()
 logger = get_logger(__name__)
 scraper_service = JobScraperService()
 matching_service = JobMatchingService()
+optimized_matching_service = get_optimized_matching_service()
 
 
 # Pydantic models
@@ -185,13 +187,12 @@ async def search_jobs(
         if isinstance(user_id, str):
             import uuid
             user_id = uuid.UUID(user_id)
-        
-        # Get matched jobs
-        matches = await matching_service.match_jobs_for_user(
+
+        # Use OPTIMIZED matching service for faster results
+        matches = await optimized_matching_service.get_cached_matches(
             user_id=str(user_id),
             db=db,
-            limit=page_size * 2,  # Get more to filter
-            min_score=0.0
+            limit=page_size * 2  # Get more for pagination
         )
         
         # Extract job IDs from matches
