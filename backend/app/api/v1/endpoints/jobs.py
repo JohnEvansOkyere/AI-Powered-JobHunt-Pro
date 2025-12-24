@@ -20,6 +20,7 @@ from app.models.job_match import JobMatch
 from app.services.job_scraper_service import JobScraperService
 from app.services.job_matching_service import JobMatchingService
 from app.services.job_matching_service_optimized import get_optimized_matching_service
+from app.services.ai_job_matcher import get_ai_job_matcher
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, field_serializer
 
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 scraper_service = JobScraperService()
 matching_service = JobMatchingService()
 optimized_matching_service = get_optimized_matching_service()
+ai_matcher = get_ai_job_matcher()  # AI-powered semantic matching
 
 
 # Pydantic models
@@ -188,8 +190,8 @@ async def search_jobs(
             import uuid
             user_id = uuid.UUID(user_id)
 
-        # Use OPTIMIZED matching service for faster results
-        matches = await optimized_matching_service.get_cached_matches(
+        # Use AI-POWERED matching service (60%+ quality matches only)
+        matches = await ai_matcher.get_cached_matches(
             user_id=str(user_id),
             db=db,
             limit=page_size * 2  # Get more for pagination

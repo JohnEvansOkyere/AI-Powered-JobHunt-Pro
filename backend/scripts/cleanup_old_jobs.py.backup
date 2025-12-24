@@ -1,0 +1,177 @@
+"""
+Job Cleanup Script
+
+Keeps database lean by archiving/deleting old jobs:
+1. Archive jobs older than 7 days that have no matches
+2. Delete archived jobs older than 30 days
+3. Keep jobs that have active matches (user interest)
+
+Run daily via cron.
+"""
+
+import sys
+from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, func
+
+sys.path.insert(0, '/home/grejoy/Projects/AI-Powered-JobHunt-Pro/backend')
+
+from app.core.database import get_db
+from app.models.job import Job
+from app.models.job_match import JobMatch
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+def archive_unmatched_jobs(db: Session, days_old: int = 7):
+    """
+    Archive jobs that are old and have never been matched to any user.
+
+    Args:
+        days_old: Number of days after which to archive (default: 7)
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+
+    # Find jobs older than cutoff that have no matches and aren't archived
+    jobs_to_archive = db.query(Job).filter(
+        and_(
+            Job.created_at < cutoff_date,
+            Job.processing_status != "archived",
+            ~Job.id.in_(
+                db.query(JobMatch.job_id).distinct()
+            )
+        )
+    ).all()
+
+    if jobs_to_archive:
+        for job in jobs_to_archive:
+            job.processing_status = "archived"
+            logger.info(f"Archived old job: {job.title} at {job.company} (posted {job.created_at})")
+
+        db.commit()
+        logger.info(f"✅ Archived {len(jobs_to_archive)} jobs older than {days_old} days with no matches")
+    else:
+        logger.info(f"No jobs to archive (checked jobs older than {days_old} days)")
+
+    return len(jobs_to_archive)
+
+
+def delete_old_archived_jobs(db: Session, days_old: int = 30):
+    """
+    Permanently delete archived jobs older than specified days.
+
+    Args:
+        days_old: Number of days after which to delete archived jobs (default: 30)
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+
+    # Find archived jobs older than cutoff
+    jobs_to_delete = db.query(Job).filter(
+        and_(
+            Job.created_at < cutoff_date,
+            Job.processing_status == "archived"
+        )
+    ).all()
+
+    if jobs_to_delete:
+        job_ids = [job.id for job in jobs_to_delete]
+
+        # Delete associated matches first (foreign key constraint)
+        deleted_matches = db.query(JobMatch).filter(JobMatch.job_id.in_(job_ids)).delete(synchronize_session=False)
+
+        # Delete jobs
+        for job in jobs_to_delete:
+            logger.info(f"Deleting archived job: {job.title} at {job.company} (archived since {job.updated_at})")
+            db.delete(job)
+
+        db.commit()
+        logger.info(f"✅ Deleted {len(jobs_to_delete)} archived jobs older than {days_old} days")
+        logger.info(f"   Also deleted {deleted_matches} associated job matches")
+    else:
+        logger.info(f"No archived jobs to delete (checked jobs older than {days_old} days)")
+
+    return len(jobs_to_delete)
+
+
+def keep_recent_matches(db: Session, days_to_keep: int = 90):
+    """
+    Delete very old job matches to keep job_matches table lean.
+    Keep only matches from last X days.
+
+    Args:
+        days_to_keep: Number of days of matches to keep (default: 90)
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+
+    old_matches = db.query(JobMatch).filter(
+        JobMatch.created_at < cutoff_date
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    if old_matches > 0:
+        logger.info(f"✅ Deleted {old_matches} job matches older than {days_to_keep} days")
+    else:
+        logger.info(f"No old matches to delete (checked matches older than {days_to_keep} days)")
+
+    return old_matches
+
+
+def print_db_stats(db: Session):
+    """Print database statistics."""
+    total_jobs = db.query(Job).count()
+    active_jobs = db.query(Job).filter(Job.processing_status != "archived").count()
+    archived_jobs = db.query(Job).filter(Job.processing_status == "archived").count()
+    total_matches = db.query(JobMatch).count()
+
+    print(f"\n{'='*60}")
+    print(f"📊 Database Statistics:")
+    print(f"{'='*60}")
+    print(f"  Total jobs: {total_jobs}")
+    print(f"  Active jobs: {active_jobs}")
+    print(f"  Archived jobs: {archived_jobs}")
+    print(f"  Total job matches: {total_matches}")
+    print(f"{'='*60}\n")
+
+
+def main():
+    """Run cleanup tasks."""
+    print("🧹 Starting job cleanup...\n")
+
+    db = next(get_db())
+
+    try:
+        # Print before stats
+        print_db_stats(db)
+
+        # 1. Archive unmatched jobs older than 7 days
+        print("Step 1: Archiving old unmatched jobs...")
+        archived = archive_unmatched_jobs(db, days_old=7)
+
+        # 2. Delete archived jobs older than 30 days
+        print("\nStep 2: Deleting very old archived jobs...")
+        deleted = delete_old_archived_jobs(db, days_old=30)
+
+        # 3. Delete old job matches (optional - keeps DB lean)
+        print("\nStep 3: Cleaning up old job matches...")
+        deleted_matches = keep_recent_matches(db, days_to_keep=90)
+
+        # Print after stats
+        print_db_stats(db)
+
+        print("✅ Cleanup completed successfully!")
+        print(f"   - Archived: {archived} jobs")
+        print(f"   - Deleted: {deleted} jobs")
+        print(f"   - Cleaned matches: {deleted_matches}")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    main()
