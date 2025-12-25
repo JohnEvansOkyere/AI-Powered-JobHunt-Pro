@@ -95,9 +95,15 @@ class AIJobMatcher:
         """
         parts = []
 
-        # Job titles they want
+        # Job titles they want (include both primary and secondary)
+        target_roles = []
         if profile.primary_job_title:
-            parts.append(f"Target roles: {profile.primary_job_title}")
+            target_roles.append(profile.primary_job_title)
+        if profile.secondary_job_titles:
+            target_roles.extend(profile.secondary_job_titles)
+
+        if target_roles:
+            parts.append(f"Target roles: {', '.join(target_roles)}")
 
         # Seniority level
         if profile.seniority_level:
@@ -362,17 +368,21 @@ class AIJobMatcher:
         elif score >= 50:
             reasons.append("Good match - worth applying")
 
-        # Check for title alignment
+        # Check for title alignment (check both primary and secondary titles)
+        user_titles = []
         if profile.primary_job_title:
-            user_titles = [t.strip().lower() for t in profile.primary_job_title.split('|')]
-            job_title_lower = job.title.lower()
+            user_titles.append(profile.primary_job_title.lower())
+        if profile.secondary_job_titles:
+            user_titles.extend([t.lower() for t in profile.secondary_job_titles])
 
-            for user_title in user_titles:
-                # Extract key words
-                key_words = [w for w in user_title.split() if len(w) > 3]
-                if any(word in job_title_lower for word in key_words):
-                    reasons.append("Title aligns with your target roles")
-                    break
+        job_title_lower = job.title.lower()
+
+        for user_title in user_titles:
+            # Extract key words (ignore common words)
+            key_words = [w for w in user_title.split() if len(w) > 3]
+            if any(word in job_title_lower for word in key_words):
+                reasons.append("Title aligns with your target roles")
+                break
 
         # Check remote preference
         if profile.work_preference == "remote" and job.remote_type == "remote":

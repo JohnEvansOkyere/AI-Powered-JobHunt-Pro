@@ -31,8 +31,8 @@ export class ApiClient {
     const url = `${this.baseUrl}${endpoint}`
     const token = await this.getAuthToken()
     
-    const headers: HeadersInit = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
     }
 
     // Only set Content-Type for JSON, not for FormData

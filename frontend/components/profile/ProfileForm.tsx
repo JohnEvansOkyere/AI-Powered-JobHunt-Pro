@@ -10,17 +10,38 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import type { UserProfileFormData } from '@/types/profile'
 import { SKILL_CATEGORIES, searchSkills } from '@/lib/skills'
+import { calculateProfileCompletion } from '@/lib/profile-utils'
 
 interface ProfileFormProps {
   onComplete?: () => void
 }
 
 export function ProfileForm({ onComplete }: ProfileFormProps) {
-  const { saveProfile, saving } = useProfile()
+  const { profile, saveProfile, saving } = useProfile()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<UserProfileFormData>({})
 
-  const totalSteps = 6
+  const totalSteps = 5
+
+  // Load existing profile data when available
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        primary_job_title: profile.primary_job_title,
+        secondary_job_titles: profile.secondary_job_titles,
+        seniority_level: profile.seniority_level,
+        work_preference: profile.work_preference,
+        technical_skills: profile.technical_skills,
+        soft_skills: profile.soft_skills,
+        tools_technologies: profile.tools_technologies,
+        experience: profile.experience,
+        preferred_keywords: profile.preferred_keywords,
+        writing_tone: profile.writing_tone,
+        ai_preferences: profile.ai_preferences,
+        desired_industries: profile.desired_industries,
+      })
+    }
+  }, [profile])
 
   const updateFormData = (data: Partial<UserProfileFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }))
@@ -47,6 +68,9 @@ export function ProfileForm({ onComplete }: ProfileFormProps) {
     }
   }
 
+  // Calculate actual completion percentage based on filled data
+  const completionPercentage = calculateProfileCompletion(formData)
+
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
       {/* Progress Bar */}
@@ -55,16 +79,21 @@ export function ProfileForm({ onComplete }: ProfileFormProps) {
           <span className="text-sm font-medium text-neutral-700">
             Step {currentStep} of {totalSteps}
           </span>
-          <span className="text-sm text-neutral-500">
-            {Math.round((currentStep / totalSteps) * 100)}% Complete
+          <span className="text-sm font-medium text-primary-600">
+            {completionPercentage}% Complete
           </span>
         </div>
         <div className="w-full bg-neutral-200 rounded-full h-2">
           <div
             className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+            style={{ width: `${completionPercentage}%` }}
           />
         </div>
+        {completionPercentage < 100 && (
+          <p className="text-xs text-neutral-500 mt-2">
+            Fill in more details to increase your match quality
+          </p>
+        )}
       </div>
 
       {/* Step Content */}
@@ -88,18 +117,12 @@ export function ProfileForm({ onComplete }: ProfileFormProps) {
           />
         )}
         {currentStep === 4 && (
-          <JobPreferencesStep
-            data={formData}
-            onChange={updateFormData}
-          />
-        )}
-        {currentStep === 5 && (
           <ApplicationStyleStep
             data={formData}
             onChange={updateFormData}
           />
         )}
-        {currentStep === 6 && (
+        {currentStep === 5 && (
           <AIPreferencesStep
             data={formData}
             onChange={updateFormData}
@@ -149,22 +172,122 @@ function CareerTargetingStep({
   data: UserProfileFormData
   onChange: (data: Partial<UserProfileFormData>) => void
 }) {
+  const [jobTitleInput, setJobTitleInput] = useState('')
+  const [allJobTitles, setAllJobTitles] = useState<string[]>([])
+
+  // Initialize job titles from data
+  useEffect(() => {
+    const titles: string[] = []
+    if (data.primary_job_title) {
+      titles.push(data.primary_job_title)
+    }
+    if (data.secondary_job_titles && data.secondary_job_titles.length > 0) {
+      titles.push(...data.secondary_job_titles)
+    }
+    setAllJobTitles(titles)
+  }, [data.primary_job_title, data.secondary_job_titles])
+
+  const handleAddJobTitle = () => {
+    const trimmedTitle = jobTitleInput.trim()
+    if (!trimmedTitle) return
+
+    // Split by comma if user entered multiple at once
+    const newTitles = trimmedTitle
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .filter((t) => !allJobTitles.includes(t))
+
+    if (newTitles.length === 0) {
+      setJobTitleInput('')
+      return
+    }
+
+    const updatedTitles = [...allJobTitles, ...newTitles]
+    setAllJobTitles(updatedTitles)
+
+    // First title is primary, rest are secondary
+    onChange({
+      primary_job_title: updatedTitles[0],
+      secondary_job_titles: updatedTitles.slice(1),
+    })
+
+    setJobTitleInput('')
+  }
+
+  const handleRemoveJobTitle = (titleToRemove: string) => {
+    const updatedTitles = allJobTitles.filter((t) => t !== titleToRemove)
+    setAllJobTitles(updatedTitles)
+
+    // First title is primary, rest are secondary
+    onChange({
+      primary_job_title: updatedTitles[0] || '',
+      secondary_job_titles: updatedTitles.slice(1),
+    })
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddJobTitle()
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-neutral-800">Career Targeting</h2>
       <p className="text-neutral-600">Tell us about your career goals and preferences.</p>
-      
+
       <div>
         <label className="block text-sm font-medium text-neutral-700 mb-2">
-          Primary Job Title
+          Job Titles (Target Roles)
         </label>
-        <input
-          type="text"
-          value={data.primary_job_title || ''}
-          onChange={(e) => onChange({ primary_job_title: e.target.value })}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-          placeholder="e.g., Software Engineer"
-        />
+
+        {/* Display existing job titles */}
+        {allJobTitles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {allJobTitles.map((title, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-3 py-1.5 bg-primary-100 text-primary-700 rounded-full text-sm font-medium"
+              >
+                {title}
+                {index === 0 && (
+                  <span className="ml-1 text-xs text-primary-600">(Primary)</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveJobTitle(title)}
+                  className="ml-2 text-primary-600 hover:text-primary-800 focus:outline-none"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Input for adding new job titles */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={jobTitleInput}
+            onChange={(e) => setJobTitleInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            placeholder="e.g., Data Scientist, ML Engineer, AI Engineer"
+          />
+          <button
+            type="button"
+            onClick={handleAddJobTitle}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Add
+          </button>
+        </div>
+        <p className="text-xs text-neutral-500 mt-2">
+          Add multiple job titles separated by commas, or add them one at a time. The first title will be your primary role.
+        </p>
       </div>
 
       <div>
@@ -173,7 +296,7 @@ function CareerTargetingStep({
         </label>
         <select
           value={data.seniority_level || ''}
-          onChange={(e) => onChange({ seniority_level: e.target.value })}
+          onChange={(e) => onChange({ seniority_level: e.target.value as 'entry' | 'mid' | 'senior' | 'lead' | 'executive' })}
           className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="">Select level</option>
@@ -191,7 +314,7 @@ function CareerTargetingStep({
         </label>
         <select
           value={data.work_preference || ''}
-          onChange={(e) => onChange({ work_preference: e.target.value })}
+          onChange={(e) => onChange({ work_preference: e.target.value as 'remote' | 'hybrid' | 'onsite' | 'flexible' })}
           className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="">Select preference</option>
@@ -283,27 +406,21 @@ function SkillsStep({
     setCategorySkills(updated)
     
     // Update technical_skills in form data
-    const allTechnicalSkills = Object.values(updated)
-      .flat()
-      .map((skillName) => ({
-        skill: skillName,
-        years: undefined,
-        confidence: undefined,
-      }))
-    
-    // Merge with existing skills that might have years/confidence
     const existingSkillsMap = new Map(
       (data.technical_skills || []).map((s) => [s.skill, s])
     )
-    
-    allTechnicalSkills.forEach((newSkill) => {
-      if (existingSkillsMap.has(newSkill.skill)) {
-        const existing = existingSkillsMap.get(newSkill.skill)!
-        newSkill.years = existing.years
-        newSkill.confidence = existing.confidence
-      }
-    })
-    
+
+    const allTechnicalSkills = Object.values(updated)
+      .flat()
+      .map((skillName) => {
+        const existing = existingSkillsMap.get(skillName)
+        return {
+          skill: skillName,
+          years: existing?.years,
+          confidence: existing?.confidence,
+        }
+      })
+
     onChange({ technical_skills: allTechnicalSkills })
     setSkillSearchQuery('')
   }
@@ -317,26 +434,21 @@ function SkillsStep({
     setCategorySkills(updated)
     
     // Update technical_skills
-    const allTechnicalSkills = Object.values(updated)
-      .flat()
-      .map((skillName) => ({
-        skill: skillName,
-        years: undefined,
-        confidence: undefined,
-      }))
-    
     const existingSkillsMap = new Map(
       (data.technical_skills || []).map((s) => [s.skill, s])
     )
-    
-    allTechnicalSkills.forEach((newSkill) => {
-      if (existingSkillsMap.has(newSkill.skill)) {
-        const existing = existingSkillsMap.get(newSkill.skill)!
-        newSkill.years = existing.years
-        newSkill.confidence = existing.confidence
-      }
-    })
-    
+
+    const allTechnicalSkills = Object.values(updated)
+      .flat()
+      .map((skillName) => {
+        const existing = existingSkillsMap.get(skillName)
+        return {
+          skill: skillName,
+          years: existing?.years,
+          confidence: existing?.confidence,
+        }
+      })
+
     onChange({ technical_skills: allTechnicalSkills })
   }
 
@@ -358,22 +470,36 @@ function SkillsStep({
     setCategorySkills(updated)
     
     // Update technical_skills
+    const existingSkillsMap = new Map(
+      (data.technical_skills || []).map((s) => [s.skill, s])
+    )
+
     const allTechnicalSkills = Object.values(updated)
       .flat()
-      .map((skillName) => ({
-        skill: skillName,
-        years: undefined,
-        confidence: undefined,
-      }))
-    
+      .map((skillName) => {
+        const existing = existingSkillsMap.get(skillName)
+        return {
+          skill: skillName,
+          years: existing?.years,
+          confidence: existing?.confidence,
+        }
+      })
+
     onChange({ technical_skills: allTechnicalSkills })
   }
 
   const handleSoftSkillsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setSoftSkillsInput(value)
+
+    // Split by comma, trim each skill, and filter out empty/whitespace-only entries
+    const skills = value
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+
     onChange({
-      soft_skills: value.split(',').map((s) => s.trim()).filter(Boolean),
+      soft_skills: skills,
     })
   }
 
@@ -791,53 +917,6 @@ function ExperienceStep({
   )
 }
 
-function JobPreferencesStep({
-  data,
-  onChange,
-}: {
-  data: UserProfileFormData
-  onChange: (data: Partial<UserProfileFormData>) => void
-}) {
-  // Use local state to preserve input while typing
-  const [keywordsInput, setKeywordsInput] = useState(
-    data.preferred_keywords?.join(', ') || ''
-  )
-
-  // Update local state when data changes externally
-  useEffect(() => {
-    setKeywordsInput(data.preferred_keywords?.join(', ') || '')
-  }, [data.preferred_keywords])
-
-  const handleKeywordsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setKeywordsInput(value)
-    // Update form data with parsed keywords
-    onChange({
-      preferred_keywords: value.split(',').map((s) => s.trim()).filter(Boolean),
-    })
-  }
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-neutral-800">Job Preferences</h2>
-      <p className="text-neutral-600">Customize how we match jobs for you.</p>
-      
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-2">
-          Preferred Keywords (comma-separated)
-        </label>
-        <input
-          type="text"
-          value={keywordsInput}
-          onChange={handleKeywordsChange}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-          placeholder="e.g., Python, React, AWS"
-        />
-      </div>
-    </div>
-  )
-}
-
 function ApplicationStyleStep({
   data,
   onChange,
@@ -856,7 +935,7 @@ function ApplicationStyleStep({
         </label>
         <select
           value={data.writing_tone || 'professional'}
-          onChange={(e) => onChange({ writing_tone: e.target.value })}
+          onChange={(e) => onChange({ writing_tone: e.target.value as 'formal' | 'friendly' | 'confident' | 'professional' })}
           className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="formal">Formal</option>
@@ -891,7 +970,7 @@ function AIPreferencesStep({
             onChange({
               ai_preferences: {
                 ...data.ai_preferences,
-                speed_vs_quality: e.target.value,
+                speed_vs_quality: e.target.value as 'speed' | 'quality' | 'balanced',
               },
             })
           }

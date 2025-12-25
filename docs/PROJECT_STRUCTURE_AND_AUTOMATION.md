@@ -44,6 +44,8 @@ AI-Powered-JobHunt-Pro/
     ├── TESTING_QUICKSTART.md                # Testing guide
     ├── FRONTEND_BACKEND_DIAGNOSTICS.md      # Connection diagnostics
     ├── TESTING_SETUP_SUMMARY.md             # Testing setup
+    ├── MULTI_TITLE_FEATURE.md               # Multi-title job search feature
+    ├── PROFILE_SIMPLIFICATION.md            # Profile wizard simplification (6→5 steps)
     └── PROJECT_STRUCTURE_AND_AUTOMATION.md  # This file
 ```
 

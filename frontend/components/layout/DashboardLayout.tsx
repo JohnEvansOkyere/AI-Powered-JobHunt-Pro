@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
+import { calculateProfileCompletion } from '@/lib/profile-utils'
 import {
   Briefcase,
   User,
@@ -26,7 +27,7 @@ const navigation = [
   { name: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { name: 'Applications', href: '/dashboard/applications', icon: FileText },
   { name: 'CV Management', href: '/dashboard/cv', icon: FileText },
-  { name: 'Profile', href: '/profile/setup', icon: User },
+  { name: 'Profile', href: '/dashboard/profile', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
@@ -35,6 +36,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
   const { profile } = useProfile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const completionPercentage = calculateProfileCompletion(profile)
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -81,24 +84,40 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </p>
               </div>
             </div>
-            {profile?.seniority_level && (
-              <div className="mt-3 pt-3 border-t border-neutral-100">
+            <div className="mt-3 pt-3 border-t border-neutral-100">
+              {/* Profile Completion */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-neutral-500">Profile Completion</span>
+                  <span className="font-medium text-primary-600">
+                    {completionPercentage}%
+                  </span>
+                </div>
+                <div className="w-full bg-neutral-200 rounded-full h-1.5">
+                  <div
+                    className="bg-primary-600 h-1.5 rounded-full transition-all"
+                    style={{ width: `${completionPercentage}%` }}
+                  />
+                </div>
+              </div>
+
+              {profile?.seniority_level && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-500">Level</span>
                   <span className="font-medium text-neutral-700 capitalize">
                     {profile.seniority_level}
                   </span>
                 </div>
-                {profile.work_preference && (
-                  <div className="flex items-center justify-between text-xs mt-2">
-                    <span className="text-neutral-500">Work Type</span>
-                    <span className="font-medium text-neutral-700 capitalize">
-                      {profile.work_preference}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              {profile?.work_preference && (
+                <div className="flex items-center justify-between text-xs mt-2">
+                  <span className="text-neutral-500">Work Type</span>
+                  <span className="font-medium text-neutral-700 capitalize">
+                    {profile.work_preference}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Navigation */}
