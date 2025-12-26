@@ -12,7 +12,11 @@ celery_app = Celery(
     "ai_job_platform",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.job_scraping", "app.tasks.ai_processing"],
+    include=[
+        "app.tasks.job_scraping",
+        "app.tasks.ai_processing",
+        "app.tasks.periodic_tasks",  # Scheduled tasks
+    ],
 )
 
 # Celery configuration

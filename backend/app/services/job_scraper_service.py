@@ -35,24 +35,35 @@ class JobScraperService:
             "linkedin": LinkedInScraper(),
             "indeed": IndeedScraper(),
             "ai": AIScraper(),
-            "remotive": None,  # Lazy init below
-            "serpapi": None,   # Lazy init below
+            "remotive": None,   # Lazy init below (FREE)
+            "remoteok": None,   # Lazy init below (FREE)
+            "serpapi": None,    # Lazy init below (PAID - optional)
         }
-        # Lazy-load Remotive to avoid import issues if requests missing
+
+        # Lazy-load Remotive (FREE - no API key needed)
         try:
             from app.scrapers.remotive_scraper import RemotiveScraper
             self.scrapers["remotive"] = RemotiveScraper()
+            logger.info("Remotive scraper initialized (FREE)")
         except Exception as e:
             logger.warning(f"Remotive scraper unavailable: {e}")
 
-        # SerpAPI scraper (Google Jobs)
+        # Lazy-load RemoteOK (FREE - no API key needed)
+        try:
+            from app.scrapers.remoteok_scraper import RemoteOKScraper
+            self.scrapers["remoteok"] = RemoteOKScraper()
+            logger.info("RemoteOK scraper initialized (FREE)")
+        except Exception as e:
+            logger.warning(f"RemoteOK scraper unavailable: {e}")
+
+        # SerpAPI scraper (PAID - optional, only if API key is set)
         try:
             serpapi_key = settings.SERPAPI_API_KEY
-            if serpapi_key:
+            if serpapi_key and serpapi_key.strip():
                 self.scrapers["serpapi"] = SerpAPIScraper(api_key=serpapi_key)
-                logger.info("SerpAPI scraper initialized.")
+                logger.info("SerpAPI scraper initialized (PAID)")
             else:
-                logger.warning("SERPAPI_API_KEY not set; SerpAPI scraper disabled.")
+                logger.info("SERPAPI_API_KEY not set; using free scrapers only")
         except Exception as e:
             logger.warning(f"SerpAPI scraper unavailable: {e}")
     

@@ -40,6 +40,10 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         Returns:
             Response with proper error handling
         """
+        # Skip error handling for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Generate unique request ID for tracing
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id

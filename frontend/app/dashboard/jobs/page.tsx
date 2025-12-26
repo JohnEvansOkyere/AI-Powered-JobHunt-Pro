@@ -1,15 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { JobFilters, FilterState } from '@/components/jobs/JobFilters'
 import { JobCard } from '@/components/jobs/JobCard'
 import { searchJobs, Job, JobSearchParams } from '@/lib/api/jobs'
-import { Search, Sparkles, Loader } from 'lucide-react'
+import { Search, Sparkles, Loader, Briefcase } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
+type TabType = 'recommendations' | 'all-jobs'
+
 export default function JobsPage() {
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<TabType>('recommendations')
   const [jobs, setJobs] = useState<Job[]>([])
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -26,52 +31,65 @@ export default function JobsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
 
-  // Load jobs from API
+  // Load jobs from API when tab, page, or filters change
   useEffect(() => {
     loadJobs()
-  }, [page, searchQuery, filters])
+  }, [activeTab, page, searchQuery, filters])
+
+  // Reset to page 1 when changing tabs
+  useEffect(() => {
+    setPage(1)
+  }, [activeTab])
 
   const loadJobs = async () => {
     try {
       setLoading(true)
-      
+
       const params: JobSearchParams = {
         page,
         page_size: 20,
-        matched: true, // Get matched jobs with scores
       }
-      
-      // Add search query
-      if (searchQuery) {
-        params.q = searchQuery
-      }
-      
-      // Add filters
-      if (filters.location) {
-        params.location = filters.location
-      }
-      
-      if (filters.workType.length > 0) {
-        // Map workType to remote_type
-        const remoteType = filters.workType[0].toLowerCase()
-        if (['remote', 'hybrid', 'onsite'].includes(remoteType)) {
-          params.remote_type = remoteType
+
+      if (activeTab === 'recommendations') {
+        // Recommendations tab: Use CV matching with OpenAI embeddings
+        params.matched = true
+        // Don't apply any filters in recommendations mode
+      } else {
+        // All Jobs tab: Use filters for direct search
+        // Add search query (job title from filter or search box)
+        if (filters.jobTitle) {
+          params.q = filters.jobTitle
+        } else if (searchQuery) {
+          params.q = searchQuery
+        }
+
+        // Add filters
+        if (filters.location) {
+          params.location = filters.location
+        }
+
+        if (filters.workType.length > 0) {
+          // Map workType to remote_type
+          const remoteType = filters.workType[0].toLowerCase()
+          if (['remote', 'hybrid', 'onsite'].includes(remoteType)) {
+            params.remote_type = remoteType
+          }
+        }
+
+        if (filters.datePosted !== 'Any') {
+          // Map datePosted to min_posted_days
+          const daysMap: Record<string, number> = {
+            'Last 24 hours': 1,
+            'Last week': 7,
+            'Last month': 30,
+            'Last 3 months': 90,
+          }
+          if (daysMap[filters.datePosted]) {
+            params.min_posted_days = daysMap[filters.datePosted]
+          }
         }
       }
-      
-      if (filters.datePosted !== 'Any') {
-        // Map datePosted to min_posted_days
-        const daysMap: Record<string, number> = {
-          'Last 24 hours': 1,
-          'Last week': 7,
-          'Last month': 30,
-          'Last 3 months': 90,
-        }
-        if (daysMap[filters.datePosted]) {
-          params.min_posted_days = daysMap[filters.datePosted]
-        }
-      }
-      
+
       const response = await searchJobs(params)
       setJobs(response.jobs)
       setFilteredJobs(response.jobs)
@@ -91,8 +109,8 @@ export default function JobsPage() {
   }
 
   const handleApply = (jobId: string) => {
-    // TODO: Navigate to application generation page
-    console.log('Generate application for job:', jobId)
+    // Navigate to application generation page
+    router.push(`/dashboard/applications/generate/${jobId}`)
   }
   
   const handleSearch = (e: React.FormEvent) => {
@@ -108,40 +126,99 @@ export default function JobsPage() {
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center space-x-2 mb-2">
-              <Sparkles className="h-6 w-6 text-primary-600" />
+              <Briefcase className="h-6 w-6 text-primary-600" />
               <h1 className="text-3xl font-bold text-neutral-800">
-                Job Recommendations
+                Jobs
               </h1>
             </div>
             <p className="text-neutral-600">
-              AI-powered job matches based on your profile
+              Find jobs that match your profile or browse all available positions
             </p>
           </div>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search jobs by title, company, or keywords..."
-                className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+          {/* Tabs */}
+          <div className="mb-6">
+            <div className="border-b border-neutral-200">
+              <nav className="flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('recommendations')}
+                  className={`
+                    py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                    ${activeTab === 'recommendations'
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                    }
+                  `}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Recommended for You</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('all-jobs')}
+                  className={`
+                    py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                    ${activeTab === 'all-jobs'
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                    }
+                  `}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4" />
+                    <span>All Jobs</span>
+                  </div>
+                </button>
+              </nav>
             </div>
-          </form>
+          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Filters Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-24">
-                <JobFilters onFilterChange={handleFilterChange} />
+          {/* Search Bar - Only show in "All Jobs" tab */}
+          {activeTab === 'all-jobs' && (
+            <form onSubmit={handleSearch} className="mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search jobs by title, company, or keywords..."
+                  className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </form>
+          )}
+
+          {/* Info banner for Recommendations tab */}
+          {activeTab === 'recommendations' && (
+            <div className="mb-6 bg-primary-50 border border-primary-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <Sparkles className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium text-primary-900 mb-1">
+                    AI-Powered Job Matching
+                  </h3>
+                  <p className="text-sm text-primary-700">
+                    These jobs are personalized recommendations based on your profile, skills, experience, and preferences using OpenAI embeddings.
+                  </p>
+                </div>
               </div>
             </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Filters Sidebar - Only show in "All Jobs" tab */}
+            {activeTab === 'all-jobs' && (
+              <div className="lg:col-span-1">
+                <div className="sticky top-24">
+                  <JobFilters onFilterChange={handleFilterChange} />
+                </div>
+              </div>
+            )}
 
             {/* Jobs List */}
-            <div className="lg:col-span-3">
+            <div className={activeTab === 'all-jobs' ? 'lg:col-span-3' : 'lg:col-span-4'}>
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-neutral-600">
                   {total} job{total !== 1 ? 's' : ''} found
@@ -176,7 +253,8 @@ export default function JobsPage() {
                           salary: job.salary_range || 'Not specified',
                           postedDate: job.posted_date || job.scraped_at,
                           description: job.description,
-                          matchScore: job.match_score || 0,
+                          // Show match score only in recommendations tab
+                          matchScore: activeTab === 'recommendations' ? job.match_score : undefined,
                           url: job.job_link,
                         }}
                         onApply={handleApply}

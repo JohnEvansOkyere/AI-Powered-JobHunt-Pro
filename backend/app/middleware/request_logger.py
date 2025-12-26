@@ -43,6 +43,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from the handler
         """
+        # Skip logging for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip logging for excluded paths
         if request.url.path in self.EXCLUDE_PATHS:
             return await call_next(request)

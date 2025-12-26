@@ -5,7 +5,7 @@ Centralized configuration management using Pydantic Settings.
 All environment variables are loaded here with validation and defaults.
 """
 
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        env_parse_none_str="null",
     )
 
     # Environment
@@ -75,11 +76,11 @@ class Settings(BaseSettings):
     )
 
     # CORS
-    CORS_ORIGINS: List[str] = Field(
+    CORS_ORIGINS: Union[str, List[str]] = Field(
         default=["http://localhost:3000"],
         description="Allowed CORS origins",
     )
-    ALLOWED_HOSTS: List[str] = Field(
+    ALLOWED_HOSTS: Union[str, List[str]] = Field(
         default=["*"], description="Allowed hosts for TrustedHost middleware"
     )
 
@@ -105,19 +106,23 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v):
+    def parse_cors_origins(cls, v) -> List[str]:
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return v
+        return ["http://localhost:3000"]
 
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
-    def parse_allowed_hosts(cls, v):
+    def parse_allowed_hosts(cls, v) -> List[str]:
         """Parse allowed hosts from string or list."""
         if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
-        return v
+            return [host.strip() for host in v.split(",") if host.strip()]
+        if isinstance(v, list):
+            return v
+        return ["*"]
 
     @property
     def is_production(self) -> bool:

@@ -368,8 +368,17 @@ function SkillsStep({
     setCategorySkills(skillsByCategory)
   }, [data.technical_skills])
 
+  // Initialize soft skills input only when input is empty (first load or cleared)
+  // This prevents overwriting user input while they're typing
   useEffect(() => {
-    setSoftSkillsInput(data.soft_skills?.join(', ') || '')
+    // Only initialize if input is empty and data is available
+    // This handles both initial load and async profile loading
+    if (!softSkillsInput && data.soft_skills && data.soft_skills.length > 0) {
+      const initialValue = data.soft_skills.join(', ')
+      setSoftSkillsInput(initialValue)
+    }
+    // Note: We don't use isInitializedRef here because we want to allow
+    // re-initialization if the user clears the field
   }, [data.soft_skills])
 
   // Close dropdown when clicking outside

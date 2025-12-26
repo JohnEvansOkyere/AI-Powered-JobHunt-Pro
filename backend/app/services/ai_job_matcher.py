@@ -30,12 +30,12 @@ class AIJobMatcher:
     1. Creates semantic embeddings of user's profile (skills, experience, goals)
     2. Creates semantic embeddings of each job (title, description)
     3. Calculates cosine similarity (0-100%) between user and job
-    4. Only shows jobs with 50%+ similarity (good quality matches worth applying to)
+    4. Shows jobs with 20%+ similarity (reasonable matches worth considering)
     """
 
     CACHE_EXPIRY_HOURS = 1
-    MAX_JOBS_PER_REQUEST = 20
-    MIN_SCORE = 50.0  # Only show good-quality matches (50%+ = worth applying)
+    MAX_JOBS_PER_REQUEST = 200  # Check more jobs for better matches
+    MIN_SCORE = 20.0  # Show matches with 20%+ similarity (reasonable threshold)
 
     def __init__(self):
         """Initialize OpenAI client."""

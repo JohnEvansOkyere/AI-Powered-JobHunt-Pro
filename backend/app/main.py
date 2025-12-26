@@ -57,13 +57,7 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Error Handler Middleware (First - catches all exceptions)
-    app.add_middleware(ErrorHandlerMiddleware)
-
-    # Request Logging Middleware (Second - logs all requests)
-    app.add_middleware(RequestLoggingMiddleware)
-
-    # CORS Middleware
+    # CORS Middleware (First - must be before other middleware to handle OPTIONS)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -71,6 +65,12 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Error Handler Middleware (Second - catches all exceptions)
+    app.add_middleware(ErrorHandlerMiddleware)
+
+    # Request Logging Middleware (Third - logs all requests)
+    app.add_middleware(RequestLoggingMiddleware)
 
     # Trusted Host Middleware (production)
     if not settings.DEBUG:
