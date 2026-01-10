@@ -196,6 +196,56 @@ class AIJobMatcher:
         job_text = ". ".join(parts)
         return job_text
 
+    def _calculate_title_boost(self, job_title: str, profile: UserProfile) -> float:
+        """
+        Calculate boost score for jobs that match user's target job titles.
+
+        Returns:
+            float: Boost percentage (0-40)
+        """
+        job_title_lower = job_title.lower()
+
+        # Get user's target job titles
+        target_titles = []
+        if profile.primary_job_title:
+            target_titles.append(profile.primary_job_title.lower())
+        if profile.secondary_job_titles:
+            target_titles.extend([t.lower() for t in profile.secondary_job_titles])
+
+        if not target_titles:
+            return 0.0
+
+        # Check for exact or near-exact matches
+        for target_title in target_titles:
+            # Exact match (e.g., "AI Engineer" == "AI Engineer")
+            if target_title == job_title_lower:
+                logger.info(f"💯 EXACT title match: '{job_title}' matches '{target_title}'")
+                return 40.0  # +40% boost for exact match
+
+            # Job title contains target title (e.g., "Senior AI Engineer" contains "AI Engineer")
+            if target_title in job_title_lower:
+                logger.info(f"🎯 Job title contains target: '{job_title}' contains '{target_title}'")
+                return 30.0  # +30% boost
+
+            # Target title contains job title (e.g., "Machine Learning Engineer" contains "ML Engineer")
+            if job_title_lower in target_title:
+                logger.info(f"🎯 Target contains job title: '{target_title}' contains '{job_title}'")
+                return 30.0  # +30% boost
+
+            # Fuzzy match - check key words
+            # e.g., "Machine Learning Engineer" and "ML Engineer" should match
+            job_words = set(job_title_lower.split())
+            target_words = set(target_title.split())
+            common_words = job_words.intersection(target_words)
+
+            # If they share important keywords (not just "engineer" or "developer")
+            important_words = common_words - {'engineer', 'developer', 'senior', 'junior', 'lead', 'staff', 'principal'}
+            if len(important_words) >= 2:  # At least 2 important words match
+                logger.info(f"🎯 Keyword match: '{job_title}' and '{target_title}' share {important_words}")
+                return 20.0  # +20% boost for keyword match
+
+        return 0.0  # No boost
+
     async def get_cached_matches(
         self,
         user_id: str,
@@ -294,6 +344,14 @@ class AIJobMatcher:
 
             # Convert to percentage (0-100)
             score = round(similarity * 100, 2)
+
+            # BOOST SCORE FOR EXACT TITLE MATCHES
+            # If job title matches user's target job titles, give significant boost
+            title_boost = self._calculate_title_boost(job.title, profile)
+            if title_boost > 0:
+                original_score = score
+                score = min(100, score + title_boost)  # Cap at 100
+                logger.info(f"🎯 Title boost: {job.title} - {original_score}% → {score}% (+{title_boost}%)")
 
             # Only include high-quality matches
             if score >= self.MIN_SCORE:

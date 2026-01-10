@@ -37,6 +37,7 @@ class JobScraperService:
             "ai": AIScraper(),
             "remotive": None,   # Lazy init below (FREE)
             "remoteok": None,   # Lazy init below (FREE)
+            "adzuna": None,     # Lazy init below (FREE)
             "serpapi": None,    # Lazy init below (PAID - optional)
         }
 
@@ -55,6 +56,14 @@ class JobScraperService:
             logger.info("RemoteOK scraper initialized (FREE)")
         except Exception as e:
             logger.warning(f"RemoteOK scraper unavailable: {e}")
+
+        # Lazy-load Adzuna (FREE - no API key needed)
+        try:
+            from app.scrapers.adzuna_scraper import AdzunaScraper
+            self.scrapers["adzuna"] = AdzunaScraper()
+            logger.info("Adzuna scraper initialized (FREE)")
+        except Exception as e:
+            logger.warning(f"Adzuna scraper unavailable: {e}")
 
         # SerpAPI scraper (PAID - optional, only if API key is set)
         try:
@@ -86,11 +95,12 @@ class JobScraperService:
         location: Optional[str] = None,
         max_results_per_source: int = 50,
         db: Optional[Session] = None,
-        scraping_job_id: Optional[str] = None
+        scraping_job_id: Optional[str] = None,
+        min_posted_date: Optional[datetime] = None
     ) -> Dict[str, Any]:
         """
         Scrape jobs from multiple sources.
-        
+
         Args:
             sources: List of source names to scrape
             keywords: Search keywords
@@ -98,7 +108,8 @@ class JobScraperService:
             max_results_per_source: Maximum results per source
             db: Database session
             scraping_job_id: ID of the scraping job record (for progress tracking)
-            
+            min_posted_date: Only include jobs posted after this date (filters old jobs)
+
         Returns:
             dict: Summary of scraping results
         """
@@ -130,9 +141,19 @@ class JobScraperService:
                     location=location,
                     max_results=max_results_per_source
                 )
-                
+
                 # Normalize jobs
                 normalized_jobs = [scraper.normalize_job(job) for job in jobs]
+
+                # Filter by posted date if specified (only include recent jobs)
+                if min_posted_date:
+                    filtered_jobs = []
+                    for job in normalized_jobs:
+                        if job.posted_date and job.posted_date >= min_posted_date:
+                            filtered_jobs.append(job)
+                    logger.info(f"Filtered {len(normalized_jobs)} jobs to {len(filtered_jobs)} jobs posted after {min_posted_date.strftime('%Y-%m-%d')}")
+                    normalized_jobs = filtered_jobs
+
                 all_jobs.extend(normalized_jobs)
                 
                 logger.info(f"Scraped {len(jobs)} jobs from {source}")

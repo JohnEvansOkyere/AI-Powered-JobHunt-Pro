@@ -1,6 +1,6 @@
 'use client'
 
-import { MapPin, Briefcase, Clock, DollarSign, ExternalLink } from 'lucide-react'
+import { MapPin, Briefcase, Clock, DollarSign, ExternalLink, Bookmark, BookmarkCheck } from 'lucide-react'
 
 export interface Job {
   id: string
@@ -19,9 +19,11 @@ export interface Job {
 interface JobCardProps {
   job: Job
   onApply?: (jobId: string) => void
+  onSave?: (jobId: string) => void
+  isSaved?: boolean
 }
 
-export function JobCard({ job, onApply }: JobCardProps) {
+export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -96,12 +98,32 @@ export function JobCard({ job, onApply }: JobCardProps) {
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-        <button
-          onClick={() => onApply?.(job.id)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm"
-        >
-          Generate Application
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => onApply?.(job.id)}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm"
+          >
+            Generate Application
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onSave?.(job.id)
+            }}
+            className={`p-2 rounded-lg transition-colors ${
+              isSaved
+                ? 'text-primary-600 bg-primary-50'
+                : 'text-neutral-600 hover:text-primary-600 hover:bg-neutral-50'
+            }`}
+            title={isSaved ? 'Remove from saved' : 'Save for later'}
+          >
+            {isSaved ? (
+              <BookmarkCheck className="h-5 w-5" />
+            ) : (
+              <Bookmark className="h-5 w-5" />
+            )}
+          </button>
+        </div>
         <a
           href={job.url}
           target="_blank"

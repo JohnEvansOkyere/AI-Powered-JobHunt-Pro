@@ -29,15 +29,35 @@ setup_logging()
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
-    
+
     Handles:
     - Database connection initialization
-    - Background task initialization
+    - Background task initialization (APScheduler for job scraping)
     - Cleanup on shutdown
     """
     # Startup
+    logger.info("🚀 Starting application...")
+
+    # Start the job scraper scheduler
+    try:
+        from app.scheduler import start_scheduler, stop_scheduler
+        scheduler = start_scheduler()
+        logger.info("✅ Job scraper scheduler started successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to start job scraper scheduler: {e}", exc_info=True)
+        scheduler = None
+
     yield
+
     # Shutdown
+    logger.info("🛑 Shutting down application...")
+    if scheduler:
+        try:
+            from app.scheduler import stop_scheduler
+            stop_scheduler()
+            logger.info("✅ Job scraper scheduler stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping scheduler: {e}", exc_info=True)
 
 
 def create_application() -> FastAPI:

@@ -44,7 +44,7 @@ class GenerateCVResponse(BaseModel):
 
 class ApplicationResponse(BaseModel):
     """Application response model."""
-    
+
     id: uuid.UUID
     user_id: uuid.UUID
     job_id: uuid.UUID
@@ -53,10 +53,12 @@ class ApplicationResponse(BaseModel):
     cover_letter: Optional[str]
     application_email: Optional[str]
     status: str
+    saved_at: Optional[datetime]
+    expires_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
-    
-    @field_serializer('created_at', 'updated_at')
+
+    @field_serializer('created_at', 'updated_at', 'saved_at', 'expires_at')
     def serialize_datetime(self, dt: datetime, _info):
         """Serialize datetime to ISO format string."""
         return dt.isoformat() if dt else None
@@ -236,5 +238,156 @@ def get_cv_download_url(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get download URL"
         )
+
+
+@router.post("/save-job/{job_id}", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
+def save_job(
+    job_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Save a job for later (bookmark it).
+
+    Creates an application record with status='saved' and expires_at=now+10days.
+    User can save up to 10 jobs at a time.
+    """
+    from datetime import timedelta
+
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    # Check if job exists
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+
+    # Check if already saved
+    existing = db.query(Application).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.job_id == job_id
+        )
+    ).first()
+
+    if existing:
+        # If already exists, just return it
+        if existing.status == 'saved':
+            logger.info(f"Job {job_id} already saved by user {user_id}")
+            return ApplicationResponse.from_orm(existing)
+        else:
+            # If in progress or submitted, don't allow re-saving
+            logger.warning(f"Job {job_id} already has application in status: {existing.status}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Job already has an application in '{existing.status}' status"
+            )
+
+    # Check saved jobs limit (max 10)
+    saved_count = db.query(Application).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.status == 'saved'
+        )
+    ).count()
+
+    if saved_count >= 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have reached the maximum limit of 10 saved jobs. Please remove some before saving more."
+        )
+
+    # Create saved application
+    now = datetime.utcnow()
+    expires_at = now + timedelta(days=10)
+
+    application = Application(
+        user_id=user_id,
+        job_id=job_id,
+        status="saved",
+        saved_at=now,
+        expires_at=expires_at
+    )
+
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+
+    logger.info(f"Job {job_id} saved by user {user_id}, expires at {expires_at}")
+
+    return ApplicationResponse.from_orm(application)
+
+
+@router.delete("/unsave-job/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unsave_job(
+    job_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Remove a saved job (unsave/unbookmark).
+
+    Deletes the application record if status is 'saved'.
+    Cannot unsave if CV has been generated (status != 'saved').
+    """
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    application = db.query(Application).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.job_id == job_id
+        )
+    ).first()
+
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Saved job not found"
+        )
+
+    if application.status != 'saved':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot unsave job with status '{application.status}'. Only 'saved' jobs can be removed."
+        )
+
+    db.delete(application)
+    db.commit()
+
+    logger.info(f"Job {job_id} unsaved by user {user_id}")
+
+    return None
+
+
+@router.get("/saved-jobs", response_model=list[ApplicationResponse])
+def get_saved_jobs(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all saved jobs for the current user.
+
+    Returns applications with status='saved', ordered by saved_at desc.
+    """
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    saved_apps = db.query(Application).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.status == 'saved'
+        )
+    ).order_by(Application.saved_at.desc()).all()
+
+    logger.info(f"Retrieved {len(saved_apps)} saved jobs for user {user_id}")
+
+    return [ApplicationResponse.from_orm(app) for app in saved_apps]
 
 

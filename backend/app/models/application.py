@@ -36,10 +36,14 @@ class Application(Base):
     # Status
     status = Column(
         String(20),
-        CheckConstraint("status IN ('draft', 'reviewed', 'finalized', 'sent')"),
-        default="draft",
+        CheckConstraint("status IN ('saved', 'draft', 'reviewed', 'finalized', 'sent', 'submitted', 'interviewing', 'rejected', 'offer')"),
+        default="saved",
         index=True,
     )
+
+    # Saved Job Tracking
+    saved_at = Column(TIMESTAMP(timezone=True), nullable=True)  # When job was saved
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=True)  # Expiry date (saved_at + 10 days)
 
     # User Customizations
     user_edits = Column(JSONB, nullable=True)  # User modifications

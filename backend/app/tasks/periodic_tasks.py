@@ -36,31 +36,109 @@ logger = get_logger(__name__)
 TECH_JOB_KEYWORDS = [
     # Software Engineering
     "software engineer",
+    "software developer",
     "backend engineer",
+    "backend developer",
     "frontend engineer",
+    "frontend developer",
     "full stack developer",
+    "full stack engineer",
+    "web developer",
     "mobile developer",
-    "devops engineer",
+    "ios developer",
+    "android developer",
+    "react developer",
+    "python developer",
+    "java developer",
+    "node developer",
+    ".net developer",
+    "golang developer",
+    "ruby developer",
 
     # Data & AI
     "data scientist",
     "data analyst",
+    "data engineer",
     "machine learning engineer",
     "ai engineer",
-    "data engineer",
+    "ml engineer",
+    "deep learning engineer",
+    "nlp engineer",
+    "computer vision engineer",
     "business intelligence analyst",
+    "bi analyst",
+    "analytics engineer",
+    "big data engineer",
 
-    # Product & Design
-    "product manager",
+    # DevOps & Infrastructure
+    "devops engineer",
+    "site reliability engineer",
+    "sre",
+    "platform engineer",
+    "infrastructure engineer",
+    "cloud engineer",
+    "aws engineer",
+    "azure engineer",
+    "gcp engineer",
+    "kubernetes engineer",
+    "docker engineer",
+    "systems engineer",
+    "network engineer",
+
+    # Design
     "ux designer",
     "ui designer",
+    "ui/ux designer",
     "product designer",
+    "graphic designer",
+    "web designer",
+    "visual designer",
+    "interaction designer",
+    "motion designer",
+    "design lead",
 
-    # Other Tech Roles
-    "cloud engineer",
-    "security engineer",
+    # Product & Management
+    "product manager",
+    "technical product manager",
+    "product owner",
+    "program manager",
+    "engineering manager",
+    "tech lead",
+    "technical lead",
+
+    # Quality & Testing
     "qa engineer",
-    "site reliability engineer",
+    "quality assurance engineer",
+    "test engineer",
+    "automation engineer",
+    "sdet",
+    "performance engineer",
+
+    # Security & Compliance
+    "security engineer",
+    "cybersecurity engineer",
+    "infosec engineer",
+    "security analyst",
+    "penetration tester",
+    "compliance engineer",
+
+    # Specialized Engineering
+    "embedded engineer",
+    "firmware engineer",
+    "hardware engineer",
+    "robotics engineer",
+    "game developer",
+    "blockchain developer",
+    "smart contract developer",
+
+    # Database & Architecture
+    "database engineer",
+    "database administrator",
+    "dba",
+    "solutions architect",
+    "software architect",
+    "system architect",
+    "enterprise architect",
 ]
 
 
@@ -72,6 +150,7 @@ def scheduled_tech_job_scraping():
     Scrapes from multiple FREE sources:
     - Remotive (Remote jobs - no API key needed)
     - RemoteOK (Remote jobs - no API key needed)
+    - Adzuna (Job aggregator - no API key needed)
 
     Returns:
         dict: Summary of all scraping results
@@ -84,11 +163,11 @@ def scheduled_tech_job_scraping():
         # Create a scraping job record for tracking
         scraping_job = ScrapingJob(
             user_id=None,  # System-initiated scraping
-            sources=["remotive", "remoteok"],  # Both FREE - No API keys needed
+            sources=["remotive", "remoteok", "adzuna"],  # All 3 FREE - No API keys needed
             keywords=TECH_JOB_KEYWORDS,
             filters={
                 "location": "Worldwide",
-                "max_results_per_source": 200,  # 200 per source = ~400 total jobs
+                "max_results_per_source": 100,  # 100 per source x 3 sources = ~300 total jobs
                 "job_type": "tech"
             },
             status="pending"
@@ -103,10 +182,10 @@ def scheduled_tech_job_scraping():
         # Trigger the scraping task
         result = scrape_jobs_task.delay(
             scraping_job_id=str(scraping_job.id),
-            sources=["remotive", "remoteok"],  # Both FREE - No API keys needed
+            sources=["remotive", "remoteok", "adzuna"],  # All 3 FREE - No API keys needed
             keywords=TECH_JOB_KEYWORDS,
             location="Worldwide",
-            max_results_per_source=200
+            max_results_per_source=100
         )
 
         logger.info(f"Scheduled tech job scraping task triggered: {result}")
@@ -115,7 +194,7 @@ def scheduled_tech_job_scraping():
             "status": "started",
             "scraping_job_id": str(scraping_job.id),
             "task_id": str(result.id) if hasattr(result, 'id') else None,
-            "sources": ["remotive", "remoteok"],  # Both FREE - No API keys needed
+            "sources": ["remotive", "remoteok", "adzuna"],  # All 3 FREE - No API keys needed
             "keyword_count": len(TECH_JOB_KEYWORDS),
         }
 

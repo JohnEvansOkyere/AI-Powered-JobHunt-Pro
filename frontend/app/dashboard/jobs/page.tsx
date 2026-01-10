@@ -6,7 +6,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { JobFilters, FilterState } from '@/components/jobs/JobFilters'
 import { JobCard } from '@/components/jobs/JobCard'
-import { searchJobs, Job, JobSearchParams } from '@/lib/api/jobs'
+import { searchJobs, getRecommendations, Job, JobSearchParams } from '@/lib/api/jobs'
+import { saveJob, unsaveJob, getSavedJobs } from '@/lib/api/savedJobs'
 import { Search, Sparkles, Loader, Briefcase } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -30,6 +31,7 @@ export default function JobsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
 
   // Load jobs from API when tab, page, or filters change
   useEffect(() => {
@@ -41,21 +43,29 @@ export default function JobsPage() {
     setPage(1)
   }, [activeTab])
 
+  // Load saved jobs on mount
+  useEffect(() => {
+    loadSavedJobs()
+  }, [])
+
   const loadJobs = async () => {
     try {
       setLoading(true)
 
-      const params: JobSearchParams = {
-        page,
-        page_size: 20,
-      }
-
       if (activeTab === 'recommendations') {
-        // Recommendations tab: Use CV matching with OpenAI embeddings
-        params.matched = true
-        // Don't apply any filters in recommendations mode
+        // Recommendations tab: Fetch pre-computed recommendations (instant!)
+        const response = await getRecommendations(page, 20)
+        setJobs(response.jobs)
+        setFilteredJobs(response.jobs)
+        setTotal(response.total)
+        setTotalPages(response.total_pages)
       } else {
         // All Jobs tab: Use filters for direct search
+        const params: JobSearchParams = {
+          page,
+          page_size: 20,
+        }
+
         // Add search query (job title from filter or search box)
         if (filters.jobTitle) {
           params.q = filters.jobTitle
@@ -88,13 +98,13 @@ export default function JobsPage() {
             params.min_posted_days = daysMap[filters.datePosted]
           }
         }
-      }
 
-      const response = await searchJobs(params)
-      setJobs(response.jobs)
-      setFilteredJobs(response.jobs)
-      setTotal(response.total)
-      setTotalPages(response.total_pages)
+        const response = await searchJobs(params)
+        setJobs(response.jobs)
+        setFilteredJobs(response.jobs)
+        setTotal(response.total)
+        setTotalPages(response.total_pages)
+      }
     } catch (error: any) {
       console.error('Error loading jobs:', error)
       toast.error('Failed to load jobs')
@@ -108,11 +118,47 @@ export default function JobsPage() {
     setPage(1) // Reset to first page when filters change
   }
 
+  const loadSavedJobs = async () => {
+    try {
+      const savedApplications = await getSavedJobs()
+      const jobIds = new Set(savedApplications.map(app => app.job_id))
+      setSavedJobs(jobIds)
+    } catch (error) {
+      console.error('Error loading saved jobs:', error)
+    }
+  }
+
   const handleApply = (jobId: string) => {
     // Navigate to application generation page
     router.push(`/dashboard/applications/generate/${jobId}`)
   }
-  
+
+  const handleSaveToggle = async (jobId: string) => {
+    const isSaved = savedJobs.has(jobId)
+
+    try {
+      if (isSaved) {
+        await unsaveJob(jobId)
+        setSavedJobs(prev => {
+          const next = new Set(prev)
+          next.delete(jobId)
+          return next
+        })
+        toast.success('Job removed from saved')
+      } else {
+        await saveJob(jobId)
+        setSavedJobs(prev => new Set(prev).add(jobId))
+        toast.success('Job saved to Applications')
+      }
+    } catch (error: any) {
+      if (error.response?.status === 400 && error.response?.data?.detail?.includes('maximum limit')) {
+        toast.error('Maximum 10 saved jobs. Remove some first.')
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to save job')
+      }
+    }
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setPage(1)
@@ -258,6 +304,8 @@ export default function JobsPage() {
                           url: job.job_link,
                         }}
                         onApply={handleApply}
+                        onSave={handleSaveToggle}
+                        isSaved={savedJobs.has(job.id)}
                       />
                     ))}
                   </div>

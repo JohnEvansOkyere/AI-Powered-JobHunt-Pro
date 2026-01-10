@@ -17,12 +17,24 @@ export function useAuth() {
   const router = useRouter()
 
   useEffect(() => {
-    // Get initial session
-    getCurrentSession().then((session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
       setLoading(false)
-    })
+    }, 3000) // 3 second timeout
+
+    // Get initial session
+    getCurrentSession()
+      .then((session) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+        clearTimeout(timeout)
+      })
+      .catch((error) => {
+        console.error('Error getting session:', error)
+        setLoading(false)
+        clearTimeout(timeout)
+      })
 
     // Listen for auth changes
     const supabase = createClient()
@@ -35,6 +47,7 @@ export function useAuth() {
     })
 
     return () => {
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
   }, [])

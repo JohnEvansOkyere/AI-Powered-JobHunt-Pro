@@ -101,7 +101,15 @@ export default function CVPage() {
       await loadCVs()
     } catch (error: any) {
       console.error('Error deleting CV:', error)
-      toast.error(error.response?.data?.detail || 'Failed to delete CV')
+      const errorMessage = error.response?.data?.detail || 'Failed to delete CV'
+
+      // If CV not found, it might be stale data - refresh the list
+      if (error.response?.status === 404 || errorMessage.includes('not found')) {
+        toast.error('CV not found. Refreshing list...')
+        await loadCVs()
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 
@@ -164,9 +172,27 @@ export default function CVPage() {
               <p className="text-sm text-neutral-600 mb-4">
                 Drag and drop your CV file here, or click to browse
               </p>
-              <p className="text-xs text-neutral-500 mb-4">
+              <p className="text-xs text-neutral-500 mb-2">
                 Supported formats: PDF, DOCX (Max 10MB)
               </p>
+
+              {/* DOCX Recommendation Notice */}
+              <div className="mb-4 mx-auto max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-blue-900 mb-1">
+                      💡 Recommended: Upload DOCX format
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      For best results with tailored CV generation, upload a DOCX file.
+                      DOCX files preserve your original formatting when we create job-specific versions.
+                      PDF files will be converted to a new format.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <label className="inline-block">
                 <input
                   type="file"

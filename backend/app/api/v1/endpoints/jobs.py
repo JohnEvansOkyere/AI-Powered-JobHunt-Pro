@@ -17,10 +17,12 @@ from app.core.logging import get_logger
 from app.models.job import Job
 from app.models.scraping_job import ScrapingJob
 from app.models.job_match import JobMatch
+from app.models.job_recommendation import JobRecommendation
 from app.services.job_scraper_service import JobScraperService
 from app.services.job_matching_service import JobMatchingService
 from app.services.job_matching_service_optimized import get_optimized_matching_service
 from app.services.ai_job_matcher import get_ai_job_matcher
+from app.services.recommendation_generator import RecommendationGenerator
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, field_serializer
 
@@ -272,6 +274,78 @@ async def search_jobs(
     )
 
 
+@router.get("/recommendations", response_model=JobSearchResponse)
+async def get_recommendations(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get pre-computed job recommendations for the current user.
+
+    Returns recommendations sorted by match score (highest first).
+    Recommendations are generated daily by background scheduler.
+    """
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    # Get active recommendations (not expired)
+    now = datetime.utcnow()
+    query = db.query(JobRecommendation).filter(
+        and_(
+            JobRecommendation.user_id == user_id,
+            JobRecommendation.expires_at > now
+        )
+    ).order_by(desc(JobRecommendation.match_score))
+
+    # Get total count
+    total = query.count()
+
+    # Paginate
+    offset = (page - 1) * page_size
+    recommendations = query.offset(offset).limit(page_size).all()
+
+    if not recommendations:
+        # No recommendations found - return empty result
+        return JobSearchResponse(
+            jobs=[],
+            total=0,
+            page=page,
+            page_size=page_size,
+            total_pages=0
+        )
+
+    # Fetch job details for recommendations
+    job_ids = [rec.job_id for rec in recommendations]
+    jobs = db.query(Job).filter(Job.id.in_(job_ids)).all()
+
+    # Create job map for quick lookup
+    job_map = {job.id: job for job in jobs}
+
+    # Build response with match scores
+    jobs_with_scores = []
+    for rec in recommendations:
+        job = job_map.get(rec.job_id)
+        if job:
+            job_dict = JobResponse.from_orm(job).dict()
+            # Convert match_score from 0.0-1.0 to 0-100 for frontend
+            job_dict["match_score"] = round(rec.match_score * 100, 1)
+            job_dict["match_reasons"] = [rec.match_reason] if rec.match_reason else []
+            jobs_with_scores.append(job_dict)
+
+    total_pages = (total + page_size - 1) // page_size
+
+    return JobSearchResponse(
+        jobs=jobs_with_scores,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(
     job_id: uuid.UUID,
@@ -280,13 +354,13 @@ def get_job(
 ):
     """Get a specific job by ID."""
     job = db.query(Job).filter(Job.id == job_id).first()
-    
+
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found"
         )
-    
+
     return JobResponse.from_orm(job)
 
 
@@ -367,6 +441,43 @@ def start_scraping(
     )
 
 
+@router.post("/recommendations/generate")
+async def generate_recommendations_now(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Manually trigger recommendation generation for current user.
+
+    Useful for:
+    - Testing the recommendations feature
+    - Getting fresh recommendations immediately
+    - Initial population before scheduler runs
+    """
+    from app.services.recommendation_generator import RecommendationGenerator
+
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = str(user_id)
+
+    try:
+        generator = RecommendationGenerator(db)
+        count = await generator.generate_recommendations_for_user(user_id)
+
+        return {
+            "status": "success",
+            "message": f"Generated {count} recommendations",
+            "recommendations_count": count,
+            "user_id": user_id
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate recommendations for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate recommendations: {str(e)}"
+        )
+
+
 @router.get("/scraping/{scraping_job_id}", response_model=ScrapingJobResponse)
 def get_scraping_job(
     scraping_job_id: uuid.UUID,
@@ -378,20 +489,20 @@ def get_scraping_job(
     user_id = current_user["id"]
     if isinstance(user_id, str):
         user_id = uuid.UUID(user_id)
-    
+
     scraping_job = db.query(ScrapingJob).filter(
         and_(
             ScrapingJob.id == scraping_job_id,
             ScrapingJob.user_id == user_id
         )
     ).first()
-    
+
     if not scraping_job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Scraping job not found"
         )
-    
+
     return ScrapingJobResponse.from_orm(scraping_job)
 
 
@@ -413,6 +524,6 @@ def list_scraping_jobs(
         query = query.filter(ScrapingJob.status == status_filter.lower())
     
     scraping_jobs = query.order_by(desc(ScrapingJob.created_at)).limit(50).all()
-    
+
     return [ScrapingJobResponse.from_orm(job) for job in scraping_jobs]
 

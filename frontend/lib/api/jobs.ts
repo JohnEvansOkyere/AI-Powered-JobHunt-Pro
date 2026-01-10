@@ -137,9 +137,27 @@ export async function getScrapingJob(scrapingJobId: string): Promise<ScrapingJob
  * List user's scraping jobs
  */
 export async function listScrapingJobs(status?: string): Promise<ScrapingJob[]> {
-  const endpoint = status 
+  const endpoint = status
     ? `/api/v1/jobs/scraping/?status_filter=${status}`
     : '/api/v1/jobs/scraping/'
   return apiClient.get<ScrapingJob[]>(endpoint) as Promise<ScrapingJob[]>
+}
+
+/**
+ * Get pre-computed job recommendations for the current user
+ *
+ * Returns recommendations generated daily by background scheduler.
+ * Much faster than on-demand matching.
+ */
+export async function getRecommendations(
+  page: number = 1,
+  page_size: number = 20
+): Promise<JobSearchResponse> {
+  const queryParams = new URLSearchParams()
+  queryParams.append('page', page.toString())
+  queryParams.append('page_size', page_size.toString())
+
+  const endpoint = `/api/v1/jobs/recommendations?${queryParams.toString()}`
+  return apiClient.get<JobSearchResponse>(endpoint) as Promise<JobSearchResponse>
 }
 
