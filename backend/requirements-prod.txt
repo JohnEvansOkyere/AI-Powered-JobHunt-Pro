@@ -1,3 +1,6 @@
+# Production Requirements (Minimal - Faster Deployment)
+# Use this for Render deployment to avoid unnecessary dependencies
+
 # FastAPI and Server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -13,40 +16,27 @@ apscheduler>=3.10.0
 
 # Environment and Config
 python-dotenv
-celery
 pydantic>=2.11.7,<3.0
 pydantic-settings>=2.3.0
 
-# AI Models
+# AI Models (Core)
 openai>=1.3.0
 google-generativeai>=0.3.0
 groq>=0.3.0
-tiktoken>=0.7.0  # Updated: Pre-built wheels available
+tiktoken>=0.7.0
 
-# Voice Services (Optional - comment out if not using)
-elevenlabs>=0.2.27
-deepgram-sdk>=3.2.7
-
-# File Processing
+# File Processing (Core)
 PyPDF2>=3.0.1
 pdfplumber>=0.10.3
 python-docx>=1.1.0
-# pypandoc==1.12  # Commented: Requires pandoc system package
 
 # Utilities
 aiofiles>=23.2.1
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 
-# Logging and Monitoring
+# Logging
 structlog>=23.2.0
 
 # HTTP Clients
 requests>=2.32.3
-
-# Testing (Optional - not needed in production)
-# pytest==7.4.3
-# pytest-asyncio==0.21.1
-# pytest-cov==4.1.0
-# pytest-mock==3.12.0
-# httpx<0.28
