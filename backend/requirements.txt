@@ -7,6 +7,10 @@ python-multipart==0.0.6
 # Database
 supabase>=2.25.1
 psycopg2-binary==2.9.10
+sqlalchemy>=2.0.0
+
+# Scheduler
+apscheduler>=3.10.0
 
 # Environment and Config
 python-dotenv
