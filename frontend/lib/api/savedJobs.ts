@@ -16,10 +16,9 @@ export interface Application {
 }
 
 export async function saveJob(jobId: string): Promise<Application> {
-  const response = await apiClient.post<Application>(
+  return apiClient.post<Application>(
     `/api/v1/applications/save-job/${jobId}`
   )
-  return response.data
 }
 
 export async function unsaveJob(jobId: string): Promise<void> {
@@ -27,12 +26,11 @@ export async function unsaveJob(jobId: string): Promise<void> {
 }
 
 export async function getSavedJobs(): Promise<Application[]> {
-  const response = await apiClient.get<Application[]>(
+  return apiClient.get<Application[]>(
     '/api/v1/applications/saved-jobs'
   )
-  return response.data
 }
 
-export async function checkIfJobSaved(jobId: string, savedJobs: Application[]): boolean {
+export function checkIfJobSaved(jobId: string, savedJobs: Application[]): boolean {
   return savedJobs.some(app => app.job_id === jobId)
 }

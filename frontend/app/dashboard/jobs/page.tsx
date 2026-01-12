@@ -300,7 +300,7 @@ export default function JobsPage() {
                           postedDate: job.posted_date || job.scraped_at,
                           description: job.description,
                           // Show match score only in recommendations tab
-                          matchScore: activeTab === 'recommendations' ? job.match_score : undefined,
+                          matchScore: activeTab === 'recommendations' ? (job.match_score ?? undefined) : undefined,
                           url: job.job_link,
                         }}
                         onApply={handleApply}
