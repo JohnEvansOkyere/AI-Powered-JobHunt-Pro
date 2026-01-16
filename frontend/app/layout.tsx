@@ -6,8 +6,8 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'AI Job Application Platform',
-  description: 'AI-powered job matching and application generation platform',
+  title: 'Veloxa Smart Match - AI-Powered Job Matching',
+  description: 'Find your dream job with AI-powered matching. Tailor your CV to each job match and land your perfect role.',
 }
 
 export default function RootLayout({
@@ -16,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <body className="antialiased bg-neutral-50 text-neutral-900" suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} dark`} suppressHydrationWarning>
+      <body className="antialiased bg-neutral-900 text-neutral-100" suppressHydrationWarning>
         {children}
         <Toaster
           position="top-right"
@@ -26,10 +26,11 @@ export default function RootLayout({
             style: {
               background: '#1e293b',
               color: '#f8fafc',
+              border: '1px solid #334155',
             },
             success: {
               iconTheme: {
-                primary: '#14b8a6',
+                primary: '#06b6d4',
                 secondary: '#f8fafc',
               },
             },
@@ -45,4 +46,3 @@ export default function RootLayout({
     </html>
   )
 }
-

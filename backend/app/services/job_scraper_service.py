@@ -38,6 +38,7 @@ class JobScraperService:
             "remotive": None,   # Lazy init below (FREE)
             "remoteok": None,   # Lazy init below (FREE)
             "adzuna": None,     # Lazy init below (FREE)
+            "joinrise": None,   # Lazy init below (FREE - may have Ghana jobs)
             "serpapi": None,    # Lazy init below (PAID - optional)
         }
 
@@ -64,6 +65,14 @@ class JobScraperService:
             logger.info("Adzuna scraper initialized (FREE)")
         except Exception as e:
             logger.warning(f"Adzuna scraper unavailable: {e}")
+
+        # Lazy-load Joinrise (FREE - no API key needed, may have Ghana jobs)
+        try:
+            from app.scrapers.joinrise_scraper import JoinriseScraper
+            self.scrapers["joinrise"] = JoinriseScraper()
+            logger.info("Joinrise scraper initialized (FREE)")
+        except Exception as e:
+            logger.warning(f"Joinrise scraper unavailable: {e}")
 
         # SerpAPI scraper (PAID - optional, only if API key is set)
         try:

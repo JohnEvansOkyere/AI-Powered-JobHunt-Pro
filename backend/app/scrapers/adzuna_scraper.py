@@ -62,7 +62,7 @@ class AdzunaScraper(BaseScraper):
         try:
             # Default to US if no location specified
             country = (location or "us").lower()
-            if len(country) > 2:
+            if len(country) > 2 or country not in ["us", "gb", "ca", "au", "de", "fr", "in", "gh"]:
                 # Convert location names to country codes
                 country_map = {
                     "united states": "us",
@@ -74,8 +74,11 @@ class AdzunaScraper(BaseScraper):
                     "germany": "de",
                     "france": "fr",
                     "india": "in",
+                    "ghana": "gh",
+                    "worldwide": "us",  # Default to US for worldwide
+                    "remote": "us",     # Default to US for remote
                 }
-                country = country_map.get(country.lower(), "us")
+                country = country_map.get(country.lower(), "gh" if "ghana" in country.lower() else "us")
 
             all_jobs = []
 

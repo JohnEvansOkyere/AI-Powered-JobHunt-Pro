@@ -6,11 +6,40 @@ const config: Config = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // Primary: Deep Purple
+        // Primary: Deep Blue (VeloxaRecruit style)
         primary: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb', // Main primary
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
+        // Secondary: Cyan/Teal (VeloxaRecruit accent)
+        secondary: {
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#22d3ee',
+          500: '#06b6d4', // Main secondary
+          600: '#0891b2',
+          700: '#0e7490',
+          800: '#155e75',
+          900: '#164e63',
+          950: '#083344',
+        },
+        // Accent: Purple/Indigo (VeloxaRecruit gradient)
+        accent: {
           50: '#f5f3ff',
           100: '#ede9fe',
           200: '#ddd6fe',
@@ -18,40 +47,12 @@ const config: Config = {
           400: '#a78bfa',
           500: '#8b5cf6',
           600: '#7c3aed',
-          700: '#6b46c1', // Main primary
+          700: '#6d28d9',
           800: '#5b21b6',
           900: '#4c1d95',
           950: '#2e1065',
         },
-        // Secondary: Coral Pink
-        secondary: {
-          50: '#fdf2f8',
-          100: '#fce7f3',
-          200: '#fbcfe8',
-          300: '#f9a8d4',
-          400: '#f472b6', // Main secondary
-          500: '#ec4899',
-          600: '#db2777',
-          700: '#be185d',
-          800: '#9f1239',
-          900: '#831843',
-          950: '#500724',
-        },
-        // Accent: Teal
-        accent: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6', // Main accent
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e',
-        },
-        // Neutral: Slate
+        // Neutral: Slate (for dark mode)
         neutral: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -61,8 +62,8 @@ const config: Config = {
           500: '#64748b',
           600: '#475569',
           700: '#334155',
-          800: '#1e293b', // Main neutral
-          900: '#0f172a',
+          800: '#1e293b', // Main neutral dark
+          900: '#0f172a', // Very dark
           950: '#020617',
         },
       },
@@ -70,8 +71,11 @@ const config: Config = {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
       animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-up': 'slideUp 0.3s ease-out',
+        'fade-in': 'fadeIn 0.6s ease-out',
+        'slide-up': 'slideUp 0.8s ease-out',
+        'blob': 'blob 7s infinite',
+        'gradient': 'gradient 8s ease infinite',
+        'float': 'float 6s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -79,9 +83,26 @@ const config: Config = {
           '100%': { opacity: '1' },
         },
         slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '0%': { transform: 'translateY(30px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+        blob: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+          '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+        },
+        gradient: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-20px)' },
+        },
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
       },
     },
   },
@@ -89,4 +110,3 @@ const config: Config = {
 }
 
 export default config
-
