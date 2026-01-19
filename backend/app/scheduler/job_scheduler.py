@@ -18,58 +18,110 @@ from app.services.recommendation_generator import RecommendationGenerator
 
 logger = get_logger(__name__)
 
-# Tech job keywords (100+ covering all tech roles)
+# Tech job keywords (150+ covering all tech roles)
 TECH_JOB_KEYWORDS = [
-    # Software Engineering
+    # Software Engineering - General
     "software engineer", "software developer", "backend engineer",
     "backend developer", "frontend engineer", "frontend developer",
-    "full stack developer", "full stack engineer", "web developer",
-    "mobile developer", "ios developer", "android developer",
-    "react developer", "python developer", "java developer",
-    "node developer", ".net developer", "golang developer", "ruby developer",
+    "full stack developer", "full stack engineer", "fullstack developer",
+    "web developer", "web engineer", "application developer",
 
-    # Data & AI
-    "data scientist", "data analyst", "data engineer",
-    "machine learning engineer", "ai engineer", "ml engineer",
-    "deep learning engineer", "nlp engineer", "computer vision engineer",
-    "business intelligence analyst", "bi analyst", "analytics engineer",
-    "big data engineer",
+    # Mobile Development
+    "mobile developer", "mobile engineer", "ios developer", "ios engineer",
+    "android developer", "android engineer", "react native developer",
+    "flutter developer", "mobile app developer", "swift developer",
+    "kotlin developer",
+
+    # Frontend & JavaScript
+    "react developer", "react engineer", "vue developer", "angular developer",
+    "javascript developer", "typescript developer", "nextjs developer",
+    "frontend architect",
+
+    # Backend & Languages
+    "python developer", "python engineer", "java developer", "java engineer",
+    "node developer", "nodejs developer", ".net developer", "c# developer",
+    "golang developer", "go developer", "ruby developer", "rails developer",
+    "php developer", "rust developer", "scala developer",
+
+    # Data Science & Analytics
+    "data scientist", "data analyst", "senior data scientist",
+    "data science engineer", "quantitative analyst", "research scientist",
+    "business intelligence analyst", "bi analyst", "bi developer",
+    "analytics engineer", "data analytics", "statistical analyst",
+
+    # AI & Machine Learning
+    "ai engineer", "ai developer", "ai/ml engineer", "ml engineer",
+    "machine learning engineer", "machine learning scientist",
+    "deep learning engineer", "nlp engineer", "natural language processing",
+    "computer vision engineer", "cv engineer", "ai researcher",
+    "applied scientist", "research engineer", "llm engineer",
+    "generative ai engineer", "prompt engineer",
+
+    # Data Engineering
+    "data engineer", "big data engineer", "etl developer",
+    "data pipeline engineer", "data platform engineer",
+    "dataops engineer", "analytics engineer",
 
     # DevOps & Infrastructure
     "devops engineer", "site reliability engineer", "sre",
     "platform engineer", "infrastructure engineer", "cloud engineer",
     "aws engineer", "azure engineer", "gcp engineer",
-    "kubernetes engineer", "docker engineer", "systems engineer",
-    "network engineer",
+    "kubernetes engineer", "k8s engineer", "docker engineer",
+    "systems engineer", "linux engineer", "unix administrator",
+    "network engineer", "network administrator",
 
-    # Design
-    "ux designer", "ui designer", "ui/ux designer",
-    "product designer", "graphic designer", "web designer",
-    "visual designer", "interaction designer", "motion designer",
-    "design lead",
+    # Design & UX
+    "ux designer", "ui designer", "ui/ux designer", "ux/ui designer",
+    "product designer", "senior product designer", "lead designer",
+    "graphic designer", "web designer", "visual designer",
+    "interaction designer", "motion designer", "ux researcher",
+    "design lead", "design manager", "creative director",
+    "brand designer", "digital designer",
 
     # Product & Management
-    "product manager", "technical product manager", "product owner",
-    "program manager", "engineering manager", "tech lead",
-    "technical lead",
+    "product manager", "senior product manager", "technical product manager",
+    "product owner", "program manager", "project manager",
+    "engineering manager", "tech lead", "technical lead",
+    "team lead", "director of engineering", "vp engineering",
+    "cto", "chief technology officer", "head of engineering",
 
     # Quality & Testing
     "qa engineer", "quality assurance engineer", "test engineer",
-    "automation engineer", "sdet", "performance engineer",
+    "automation engineer", "test automation engineer", "sdet",
+    "performance engineer", "qa analyst", "quality engineer",
+    "test lead", "qa lead",
 
-    # Security & Compliance
+    # Security
     "security engineer", "cybersecurity engineer", "infosec engineer",
-    "security analyst", "penetration tester", "compliance engineer",
+    "security analyst", "penetration tester", "security architect",
+    "application security engineer", "devsecops engineer",
+    "cloud security engineer", "soc analyst",
 
     # Specialized Engineering
-    "embedded engineer", "firmware engineer", "hardware engineer",
-    "robotics engineer", "game developer", "blockchain developer",
-    "smart contract developer",
+    "embedded engineer", "embedded software engineer", "firmware engineer",
+    "hardware engineer", "robotics engineer", "iot engineer",
+    "game developer", "game engineer", "unity developer",
+    "unreal developer", "graphics engineer",
+
+    # Blockchain & Web3
+    "blockchain developer", "blockchain engineer", "smart contract developer",
+    "solidity developer", "web3 developer", "crypto developer",
+    "defi developer",
 
     # Database & Architecture
     "database engineer", "database administrator", "dba",
+    "sql developer", "database developer",
     "solutions architect", "software architect", "system architect",
-    "enterprise architect",
+    "enterprise architect", "cloud architect", "technical architect",
+
+    # Support & Operations
+    "technical support engineer", "support engineer", "it support",
+    "systems administrator", "sysadmin", "it administrator",
+    "helpdesk engineer", "technical consultant",
+
+    # Emerging Tech
+    "ar/vr developer", "xr developer", "metaverse developer",
+    "quantum computing engineer", "edge computing engineer",
 ]
 
 
@@ -77,11 +129,15 @@ class JobScraperScheduler:
     """
     Manages scheduled job scraping using APScheduler.
 
+    Schedule:
+    - 6:00 AM UTC (every 3 days): Scrape jobs posted in last 3 days
+    - 7:00 AM UTC (every 2 days): Generate recommendations for users with CV OR profile
+    - Midnight UTC (daily): Cleanup data older than 7 days
+
     Features:
-    - Daily scraping at 6 AM
-    - Only scrapes jobs posted within last 2 days
-    - Automatic deduplication
-    - 3 FREE sources (Remotive, RemoteOK, Adzuna)
+    - 4 FREE sources (Remotive, RemoteOK, Joinrise, Arbeitnow)
+    - Optional API-key sources (SerpAPI, Jooble, FindWork, Adzuna) if keys are set
+    - Uses both CV and profile data for matching
     """
 
     def __init__(self):
@@ -258,25 +314,44 @@ class JobScraperScheduler:
 
     async def scrape_recent_jobs(self):
         """
-        Scrape jobs posted within the last 2 days.
+        Scrape jobs posted within the last 3 days.
 
-        This runs daily at 6 AM to keep the database fresh with recent jobs only.
+        Runs every 3 days at 6 AM UTC to keep the database fresh.
         """
         logger.info("=" * 60)
-        logger.info("🚀 SCHEDULED JOB SCRAPING STARTED")
+        logger.info("🚀 SCHEDULED JOB SCRAPING STARTED (Every 3 Days)")
         logger.info(f"⏰ Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         logger.info("=" * 60)
 
         db: Session = SessionLocal()
 
         try:
-            # Calculate cutoff date (2 days ago)
-            cutoff_date = datetime.utcnow() - timedelta(days=2)
+            # Calculate cutoff date (3 days ago - matches scraping interval)
+            cutoff_date = datetime.utcnow() - timedelta(days=3)
             logger.info(f"📅 Scraping jobs posted after: {cutoff_date.strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
-            # Scrape from all 3 FREE sources
-            sources = ["remotive", "remoteok", "adzuna"]
-            logger.info(f"📡 Sources: {', '.join(sources)}")
+            # Scrape from all FREE sources (4 sources, no API key required)
+            # Note: HiringCafe removed - API not publicly available (returns 429)
+            # Note: Adzuna moved to API-key section - requires free credentials
+            sources = [
+                "remotive",     # Remote jobs (FREE)
+                "remoteok",     # Remote jobs (FREE)
+                "joinrise",     # Ghana + global jobs (FREE)
+                "arbeitnow",    # Remote tech jobs (FREE)
+            ]
+
+            # Add API-key sources if configured
+            from app.core.config import settings
+            if getattr(settings, 'JOOBLE_API_KEY', None):
+                sources.append("jooble")
+            if getattr(settings, 'FINDWORK_API_KEY', None):
+                sources.append("findwork")
+            if getattr(settings, 'SERPAPI_API_KEY', None):
+                sources.append("serpapi")
+            if getattr(settings, 'ADZUNA_APP_ID', None) and getattr(settings, 'ADZUNA_APP_KEY', None):
+                sources.append("adzuna")
+
+            logger.info(f"📡 Sources: {', '.join(sources)} ({len(sources)} total)")
             logger.info(f"🔑 Keywords: {len(TECH_JOB_KEYWORDS)} tech job categories")
 
             result = await self.scraper_service.scrape_jobs(
@@ -325,28 +400,28 @@ class JobScraperScheduler:
         Start the scheduler.
 
         Schedules:
-        - Daily job scraping at 6 AM UTC
-        - Daily recommendation generation at 7 AM UTC (after scraping)
-        - Daily cleanup of expired saved jobs at midnight UTC
-        - Daily cleanup of expired recommendations at midnight UTC
+        - Job scraping every 3 days at 6 AM UTC (scrapes jobs from last 3 days)
+        - Recommendation generation every 2 days at 7 AM UTC (uses CV + profile)
+        - Daily cleanup at midnight UTC (removes data older than 7 days)
         """
         try:
-            # Schedule daily scraping at 6 AM UTC
+            # Schedule job scraping every 3 days at 6 AM UTC
+            # Using day_of_month='*/3' to run every 3 days
             self.scheduler.add_job(
                 func=self.scrape_recent_jobs,
-                trigger=CronTrigger(hour=6, minute=0),  # 6:00 AM UTC daily
-                id="daily_job_scraping",
-                name="Daily Tech Job Scraping (6 AM UTC)",
+                trigger=CronTrigger(day='*/3', hour=6, minute=0),  # Every 3 days at 6 AM UTC
+                id="periodic_job_scraping",
+                name="Job Scraping (Every 3 Days at 6 AM UTC)",
                 replace_existing=True,
-                max_instances=1,  # Prevent concurrent runs
+                max_instances=1,
             )
 
-            # Schedule daily recommendation generation at 7 AM UTC (1 hour after scraping)
+            # Schedule recommendation generation every 2 days at 7 AM UTC
             self.scheduler.add_job(
                 func=self.generate_recommendations,
-                trigger=CronTrigger(hour=7, minute=0),  # 7:00 AM UTC daily
-                id="daily_recommendation_generation",
-                name="Daily Recommendation Generation (7 AM UTC)",
+                trigger=CronTrigger(day='*/2', hour=7, minute=0),  # Every 2 days at 7 AM UTC
+                id="periodic_recommendation_generation",
+                name="Recommendation Generation (Every 2 Days at 7 AM UTC)",
                 replace_existing=True,
                 max_instances=1,
             )
@@ -384,16 +459,22 @@ class JobScraperScheduler:
             self.scheduler.start()
 
             logger.info("✅ Job scraper scheduler started successfully")
-            logger.info("⏰ Job Scraping: Daily at 6:00 AM UTC")
-            logger.info("🎯 Recommendations: Daily at 7:00 AM UTC")
-            logger.info("🧹 Cleanup: Daily at 12:00 AM UTC (midnight)")
-            logger.info("   - Saved jobs cleanup: 12:00 AM")
-            logger.info("   - Recommendations cleanup: 12:05 AM")
-            logger.info("   - Old jobs cleanup (>7 days): 12:10 AM")
-            logger.info("📅 Scrapes jobs posted within last 2 days")
-            logger.info("💾 Keeps only jobs from last 7 days in database")
-            logger.info("🔄 Next scraping: " + str(self.scheduler.get_job('daily_job_scraping').next_run_time))
-            logger.info("🔄 Next recommendations: " + str(self.scheduler.get_job('daily_recommendation_generation').next_run_time))
+            logger.info("=" * 60)
+            logger.info("📅 SCHEDULE:")
+            logger.info("   🚀 Job Scraping: Every 3 days at 6:00 AM UTC")
+            logger.info("   🎯 Recommendations: Every 2 days at 7:00 AM UTC")
+            logger.info("   🧹 Cleanup: Daily at midnight UTC")
+            logger.info("      - Saved jobs cleanup: 12:00 AM")
+            logger.info("      - Recommendations cleanup: 12:05 AM")
+            logger.info("      - Old jobs cleanup (>7 days): 12:10 AM")
+            logger.info("=" * 60)
+            logger.info("📊 SETTINGS:")
+            logger.info("   - Scrapes jobs posted within last 3 days")
+            logger.info("   - Keeps only jobs from last 7 days in database")
+            logger.info("   - Uses CV + Profile data for recommendations")
+            logger.info("=" * 60)
+            logger.info("🔄 Next scraping: " + str(self.scheduler.get_job('periodic_job_scraping').next_run_time))
+            logger.info("🔄 Next recommendations: " + str(self.scheduler.get_job('periodic_recommendation_generation').next_run_time))
 
         except Exception as e:
             logger.error(f"Failed to start scheduler: {e}", exc_info=True)

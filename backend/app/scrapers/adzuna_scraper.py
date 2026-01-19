@@ -1,10 +1,10 @@
 """
 Adzuna Job Scraper
 
-Adzuna is a FREE job search engine that aggregates listings from thousands of sources.
+Adzuna is a job search engine that aggregates listings from thousands of sources.
 API documentation: https://developer.adzuna.com/
 
-COMPLETELY FREE - No API key needed for basic usage!
+Requires FREE API key from: https://developer.adzuna.com/signup
 """
 
 from typing import List, Optional
@@ -18,28 +18,26 @@ logger = get_logger(__name__)
 
 class AdzunaScraper(BaseScraper):
     """
-    Adzuna job scraper using their free public API.
+    Adzuna job scraper using their API.
 
-    Adzuna aggregates jobs from multiple sources and provides a free API.
-    No authentication required for basic searches.
+    Adzuna aggregates jobs from multiple sources.
+    Requires API credentials from https://developer.adzuna.com/signup (FREE)
     """
 
     BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 
-    def __init__(self, app_id: Optional[str] = None, app_key: Optional[str] = None):
+    def __init__(self, app_id: str, app_key: str):
         """
         Initialize Adzuna scraper.
 
         Args:
-            app_id: Optional Adzuna app ID (for higher rate limits)
-            app_key: Optional Adzuna app key (for higher rate limits)
-
-        Note: Works without credentials but with lower rate limits
+            app_id: Adzuna app ID (required)
+            app_key: Adzuna app key (required)
         """
         super().__init__(source_name="adzuna")
-        self.app_id = app_id or "test"  # Public test credentials
-        self.app_key = app_key or "test"
-        logger.info("Adzuna scraper initialized (FREE)")
+        self.app_id = app_id
+        self.app_key = app_key
+        logger.info("Adzuna scraper initialized")
 
     async def scrape(
         self,

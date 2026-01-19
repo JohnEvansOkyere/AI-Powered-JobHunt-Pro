@@ -213,6 +213,7 @@ export default function ApplicationsPage() {
                 <div className="divide-y divide-neutral-200">
                   {savedJobs.map((app) => {
                     const daysLeft = getDaysUntilExpiry(app.expires_at!)
+                    const job = app.job
                     return (
                       <div
                         key={app.id}
@@ -222,16 +223,32 @@ export default function ApplicationsPage() {
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
                               <h3 className="text-lg font-semibold text-neutral-800">
-                                Saved Job
+                                {job?.title || 'Saved Job'}
                               </h3>
+                              {job?.remote_type && (
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full font-medium capitalize">
+                                  {job.remote_type}
+                                </span>
+                              )}
                               {daysLeft <= 3 && (
                                 <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full font-medium">
                                   Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
                                 </span>
                               )}
                             </div>
+                            {job && (
+                              <div className="mb-3">
+                                <p className="text-neutral-600 font-medium">{job.company}</p>
+                                <div className="flex items-center space-x-4 text-sm text-neutral-500 mt-1">
+                                  {job.location && <span>{job.location}</span>}
+                                  {job.salary_range && <span>{job.salary_range}</span>}
+                                  {job.job_type && <span className="capitalize">{job.job_type}</span>}
+                                </div>
+                              </div>
+                            )}
                             <p className="text-sm text-neutral-500 mb-4">
                               Saved on {new Date(app.saved_at!).toLocaleDateString()}
+                              {job?.source && <span className="ml-2">from {job.source}</span>}
                             </p>
 
                             <div className="flex items-center space-x-3">
@@ -241,6 +258,17 @@ export default function ApplicationsPage() {
                               >
                                 Generate Tailored CV
                               </button>
+                              {job?.job_link && (
+                                <a
+                                  href={job.job_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium text-sm flex items-center space-x-2"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  <span>View Job</span>
+                                </a>
+                              )}
                               <button
                                 onClick={() => handleUnsave(app.job_id)}
                                 className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium text-sm flex items-center space-x-2"

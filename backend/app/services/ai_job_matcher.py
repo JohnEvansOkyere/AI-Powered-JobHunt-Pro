@@ -88,19 +88,41 @@ class AIJobMatcher:
         similarity = dot_product / (norm1 * norm2)
         return float(similarity)
 
-    def create_user_profile_text(self, profile: UserProfile, cv: Optional[CV]) -> str:
+    def create_user_profile_text(self, profile: UserProfile, cv: Optional[CV], interested_jobs: Optional[List[Job]] = None) -> str:
         """
         Create a rich text representation of user's profile.
         This will be converted to an embedding for matching.
+
+        Uses ALL available profile fields:
+        - primary_job_title, secondary_job_titles
+        - technical_skills (JSON string or list of {skill: name} objects)
+        - soft_skills, tools_technologies
+        - seniority_level, work_preference
+        - desired_industries, preferred_keywords
+        - experience (from profile AND CV)
+        - interested_jobs: Jobs user has saved/applied to (interest signals)
         """
+        import json
         parts = []
 
         # Job titles they want (include both primary and secondary)
+        # Note: primary_job_title can contain multiple titles separated by "|"
         target_roles = []
         if profile.primary_job_title:
-            target_roles.append(profile.primary_job_title)
+            # Split by "|" in case multiple titles are combined
+            primary_titles = [t.strip() for t in profile.primary_job_title.split("|")]
+            target_roles.extend(primary_titles)
         if profile.secondary_job_titles:
-            target_roles.extend(profile.secondary_job_titles)
+            if isinstance(profile.secondary_job_titles, list):
+                target_roles.extend(profile.secondary_job_titles)
+            elif isinstance(profile.secondary_job_titles, str):
+                # Try to parse as JSON if it's a string
+                try:
+                    parsed = json.loads(profile.secondary_job_titles)
+                    if isinstance(parsed, list):
+                        target_roles.extend(parsed)
+                except (json.JSONDecodeError, TypeError):
+                    target_roles.append(profile.secondary_job_titles)
 
         if target_roles:
             parts.append(f"Target roles: {', '.join(target_roles)}")
@@ -109,25 +131,56 @@ class AIJobMatcher:
         if profile.seniority_level:
             parts.append(f"Seniority: {profile.seniority_level}")
 
-        # Skills
+        # Technical Skills - handle both JSON string and list formats
         skills = []
         if profile.technical_skills:
-            if isinstance(profile.technical_skills, list):
-                for skill_obj in profile.technical_skills:
+            tech_skills = profile.technical_skills
+
+            # If it's a string, try to parse as JSON
+            if isinstance(tech_skills, str):
+                try:
+                    tech_skills = json.loads(tech_skills)
+                except (json.JSONDecodeError, TypeError):
+                    # If parsing fails, treat as comma-separated string
+                    skills.extend([s.strip() for s in tech_skills.split(",")])
+                    tech_skills = None
+
+            # If it's a list, extract skill names
+            if isinstance(tech_skills, list):
+                for skill_obj in tech_skills:
                     if isinstance(skill_obj, dict) and 'skill' in skill_obj:
                         skills.append(skill_obj['skill'])
                     elif isinstance(skill_obj, str):
                         skills.append(skill_obj)
 
+        # Add tools_technologies
         if profile.tools_technologies:
-            skills.extend(profile.tools_technologies)
+            if isinstance(profile.tools_technologies, list):
+                skills.extend(profile.tools_technologies)
+            elif isinstance(profile.tools_technologies, str):
+                try:
+                    parsed = json.loads(profile.tools_technologies)
+                    if isinstance(parsed, list):
+                        skills.extend(parsed)
+                except (json.JSONDecodeError, TypeError):
+                    skills.extend([s.strip() for s in profile.tools_technologies.split(",")])
 
         if skills:
-            parts.append(f"Technical skills: {', '.join(skills[:20])}")  # Limit to avoid token limits
+            # Remove duplicates while preserving order
+            unique_skills = list(dict.fromkeys(skills))
+            parts.append(f"Technical skills: {', '.join(unique_skills[:25])}")
 
         # Soft skills
         if profile.soft_skills:
-            parts.append(f"Soft skills: {', '.join(profile.soft_skills[:10])}")
+            soft_skills = profile.soft_skills
+            if isinstance(soft_skills, str):
+                try:
+                    soft_skills = json.loads(soft_skills)
+                except (json.JSONDecodeError, TypeError):
+                    soft_skills = [s.strip() for s in soft_skills.split(",")]
+
+            if isinstance(soft_skills, list) and soft_skills:
+                parts.append(f"Soft skills: {', '.join(soft_skills[:10])}")
 
         # Work preferences
         if profile.work_preference:
@@ -135,28 +188,105 @@ class AIJobMatcher:
 
         # Industries
         if profile.desired_industries:
-            parts.append(f"Industries: {', '.join(profile.desired_industries[:5])}")
+            industries = profile.desired_industries
+            if isinstance(industries, str):
+                try:
+                    industries = json.loads(industries)
+                except (json.JSONDecodeError, TypeError):
+                    industries = [s.strip() for s in industries.split(",")]
 
-        # Experience from CV
+            if isinstance(industries, list) and industries:
+                parts.append(f"Industries: {', '.join(industries[:5])}")
+
+        # Preferred keywords (important for matching!)
+        if profile.preferred_keywords:
+            keywords = profile.preferred_keywords
+            if isinstance(keywords, str):
+                try:
+                    keywords = json.loads(keywords)
+                except (json.JSONDecodeError, TypeError):
+                    keywords = [s.strip() for s in keywords.split(",")]
+
+            if isinstance(keywords, list) and keywords:
+                parts.append(f"Preferred keywords: {', '.join(keywords[:10])}")
+
+        # Experience from PROFILE (stored in profile.experience field)
+        if profile.experience:
+            experience_data = profile.experience
+            if isinstance(experience_data, str):
+                try:
+                    experience_data = json.loads(experience_data)
+                except (json.JSONDecodeError, TypeError):
+                    experience_data = None
+
+            if isinstance(experience_data, list) and experience_data:
+                exp_summary = []
+                for exp in experience_data[:3]:  # Top 3 experiences
+                    if isinstance(exp, dict):
+                        role = exp.get('role', '')
+                        company = exp.get('company', '')
+                        duration = exp.get('duration', '')
+                        if role:
+                            exp_text = f"{role} at {company}"
+                            if duration:
+                                exp_text += f" ({duration})"
+                            exp_summary.append(exp_text)
+
+                if exp_summary:
+                    parts.append(f"Experience: {'; '.join(exp_summary)}")
+
+        # Experience from CV (additional experience data)
         if cv and cv.parsed_content:
             parsed = cv.parsed_content
+            if isinstance(parsed, str):
+                try:
+                    parsed = json.loads(parsed)
+                except (json.JSONDecodeError, TypeError):
+                    parsed = None
+
             if isinstance(parsed, dict):
-                # Add experience summary
-                experience = parsed.get('experience', [])
-                if experience and isinstance(experience, list):
-                    exp_summary = []
-                    for exp in experience[:3]:  # Top 3 experiences
+                # Add CV experience (if not already from profile)
+                cv_experience = parsed.get('experience', [])
+                if cv_experience and isinstance(cv_experience, list):
+                    cv_exp_summary = []
+                    for exp in cv_experience[:3]:
                         if isinstance(exp, dict):
-                            role = exp.get('role', '')
+                            role = exp.get('role', exp.get('title', ''))
                             company = exp.get('company', '')
                             if role:
-                                exp_summary.append(f"{role} at {company}")
+                                cv_exp_summary.append(f"{role} at {company}")
 
-                    if exp_summary:
-                        parts.append(f"Experience: {'; '.join(exp_summary)}")
+                    if cv_exp_summary:
+                        parts.append(f"CV Experience: {'; '.join(cv_exp_summary)}")
+
+                # Add CV skills (complement profile skills)
+                cv_skills = parsed.get('skills', {})
+                if isinstance(cv_skills, dict):
+                    tech = cv_skills.get('technical', [])
+                    if tech and isinstance(tech, list):
+                        parts.append(f"CV Skills: {', '.join(tech[:10])}")
+
+        # Add interest signals from saved/applied jobs
+        # This helps the AI understand what kinds of jobs the user is interested in
+        if interested_jobs:
+            interested_titles = []
+            interested_companies = []
+
+            for job in interested_jobs[:5]:  # Limit to 5 most recent
+                if job.title:
+                    interested_titles.append(job.title)
+                if job.company:
+                    interested_companies.append(job.company)
+
+            if interested_titles:
+                parts.append(f"Interested in jobs like: {', '.join(interested_titles[:5])}")
+
+            if interested_companies:
+                unique_companies = list(dict.fromkeys(interested_companies))[:3]
+                parts.append(f"Companies of interest: {', '.join(unique_companies)}")
 
         profile_text = ". ".join(parts)
-        logger.debug(f"User profile text: {profile_text[:200]}...")
+        logger.info(f"User profile text ({len(profile_text)} chars): {profile_text[:300]}...")
         return profile_text
 
     def create_job_text(self, job: Job) -> str:
@@ -203,14 +333,28 @@ class AIJobMatcher:
         Returns:
             float: Boost percentage (0-40)
         """
+        import json
         job_title_lower = job_title.lower()
 
         # Get user's target job titles
         target_titles = []
+
+        # Handle primary_job_title (may contain multiple titles separated by "|")
         if profile.primary_job_title:
-            target_titles.append(profile.primary_job_title.lower())
+            primary_titles = [t.strip().lower() for t in profile.primary_job_title.split("|")]
+            target_titles.extend(primary_titles)
+
+        # Handle secondary_job_titles (may be list or JSON string)
         if profile.secondary_job_titles:
-            target_titles.extend([t.lower() for t in profile.secondary_job_titles])
+            secondary = profile.secondary_job_titles
+            if isinstance(secondary, str):
+                try:
+                    secondary = json.loads(secondary)
+                except (json.JSONDecodeError, TypeError):
+                    secondary = [secondary]
+
+            if isinstance(secondary, list):
+                target_titles.extend([t.lower() for t in secondary if isinstance(t, str)])
 
         if not target_titles:
             return 0.0
@@ -417,6 +561,7 @@ class AIJobMatcher:
 
     def _generate_match_reasons(self, score: float, profile: UserProfile, job: Job) -> List[str]:
         """Generate human-readable reasons for the match."""
+        import json
         reasons = []
 
         if score >= 70:
@@ -427,11 +572,21 @@ class AIJobMatcher:
             reasons.append("Good match - worth applying")
 
         # Check for title alignment (check both primary and secondary titles)
+        # Handle pipe-separated primary titles and JSON secondary titles
         user_titles = []
         if profile.primary_job_title:
-            user_titles.append(profile.primary_job_title.lower())
+            # Split by "|" for multiple titles
+            user_titles.extend([t.strip().lower() for t in profile.primary_job_title.split("|")])
+
         if profile.secondary_job_titles:
-            user_titles.extend([t.lower() for t in profile.secondary_job_titles])
+            secondary = profile.secondary_job_titles
+            if isinstance(secondary, str):
+                try:
+                    secondary = json.loads(secondary)
+                except (json.JSONDecodeError, TypeError):
+                    secondary = [secondary]
+            if isinstance(secondary, list):
+                user_titles.extend([t.lower() for t in secondary if isinstance(t, str)])
 
         job_title_lower = job.title.lower()
 
@@ -442,15 +597,123 @@ class AIJobMatcher:
                 reasons.append("Title aligns with your target roles")
                 break
 
-        # Check remote preference
-        if profile.work_preference == "remote" and job.remote_type == "remote":
+        # Check remote/flexible preference
+        if profile.work_preference in ["remote", "flexible"] and job.remote_type == "remote":
             reasons.append("Remote position matches your preference")
+        elif profile.work_preference == "flexible" and job.remote_type in ["remote", "hybrid"]:
+            reasons.append("Flexible work option matches your preference")
 
         # Check seniority
         if profile.seniority_level and profile.seniority_level.lower() in job.title.lower():
             reasons.append(f"Matches your {profile.seniority_level} level")
 
         return reasons[:5]  # Limit to 5 reasons
+
+    async def match_jobs_to_cv(
+        self,
+        cv: Optional[CV],
+        jobs: List[Job],
+        user_id: str,
+        db: Session,
+        interested_jobs: Optional[List[Job]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Match jobs to a user using their CV, profile, and interest signals.
+
+        This is the main method used by the recommendation generator.
+        It combines:
+        - Profile settings (job titles, skills, preferences)
+        - CV data (experience, education)
+        - Interest signals (jobs user has saved/applied to)
+
+        Args:
+            cv: User's CV (optional - can be None if user only has profile)
+            jobs: List of jobs to match against
+            user_id: User's UUID
+            db: Database session
+            interested_jobs: Jobs user has shown interest in (saved, applied, etc.)
+
+        Returns:
+            List of matches with job_id, match_score, and match_reason
+        """
+        # Get user profile (required for matching)
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+        if not profile:
+            logger.warning(f"No profile found for user {user_id} - cannot generate recommendations")
+            return []
+
+        # Check if we have enough data to match
+        has_profile_data = bool(
+            profile.primary_job_title or
+            profile.secondary_job_titles or
+            profile.technical_skills
+        )
+        has_cv_data = bool(cv and cv.parsed_content)
+        has_interest_signals = bool(interested_jobs and len(interested_jobs) > 0)
+
+        if not has_profile_data and not has_cv_data and not has_interest_signals:
+            logger.warning(f"User {user_id} has no profile, CV, or interest signals - skipping recommendations")
+            return []
+
+        # Create user profile embedding (combines profile + CV + interest signals)
+        logger.info(f"Creating embedding for user {user_id} (profile: {has_profile_data}, CV: {has_cv_data}, interests: {has_interest_signals})")
+        user_text = self.create_user_profile_text(profile, cv, interested_jobs)
+
+        if not user_text.strip():
+            logger.warning(f"Empty profile text for user {user_id}")
+            return []
+
+        user_embedding = self.get_embedding(user_text)
+
+        if not user_embedding:
+            logger.error(f"Failed to create user embedding for {user_id}")
+            return []
+
+        # Filter to tech jobs to save API costs
+        tech_jobs = self._filter_tech_jobs(jobs)
+        logger.info(f"Matching against {len(tech_jobs)} tech jobs (filtered from {len(jobs)})")
+
+        matches = []
+
+        for job in tech_jobs:
+            try:
+                # Create job embedding
+                job_text = self.create_job_text(job)
+                job_embedding = self.get_embedding(job_text)
+
+                if not job_embedding:
+                    continue
+
+                # Calculate cosine similarity (0-1)
+                similarity = self.cosine_similarity(user_embedding, job_embedding)
+
+                # Convert to percentage (0-100)
+                score = round(similarity * 100, 2)
+
+                # Apply title boost for matching job titles
+                title_boost = self._calculate_title_boost(job.title, profile)
+                if title_boost > 0:
+                    score = min(100, score + title_boost)
+
+                # Only include matches above minimum threshold
+                if score >= self.MIN_SCORE:
+                    reasons = self._generate_match_reasons(score, profile, job)
+                    reason_text = reasons[0] if reasons else "AI-based profile matching"
+
+                    matches.append({
+                        "job_id": str(job.id),
+                        "match_score": score,
+                        "match_reason": reason_text,
+                        "match_reasons": reasons,
+                    })
+
+            except Exception as e:
+                logger.error(f"Error matching job {job.id}: {e}")
+                continue
+
+        logger.info(f"Generated {len(matches)} matches for user {user_id}")
+        return matches
 
     def _store_match(
         self,

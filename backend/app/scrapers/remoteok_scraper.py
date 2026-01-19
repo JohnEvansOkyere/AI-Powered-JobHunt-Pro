@@ -58,9 +58,10 @@ class RemoteOKScraper(BaseScraper):
             jobs_data = data[1:] if isinstance(data, list) and len(data) > 1 else []
 
             # Filter jobs by keywords if provided
+            # Only use first 10 keywords to avoid over-filtering
             if keywords:
                 filtered_jobs = []
-                keywords_lower = [kw.lower() for kw in keywords]
+                keywords_lower = [kw.lower() for kw in keywords[:10]]
 
                 for job in jobs_data:
                     # Check if any keyword matches position, company, or tags

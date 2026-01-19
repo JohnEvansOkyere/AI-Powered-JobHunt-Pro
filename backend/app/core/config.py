@@ -62,7 +62,13 @@ class Settings(BaseSettings):
     GROK_API_KEY: str = Field(default="", description="Grok API key")
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
-    SERPAPI_API_KEY: str = Field(default="", description="SerpAPI key for Google Jobs")
+
+    # Job Scraper API Keys (all optional - some FREE scrapers work without any keys)
+    SERPAPI_API_KEY: str = Field(default="", description="SerpAPI key for Google Jobs (PAID)")
+    JOOBLE_API_KEY: str = Field(default="", description="Jooble API key (FREE from jooble.org/api/about)")
+    FINDWORK_API_KEY: str = Field(default="", description="FindWork.dev API key (FREE tier: 50 req/day)")
+    ADZUNA_APP_ID: str = Field(default="", description="Adzuna App ID (FREE from developer.adzuna.com)")
+    ADZUNA_APP_KEY: str = Field(default="", description="Adzuna App Key (FREE from developer.adzuna.com)")
 
     # Celery & Redis
     REDIS_URL: str = Field(

@@ -16,9 +16,9 @@ type TabType = 'recommendations' | 'all-jobs'
 export default function JobsPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('recommendations')
-  const [jobs, setJobs] = useState<Job[]>([])
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('') // Only updates on form submit
   const [filters, setFilters] = useState<FilterState>({
     jobTitle: '',
     location: '',
@@ -33,10 +33,11 @@ export default function JobsPage() {
   const [total, setTotal] = useState(0)
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
 
-  // Load jobs from API when tab, page, or filters change
+  // Load jobs from API when tab, page, or applied search/filters change
+  // Note: searchQuery is NOT in dependencies - only appliedSearchQuery is
   useEffect(() => {
     loadJobs()
-  }, [activeTab, page, searchQuery, filters])
+  }, [activeTab, page, appliedSearchQuery, filters])
 
   // Reset to page 1 when changing tabs
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function JobsPage() {
       if (activeTab === 'recommendations') {
         // Recommendations tab: Fetch pre-computed recommendations (instant!)
         const response = await getRecommendations(page, 20)
-        setJobs(response.jobs)
         setFilteredJobs(response.jobs)
         setTotal(response.total)
         setTotalPages(response.total_pages)
@@ -69,8 +69,8 @@ export default function JobsPage() {
         // Add search query (job title from filter or search box)
         if (filters.jobTitle) {
           params.q = filters.jobTitle
-        } else if (searchQuery) {
-          params.q = searchQuery
+        } else if (appliedSearchQuery) {
+          params.q = appliedSearchQuery
         }
 
         // Add filters
@@ -100,7 +100,6 @@ export default function JobsPage() {
         }
 
         const response = await searchJobs(params)
-        setJobs(response.jobs)
         setFilteredJobs(response.jobs)
         setTotal(response.total)
         setTotalPages(response.total_pages)
@@ -162,7 +161,7 @@ export default function JobsPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setPage(1)
-    loadJobs()
+    setAppliedSearchQuery(searchQuery) // This triggers useEffect to load jobs
   }
 
   return (

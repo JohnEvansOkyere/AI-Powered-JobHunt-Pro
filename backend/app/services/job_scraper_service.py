@@ -35,18 +35,30 @@ class JobScraperService:
             "linkedin": LinkedInScraper(),
             "indeed": IndeedScraper(),
             "ai": AIScraper(),
-            "remotive": None,   # Lazy init below (FREE)
-            "remoteok": None,   # Lazy init below (FREE)
-            "adzuna": None,     # Lazy init below (FREE)
-            "joinrise": None,   # Lazy init below (FREE - may have Ghana jobs)
-            "serpapi": None,    # Lazy init below (PAID - optional)
+            # FREE scrapers (no API key needed)
+            "remotive": None,
+            "remoteok": None,
+            "adzuna": None,
+            "joinrise": None,
+            "arbeitnow": None,
+            # "hiringcafe" disabled - API not publicly available (returns 429)
+            # Scrapers requiring API key
+            "serpapi": None,
+            "jooble": None,
+            "findwork": None,
         }
 
-        # Lazy-load Remotive (FREE - no API key needed)
+        # ============================================
+        # FREE SCRAPERS (No API key required)
+        # ============================================
+
+        # Remotive scraper (FREE - no API key needed)
+        # Note: Remotive API sometimes has Cloudflare 526 errors
+        # Try to initialize it, but it may fail during scraping
         try:
             from app.scrapers.remotive_scraper import RemotiveScraper
             self.scrapers["remotive"] = RemotiveScraper()
-            logger.info("Remotive scraper initialized (FREE)")
+            logger.info("Remotive scraper initialized (FREE) - may have intermittent Cloudflare issues")
         except Exception as e:
             logger.warning(f"Remotive scraper unavailable: {e}")
 
@@ -58,13 +70,7 @@ class JobScraperService:
         except Exception as e:
             logger.warning(f"RemoteOK scraper unavailable: {e}")
 
-        # Lazy-load Adzuna (FREE - no API key needed)
-        try:
-            from app.scrapers.adzuna_scraper import AdzunaScraper
-            self.scrapers["adzuna"] = AdzunaScraper()
-            logger.info("Adzuna scraper initialized (FREE)")
-        except Exception as e:
-            logger.warning(f"Adzuna scraper unavailable: {e}")
+        # Note: Adzuna moved to paid/API key section below
 
         # Lazy-load Joinrise (FREE - no API key needed, may have Ghana jobs)
         try:
@@ -74,16 +80,74 @@ class JobScraperService:
         except Exception as e:
             logger.warning(f"Joinrise scraper unavailable: {e}")
 
+        # Lazy-load Arbeitnow (FREE - no API key needed)
+        try:
+            from app.scrapers.arbeitnow_scraper import ArbeitnowScraper
+            self.scrapers["arbeitnow"] = ArbeitnowScraper()
+            logger.info("Arbeitnow scraper initialized (FREE)")
+        except Exception as e:
+            logger.warning(f"Arbeitnow scraper unavailable: {e}")
+
+        # HiringCafe disabled - API not publicly available (returns 429 rate limit)
+        # Uncomment if API becomes available
+        # try:
+        #     from app.scrapers.hiringcafe_scraper import HiringCafeScraper
+        #     self.scrapers["hiringcafe"] = HiringCafeScraper()
+        #     logger.info("HiringCafe scraper initialized (FREE)")
+        # except Exception as e:
+        #     logger.warning(f"HiringCafe scraper unavailable: {e}")
+
+        # ============================================
+        # PAID / API KEY REQUIRED SCRAPERS
+        # ============================================
+
         # SerpAPI scraper (PAID - optional, only if API key is set)
         try:
-            serpapi_key = settings.SERPAPI_API_KEY
+            serpapi_key = getattr(settings, 'SERPAPI_API_KEY', None)
             if serpapi_key and serpapi_key.strip():
                 self.scrapers["serpapi"] = SerpAPIScraper(api_key=serpapi_key)
                 logger.info("SerpAPI scraper initialized (PAID)")
             else:
-                logger.info("SERPAPI_API_KEY not set; using free scrapers only")
+                logger.debug("SERPAPI_API_KEY not set; SerpAPI scraper disabled")
         except Exception as e:
             logger.warning(f"SerpAPI scraper unavailable: {e}")
+
+        # Jooble scraper (FREE API key from jooble.org/api/about)
+        try:
+            jooble_key = getattr(settings, 'JOOBLE_API_KEY', None)
+            if jooble_key and jooble_key.strip():
+                from app.scrapers.jooble_scraper import JoobleScraper
+                self.scrapers["jooble"] = JoobleScraper(api_key=jooble_key)
+                logger.info("Jooble scraper initialized (FREE API key)")
+            else:
+                logger.debug("JOOBLE_API_KEY not set; Jooble scraper disabled")
+        except Exception as e:
+            logger.warning(f"Jooble scraper unavailable: {e}")
+
+        # FindWork scraper (FREE tier: 50 requests/day)
+        try:
+            findwork_key = getattr(settings, 'FINDWORK_API_KEY', None)
+            if findwork_key and findwork_key.strip():
+                from app.scrapers.findwork_scraper import FindWorkScraper
+                self.scrapers["findwork"] = FindWorkScraper(api_key=findwork_key)
+                logger.info("FindWork scraper initialized (FREE tier)")
+            else:
+                logger.debug("FINDWORK_API_KEY not set; FindWork scraper disabled")
+        except Exception as e:
+            logger.warning(f"FindWork scraper unavailable: {e}")
+
+        # Adzuna scraper (FREE API key from https://developer.adzuna.com/signup)
+        try:
+            adzuna_app_id = getattr(settings, 'ADZUNA_APP_ID', None)
+            adzuna_app_key = getattr(settings, 'ADZUNA_APP_KEY', None)
+            if adzuna_app_id and adzuna_app_id.strip() and adzuna_app_key and adzuna_app_key.strip():
+                from app.scrapers.adzuna_scraper import AdzunaScraper
+                self.scrapers["adzuna"] = AdzunaScraper(app_id=adzuna_app_id, app_key=adzuna_app_key)
+                logger.info("Adzuna scraper initialized (FREE API key)")
+            else:
+                logger.debug("ADZUNA_APP_ID/ADZUNA_APP_KEY not set; Adzuna scraper disabled")
+        except Exception as e:
+            logger.warning(f"Adzuna scraper unavailable: {e}")
     
     def get_scraper(self, source: str) -> Optional[BaseScraper]:
         """

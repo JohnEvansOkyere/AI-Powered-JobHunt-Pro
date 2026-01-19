@@ -7,12 +7,18 @@ Docs: https://remotive.io/api/remote-jobs
 
 from typing import List, Optional
 from datetime import datetime
-import requests
+import httpx
 
 from app.scrapers.base import BaseScraper, JobListing
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+# User-Agent to avoid Cloudflare blocking
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
 
 
 class RemotiveScraper(BaseScraper):
@@ -35,21 +41,49 @@ class RemotiveScraper(BaseScraper):
         Scrape jobs from Remotive public API.
 
         Args:
-            keywords: Search keywords
+            keywords: Search keywords (only first 3 are used for API query)
             location: Location filter (ignored; Remotive is remote-first)
             max_results: Maximum number of results
 
         Returns:
             List[JobListing]: Scraped job listings
         """
-        query = " ".join(keywords) if keywords else ""
-        params = {"search": query} if query else {}
+        # Note: Remotive API can be flaky with search queries (Cloudflare issues)
+        # Use category parameter instead of search for more reliable results
+        # Available categories: software-dev, data, marketing, sales, etc.
+        params = {"limit": max_results}
+
+        # Try category=software-dev for tech jobs instead of search
+        if keywords:
+            # Check if any keywords relate to common categories
+            keywords_lower = " ".join(keywords[:5]).lower()
+            if any(k in keywords_lower for k in ["software", "developer", "engineer", "backend", "frontend"]):
+                params["category"] = "software-dev"
+            elif any(k in keywords_lower for k in ["data", "analyst", "scientist"]):
+                params["category"] = "data"
+            elif any(k in keywords_lower for k in ["devops", "sre", "infrastructure"]):
+                params["category"] = "devops-sysadmin"
+            elif any(k in keywords_lower for k in ["design", "ux", "ui"]):
+                params["category"] = "design"
+            elif any(k in keywords_lower for k in ["product", "manager"]):
+                params["category"] = "product"
 
         try:
-            resp = requests.get(self.BASE_URL, params=params, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
+            async with httpx.AsyncClient(timeout=30.0, headers=HEADERS, follow_redirects=True) as client:
+                resp = await client.get(self.BASE_URL, params=params)
+                resp.raise_for_status()
+                data = resp.json()
             jobs = data.get("jobs", [])[:max_results]
+
+            # Filter by keywords if provided (since category may be broad)
+            if keywords:
+                keywords_lower = [kw.lower() for kw in keywords[:10]]
+                filtered_jobs = []
+                for job in jobs:
+                    job_text = f"{job.get('title', '')} {job.get('company_name', '')} {job.get('description', '')}".lower()
+                    if any(kw in job_text for kw in keywords_lower):
+                        filtered_jobs.append(job)
+                jobs = filtered_jobs[:max_results] if filtered_jobs else jobs[:max_results]
 
             listings: List[JobListing] = []
             for job in jobs:
@@ -68,7 +102,8 @@ class RemotiveScraper(BaseScraper):
                 )
                 listings.append(self.normalize_job(listing))
 
-            logger.info(f"Remotive: fetched {len(listings)} jobs for query='{query}'")
+            category = params.get("category", "all")
+            logger.info(f"Remotive: fetched {len(listings)} jobs for category='{category}'")
             return listings
         except Exception as e:
             logger.error(f"Remotive scraping failed: {e}", exc_info=True)

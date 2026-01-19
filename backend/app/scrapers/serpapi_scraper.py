@@ -36,12 +36,22 @@ class SerpAPIScraper(BaseScraper):
             logger.warning("SerpAPI API key not configured; skipping SerpAPI scraping.")
             return []
 
-        query = " ".join(keywords) if keywords else ""
+        # Limit keywords to first 3 to avoid query too long errors (400 Bad Request)
+        # SerpAPI/Google Jobs works best with focused queries
+        query_keywords = keywords[:3] if keywords else []
+        query = " ".join(query_keywords) if query_keywords else "software engineer"
+
+        # Handle location - "Worldwide" is not valid for Google Jobs
+        # Use a default location or omit for worldwide searches
+        search_location = location
+        if not location or location.lower() in ["worldwide", "remote", "anywhere"]:
+            search_location = "United States"  # Default to US for broad searches
+
         params = {
             "engine": "google_jobs",
             "q": query,
             "api_key": self.api_key,
-            "location": location or "Ghana",
+            "location": search_location,
             "hl": "en",
         }
 

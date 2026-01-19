@@ -42,6 +42,29 @@ class GenerateCVResponse(BaseModel):
     created_at: Optional[str]
 
 
+class JobDetails(BaseModel):
+    """Job details for inclusion in application responses."""
+
+    id: uuid.UUID
+    title: str
+    company: str
+    location: Optional[str]
+    job_link: str
+    source: str
+    posted_date: Optional[datetime]
+    salary_range: Optional[str]
+    job_type: Optional[str]
+    remote_type: Optional[str]
+
+    @field_serializer('posted_date')
+    def serialize_posted_date(self, dt: datetime, _info):
+        """Serialize datetime to ISO format string."""
+        return dt.isoformat() if dt else None
+
+    class Config:
+        from_attributes = True
+
+
 class ApplicationResponse(BaseModel):
     """Application response model."""
 
@@ -62,9 +85,104 @@ class ApplicationResponse(BaseModel):
     def serialize_datetime(self, dt: datetime, _info):
         """Serialize datetime to ISO format string."""
         return dt.isoformat() if dt else None
-    
+
     class Config:
         from_attributes = True
+
+
+class ApplicationWithJobResponse(BaseModel):
+    """Application response with full job details."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    job_id: uuid.UUID
+    cv_id: Optional[uuid.UUID]
+    tailored_cv_path: Optional[str]
+    cover_letter: Optional[str]
+    application_email: Optional[str]
+    status: str
+    saved_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    job: Optional[JobDetails]
+
+    @field_serializer('created_at', 'updated_at', 'saved_at', 'expires_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime to ISO format string."""
+        return dt.isoformat() if dt else None
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# Static routes MUST come before dynamic routes
+# to avoid FastAPI matching "saved-jobs" as {application_id}
+# ==========================================
+
+@router.get("/saved-jobs", response_model=list[ApplicationWithJobResponse])
+def get_saved_jobs(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all saved jobs for the current user with full job details.
+
+    Returns applications with status='saved', ordered by saved_at desc.
+    Includes job title, company, location, and other details.
+    """
+    from sqlalchemy.orm import joinedload
+
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    saved_apps = db.query(Application).options(
+        joinedload(Application.job)
+    ).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.status == 'saved'
+        )
+    ).order_by(Application.saved_at.desc()).all()
+
+    logger.info(f"Retrieved {len(saved_apps)} saved jobs for user {user_id}")
+
+    # Build response with job details
+    result = []
+    for app in saved_apps:
+        app_dict = {
+            "id": app.id,
+            "user_id": app.user_id,
+            "job_id": app.job_id,
+            "cv_id": app.cv_id,
+            "tailored_cv_path": app.tailored_cv_path,
+            "cover_letter": app.cover_letter,
+            "application_email": app.application_email,
+            "status": app.status,
+            "saved_at": app.saved_at,
+            "expires_at": app.expires_at,
+            "created_at": app.created_at,
+            "updated_at": app.updated_at,
+            "job": None
+        }
+        if app.job:
+            app_dict["job"] = {
+                "id": app.job.id,
+                "title": app.job.title,
+                "company": app.job.company,
+                "location": app.job.location,
+                "job_link": app.job.job_link,
+                "source": app.job.source,
+                "posted_date": app.job.posted_date,
+                "salary_range": app.job.salary_range,
+                "job_type": app.job.job_type,
+                "remote_type": app.job.remote_type,
+            }
+        result.append(ApplicationWithJobResponse(**app_dict))
+
+    return result
 
 
 @router.post("/generate-cv/{job_id}", response_model=GenerateCVResponse, status_code=status.HTTP_201_CREATED)
@@ -170,25 +288,62 @@ def get_application_for_job(
     return None
 
 
-@router.get("/", response_model=list[ApplicationResponse])
+@router.get("/", response_model=list[ApplicationWithJobResponse])
 def list_applications(
     status_filter: Optional[str] = Query(None, description="Filter by status"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get list of user's applications."""
+    """Get list of user's applications with job details."""
+    from sqlalchemy.orm import joinedload
+
     user_id = current_user["id"]
     if isinstance(user_id, str):
         user_id = uuid.UUID(user_id)
-    
-    query = db.query(Application).filter(Application.user_id == user_id)
-    
+
+    query = db.query(Application).options(
+        joinedload(Application.job)
+    ).filter(Application.user_id == user_id)
+
     if status_filter:
         query = query.filter(Application.status == status_filter.lower())
-    
+
     applications = query.order_by(Application.created_at.desc()).limit(50).all()
-    
-    return [ApplicationResponse.from_orm(app) for app in applications]
+
+    # Build response with job details
+    result = []
+    for app in applications:
+        app_dict = {
+            "id": app.id,
+            "user_id": app.user_id,
+            "job_id": app.job_id,
+            "cv_id": app.cv_id,
+            "tailored_cv_path": app.tailored_cv_path,
+            "cover_letter": app.cover_letter,
+            "application_email": app.application_email,
+            "status": app.status,
+            "saved_at": app.saved_at,
+            "expires_at": app.expires_at,
+            "created_at": app.created_at,
+            "updated_at": app.updated_at,
+            "job": None
+        }
+        if app.job:
+            app_dict["job"] = {
+                "id": app.job.id,
+                "title": app.job.title,
+                "company": app.job.company,
+                "location": app.job.location,
+                "job_link": app.job.job_link,
+                "source": app.job.source,
+                "posted_date": app.job.posted_date,
+                "salary_range": app.job.salary_range,
+                "job_type": app.job.job_type,
+                "remote_type": app.job.remote_type,
+            }
+        result.append(ApplicationWithJobResponse(**app_dict))
+
+    return result
 
 
 @router.get("/{application_id}/download-url")
@@ -365,29 +520,110 @@ def unsave_job(
     return None
 
 
-@router.get("/saved-jobs", response_model=list[ApplicationResponse])
-def get_saved_jobs(
+class UpdateStatusRequest(BaseModel):
+    """Request model for updating application status."""
+    status: str  # 'saved', 'draft', 'reviewed', 'finalized', 'sent', 'submitted', 'interviewing', 'rejected', 'offer'
+
+
+@router.patch("/update-status/{job_id}", response_model=ApplicationResponse)
+def update_application_status(
+    job_id: uuid.UUID,
+    request: UpdateStatusRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Get all saved jobs for the current user.
+    Update the status of an application for a job.
 
-    Returns applications with status='saved', ordered by saved_at desc.
+    Valid statuses: saved, draft, reviewed, finalized, sent, submitted, interviewing, rejected, offer
+    """
+    valid_statuses = ['saved', 'draft', 'reviewed', 'finalized', 'sent', 'submitted', 'interviewing', 'rejected', 'offer']
+
+    if request.status.lower() not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+        )
+
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    application = db.query(Application).filter(
+        and_(
+            Application.user_id == user_id,
+            Application.job_id == job_id
+        )
+    ).first()
+
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found for this job"
+        )
+
+    old_status = application.status
+    application.status = request.status.lower()
+    db.commit()
+    db.refresh(application)
+
+    logger.info(f"Application for job {job_id} updated: {old_status} -> {application.status}")
+
+    return ApplicationResponse.from_orm(application)
+
+
+@router.post("/view-job/{job_id}", response_model=ApplicationResponse)
+def track_job_view(
+    job_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Track when a user views a job (marks it as 'draft' / in-progress).
+
+    If the user has no application for this job, creates one with status='draft'.
+    If the user has a 'saved' application, updates it to 'draft'.
+    If already 'draft' or further, returns current state without changes.
     """
     user_id = current_user["id"]
     if isinstance(user_id, str):
         user_id = uuid.UUID(user_id)
 
-    saved_apps = db.query(Application).filter(
+    # Verify job exists
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+
+    # Check for existing application
+    application = db.query(Application).filter(
         and_(
             Application.user_id == user_id,
-            Application.status == 'saved'
+            Application.job_id == job_id
         )
-    ).order_by(Application.saved_at.desc()).all()
+    ).first()
 
-    logger.info(f"Retrieved {len(saved_apps)} saved jobs for user {user_id}")
+    if application:
+        # If saved, move to draft (in progress)
+        if application.status == 'saved':
+            application.status = 'draft'
+            db.commit()
+            db.refresh(application)
+            logger.info(f"Job {job_id} moved from 'saved' to 'draft' for user {user_id}")
+        else:
+            logger.info(f"Job {job_id} already in status '{application.status}' for user {user_id}")
+    else:
+        # Create new application in draft status
+        application = Application(
+            user_id=user_id,
+            job_id=job_id,
+            status="draft",
+        )
+        db.add(application)
+        db.commit()
+        db.refresh(application)
+        logger.info(f"Created draft application for job {job_id} for user {user_id}")
 
-    return [ApplicationResponse.from_orm(app) for app in saved_apps]
-
-
+    return ApplicationResponse.from_orm(application)
