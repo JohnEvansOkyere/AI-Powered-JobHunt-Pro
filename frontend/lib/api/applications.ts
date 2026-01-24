@@ -12,6 +12,36 @@ export interface GenerateCVRequest {
   emphasize_relevant_experience?: boolean
 }
 
+export interface GenerateCustomCVRequest {
+  job_title: string
+  company_name: string
+  job_description: string
+  location?: string
+  job_type?: string
+  remote_type?: string
+  tone?: 'professional' | 'confident' | 'friendly' | 'enthusiastic'
+  highlight_skills?: boolean
+  emphasize_relevant_experience?: boolean
+}
+
+export interface GenerateCoverLetterRequest {
+  job_title: string
+  company_name: string
+  job_description: string
+  location?: string
+  job_type?: string
+  remote_type?: string
+  tone?: 'professional' | 'confident' | 'friendly' | 'enthusiastic'
+  length?: 'short' | 'medium' | 'long'
+}
+
+export interface GenerateCoverLetterResponse {
+  application_id: string
+  cover_letter: string
+  status: string
+  created_at?: string
+}
+
 export interface GenerateCVResponse {
   application_id: string
   cv_path: string
@@ -42,6 +72,30 @@ export async function generateTailoredCV(
 ): Promise<GenerateCVResponse> {
   return apiClient.post<GenerateCVResponse>(
     `/api/v1/applications/generate-cv/${jobId}`,
+    request
+  )
+}
+
+/**
+ * Generate a tailored CV from a custom job description
+ */
+export async function generateCustomTailoredCV(
+  request: GenerateCustomCVRequest
+): Promise<GenerateCVResponse> {
+  return apiClient.post<GenerateCVResponse>(
+    `/api/v1/applications/generate-cv-custom`,
+    request
+  )
+}
+
+/**
+ * Generate a cover letter from a custom job description
+ */
+export async function generateCustomCoverLetter(
+  request: GenerateCoverLetterRequest
+): Promise<GenerateCoverLetterResponse> {
+  return apiClient.post<GenerateCoverLetterResponse>(
+    `/api/v1/applications/generate-cover-letter-custom`,
     request
   )
 }

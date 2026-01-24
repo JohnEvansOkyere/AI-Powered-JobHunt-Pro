@@ -5,6 +5,7 @@ Generates tailored CVs for specific job applications using AI.
 """
 
 import json
+import uuid
 from typing import Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -196,6 +197,191 @@ class CVGenerator:
             
         except Exception as e:
             logger.error(f"Error generating tailored CV: {e}", exc_info=True)
+            db.rollback()
+            raise
+    
+    async def generate_tailored_cv_from_custom_description(
+        self,
+        user_id: str,
+        job_title: str,
+        company_name: str,
+        job_description: str,
+        location: Optional[str],
+        job_type: Optional[str],
+        remote_type: Optional[str],
+        db: Session,
+        tone: str = "professional",
+        highlight_skills: bool = True,
+        emphasize_relevant_experience: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate a tailored CV from a custom job description provided by the user.
+
+        This function:
+        1. Creates a temporary job record (or uses in-memory job object)
+        2. Downloads the user's original CV file from storage
+        3. Generates tailored text content using AI based on custom job description
+        4. Updates the original CV with tailored content (preserves format)
+        5. Saves the tailored CV as a new file
+        6. Keeps the original CV untouched
+
+        Args:
+            user_id: User ID
+            job_title: Job title provided by user
+            company_name: Company name provided by user
+            job_description: Job description provided by user
+            location: Optional location
+            job_type: Optional job type (full-time, part-time, etc.)
+            remote_type: Optional remote type (remote, hybrid, on-site)
+            db: Database session
+            tone: Writing tone (professional, confident, friendly)
+            highlight_skills: Whether to highlight relevant skills
+            emphasize_relevant_experience: Whether to emphasize relevant experience
+
+        Returns:
+            dict: Generation result with CV path and metadata
+        """
+        try:
+            # Get user's active CV
+            cv = db.query(CV).filter(
+                CV.user_id == user_id,
+                CV.is_active == True
+            ).first()
+
+            if not cv:
+                raise ValueError("No active CV found. Please upload a CV first.")
+
+            if not cv.parsed_content:
+                raise ValueError("CV has not been parsed yet. Please wait for parsing to complete.")
+
+            # Create a temporary job object (not saved to DB, just for AI processing)
+            # Using a simple dict to represent the job
+            temp_job_id = str(uuid.uuid4())
+            
+            # Create temporary job record for tracking purposes
+            temp_job = Job(
+                id=uuid.UUID(temp_job_id),
+                title=job_title,
+                company=company_name,
+                description=job_description,
+                location=location or "Not specified",
+                job_type=job_type or "full-time",
+                remote_type=remote_type or "unspecified",
+                job_link=f"custom-job-{temp_job_id}",  # Placeholder
+                source="custom",
+                salary_range=None,
+                requirements=None,
+                posted_date=datetime.utcnow(),
+                expires_at=None,
+                match_score=None
+            )
+            
+            # Add temporary job to session (will be saved when we commit the application)
+            db.add(temp_job)
+            db.flush()  # Get the ID without committing
+
+            # Get user profile for additional context
+            profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+            logger.info(f"Generating tailored CV for user {user_id} with custom job description")
+            logger.info(f"Job: {job_title} at {company_name}")
+            logger.info(f"Original CV file: {cv.file_path}, Type: {cv.file_type}")
+
+            # Prepare CV data
+            cv_data = cv.parsed_content
+            if isinstance(cv_data, str):
+                cv_data = json.loads(cv_data)
+
+            # Generate tailored CV content using AI
+            tailored_content = await self._generate_cv_content(
+                cv_data=cv_data,
+                job=temp_job,
+                profile=profile,
+                tone=tone,
+                highlight_skills=highlight_skills,
+                emphasize_relevant_experience=emphasize_relevant_experience
+            )
+
+            # Download original CV file from storage
+            try:
+                original_cv_data = self.supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).download(cv.file_path)
+                logger.info(f"Downloaded original CV from storage: {len(original_cv_data)} bytes")
+            except Exception as e:
+                logger.error(f"Failed to download original CV: {e}")
+                raise ValueError(f"Failed to access original CV file: {str(e)}")
+
+            # Generate tailored CV file (preserving original format)
+            file_name, file_bytes, content_type = await self._create_tailored_cv_file(
+                original_cv_data=original_cv_data,
+                original_file_type=cv.file_type,
+                tailored_content=tailored_content,
+                cv_data=cv_data,
+                job=temp_job
+            )
+
+            # Save to Supabase Storage
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            storage_path = f"tailored-cvs/{user_id}/custom_{timestamp}_{file_name}"
+            
+            # Upload to Supabase Storage
+            try:
+                storage_response = self.supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                    path=storage_path,
+                    file=file_bytes,
+                    file_options={"content-type": content_type, "upsert": "true"}
+                )
+                
+                # Check for errors (Supabase returns UploadResponse object)
+                if hasattr(storage_response, 'error') and storage_response.error:
+                    raise ValueError(f"Failed to upload tailored CV: {storage_response.error}")
+                elif isinstance(storage_response, dict) and storage_response.get("error"):
+                    raise ValueError(f"Failed to upload tailored CV: {storage_response['error']}")
+                
+                logger.info(f"Tailored CV uploaded successfully to: {storage_path}")
+                
+            except Exception as storage_error:
+                logger.error(f"Supabase Storage upload exception: {storage_error}")
+                raise ValueError(f"Failed to upload tailored CV to storage: {str(storage_error)}")
+            
+            # Get public URL
+            try:
+                public_url_result = self.supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(storage_path)
+                public_url = public_url_result if isinstance(public_url_result, str) else public_url_result.get("publicUrl", "")
+            except Exception as e:
+                logger.warning(f"Could not get public URL: {e}")
+                public_url = ""
+            
+            # Create Application record with the custom job
+            application = Application(
+                user_id=user_id,
+                job_id=temp_job.id,
+                cv_id=cv.id,
+                tailored_cv_path=storage_path,
+                status="draft",
+                generation_settings={
+                    "tone": tone,
+                    "highlight_skills": highlight_skills,
+                    "emphasize_relevant_experience": emphasize_relevant_experience,
+                    "custom_job": True
+                }
+            )
+            db.add(application)
+            
+            db.commit()
+            db.refresh(application)
+            
+            logger.info(f"Successfully generated tailored CV for user {user_id} with custom job description")
+            
+            return {
+                "application_id": str(application.id),
+                "cv_path": storage_path,
+                "public_url": public_url,
+                "status": "completed",
+                "created_at": application.created_at.isoformat() if application.created_at else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating custom tailored CV: {e}", exc_info=True)
             db.rollback()
             raise
     

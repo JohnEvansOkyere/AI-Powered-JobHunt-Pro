@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { uploadCV, getCVs, getActiveCV, deleteCV, getCVDownloadURL, CV, CVDetail } from '@/lib/api/cvs'
-import { Upload, FileText, Download, Trash2, CheckCircle, XCircle, Loader, AlertCircle } from 'lucide-react'
+import { Upload, FileText, Download, Trash2, CheckCircle, XCircle, Loader, AlertCircle, Sparkles } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import Link from 'next/link'
 
 export default function CVPage() {
   const [cvs, setCVs] = useState<CV[]>([])
@@ -151,6 +152,20 @@ export default function CVPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-neutral-800 mb-2">CV Management</h1>
             <p className="text-neutral-600">Upload and manage your CV files</p>
+            
+            {/* Custom CV Generation Link */}
+            <div className="mt-4 flex items-center space-x-3">
+              <Link
+                href="/dashboard/cv/custom"
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Generate Custom CV</span>
+              </Link>
+              <p className="text-sm text-neutral-500">
+                Paste any job description and get a tailored CV instantly
+              </p>
+            </div>
           </div>
 
           {/* Upload Area */}

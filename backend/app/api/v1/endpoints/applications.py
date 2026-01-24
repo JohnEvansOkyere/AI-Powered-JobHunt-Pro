@@ -17,6 +17,7 @@ from app.core.logging import get_logger
 from app.models.application import Application
 from app.models.job import Job
 from app.services.cv_generator import get_cv_generator
+from app.services.cover_letter_generator import get_cover_letter_generator
 from pydantic import BaseModel, field_serializer
 
 router = APIRouter()
@@ -30,6 +31,42 @@ class GenerateCVRequest(BaseModel):
     tone: Optional[str] = "professional"  # professional, confident, friendly
     highlight_skills: bool = True
     emphasize_relevant_experience: bool = True
+
+
+class GenerateCustomCVRequest(BaseModel):
+    """Request model for custom job description CV generation."""
+    
+    job_title: str
+    company_name: str
+    job_description: str
+    location: Optional[str] = None
+    job_type: Optional[str] = None
+    remote_type: Optional[str] = None
+    tone: Optional[str] = "professional"  # professional, confident, friendly
+    highlight_skills: bool = True
+    emphasize_relevant_experience: bool = True
+
+
+class GenerateCoverLetterRequest(BaseModel):
+    """Request model for custom cover letter generation."""
+    
+    job_title: str
+    company_name: str
+    job_description: str
+    location: Optional[str] = None
+    job_type: Optional[str] = None
+    remote_type: Optional[str] = None
+    tone: Optional[str] = "professional"  # professional, confident, friendly, enthusiastic
+    length: Optional[str] = "medium"  # short, medium, long
+
+
+class GenerateCoverLetterResponse(BaseModel):
+    """Response model for cover letter generation."""
+    
+    application_id: str
+    cover_letter: str
+    status: str
+    created_at: Optional[str]
 
 
 class GenerateCVResponse(BaseModel):
@@ -235,6 +272,104 @@ async def generate_tailored_cv(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate tailored CV: {str(e)}"
+        )
+
+
+@router.post("/generate-cv-custom", response_model=GenerateCVResponse, status_code=status.HTTP_201_CREATED)
+async def generate_tailored_cv_custom(
+    request: GenerateCustomCVRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a tailored CV from a custom job description pasted by the user.
+    
+    - Requires an active CV to be uploaded
+    - User provides job title, company, and job description
+    - Uses AI to tailor the CV to the custom job requirements
+    - Saves the tailored CV to storage
+    - Creates a temporary job record for reference
+    """
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+    
+    try:
+        cv_generator = get_cv_generator()
+        result = await cv_generator.generate_tailored_cv_from_custom_description(
+            user_id=str(user_id),
+            job_title=request.job_title,
+            company_name=request.company_name,
+            job_description=request.job_description,
+            location=request.location,
+            job_type=request.job_type,
+            remote_type=request.remote_type,
+            db=db,
+            tone=request.tone,
+            highlight_skills=request.highlight_skills,
+            emphasize_relevant_experience=request.emphasize_relevant_experience
+        )
+        
+        return GenerateCVResponse(**result)
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error generating custom tailored CV: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate tailored CV: {str(e)}"
+        )
+
+
+@router.post("/generate-cover-letter-custom", response_model=GenerateCoverLetterResponse, status_code=status.HTTP_201_CREATED)
+async def generate_cover_letter_custom(
+    request: GenerateCoverLetterRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a cover letter from a custom job description pasted by the user.
+    
+    - Requires an active CV to be uploaded (for extracting applicant info)
+    - User provides job title, company, and job description
+    - Uses AI to generate a personalized cover letter
+    - Creates a temporary job record for reference
+    """
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+    
+    try:
+        cover_letter_generator = get_cover_letter_generator()
+        result = await cover_letter_generator.generate_cover_letter_from_custom_description(
+            user_id=str(user_id),
+            job_title=request.job_title,
+            company_name=request.company_name,
+            job_description=request.job_description,
+            location=request.location,
+            job_type=request.job_type,
+            remote_type=request.remote_type,
+            db=db,
+            tone=request.tone,
+            length=request.length
+        )
+        
+        return GenerateCoverLetterResponse(**result)
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error generating custom cover letter: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate cover letter: {str(e)}"
         )
 
 
