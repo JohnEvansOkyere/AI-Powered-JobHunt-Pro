@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useProfile } from '@/hooks/useProfile'
+import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import { Briefcase, FileText, User, Sparkles, ArrowRight, TrendingUp, Zap, Target, Plus, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -12,6 +13,7 @@ import { AddExternalJobModal } from '@/components/modals/AddExternalJobModal'
 
 export default function DashboardPage() {
   const { profile, loading: profileLoading } = useProfile()
+  const { user } = useAuth()
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -50,7 +52,7 @@ export default function DashboardPage() {
             <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="text-center md:text-left">
                 <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-                  Welcome back, <span className="text-brand-turquoise-400">{profile.full_name?.split(' ')[0] || 'Explorer'}</span>!
+                  Welcome back, <span className="text-brand-turquoise-400">{user?.email?.split('@')[0] || 'Explorer'}</span>!
                   <br />
                   <span className="text-2xl md:text-3xl text-neutral-400 font-bold">
                     {profile.primary_job_title || 'Expert Professional'}
