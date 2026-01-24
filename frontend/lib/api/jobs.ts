@@ -12,16 +12,26 @@ export interface Job {
   company: string
   location: string | null
   description: string
-  job_link: string
+  job_link: string | null  // Nullable for external jobs
   source: string
   source_id: string | null
+  source_url?: string | null  // New field for external jobs
   posted_date: string | null
   scraped_at: string
+  added_by_user_id?: string | null  // User who added external job
   normalized_title: string | null
   normalized_location: string | null
   salary_range: string | null
+  salary_min?: string | null  // New field
+  salary_max?: string | null  // New field
+  salary_currency?: string | null  // New field
   job_type: string | null
   remote_type: string | null
+  remote_option?: string | null  // New field
+  experience_level?: string | null  // New field
+  requirements?: string | null  // JSON array as text
+  responsibilities?: string | null  // JSON array as text
+  skills?: string | null  // JSON array as text
   processing_status: string
   created_at: string
   updated_at: string
@@ -159,5 +169,13 @@ export async function getRecommendations(
 
   const endpoint = `/api/v1/jobs/recommendations?${queryParams.toString()}`
   return apiClient.get<JobSearchResponse>(endpoint) as Promise<JobSearchResponse>
+}
+
+/**
+ * Delete an external job
+ * Only allows deletion of external jobs added by the current user
+ */
+export async function deleteJob(jobId: string): Promise<void> {
+  return apiClient.delete(`/api/v1/jobs/${jobId}`) as Promise<void>
 }
 

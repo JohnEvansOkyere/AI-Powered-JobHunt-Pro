@@ -6,7 +6,7 @@
 
 import { getCurrentSession } from '../auth'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
 export class ApiClient {
   private baseUrl: string
@@ -59,7 +59,29 @@ export class ApiClient {
       throw errorWithStatus
     }
 
-    return response.json()
+    // Handle 204 No Content responses (no body to parse)
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return undefined as T
+    }
+
+    // Check if response has content
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return response.json()
+    }
+
+    // If no content type or empty response, return undefined
+    const text = await response.text()
+    if (!text || text.trim() === '') {
+      return undefined as T
+    }
+
+    // Try to parse as JSON
+    try {
+      return JSON.parse(text)
+    } catch {
+      return undefined as T
+    }
   }
 
   async get<T>(endpoint: string): Promise<T> {

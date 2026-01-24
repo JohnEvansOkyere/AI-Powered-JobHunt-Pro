@@ -1,17 +1,19 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useProfile } from '@/hooks/useProfile'
 import Link from 'next/link'
-import { Briefcase, FileText, User, Sparkles, ArrowRight, TrendingUp, Zap, Target } from 'lucide-react'
+import { Briefcase, FileText, User, Sparkles, ArrowRight, TrendingUp, Zap, Target, Plus, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { AddExternalJobModal } from '@/components/modals/AddExternalJobModal'
 
 export default function DashboardPage() {
   const { profile, loading: profileLoading } = useProfile()
   const router = useRouter()
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     if (!profileLoading && !profile) {
@@ -47,21 +49,95 @@ export default function DashboardPage() {
             <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-brand-turquoise-500/20 to-transparent"></div>
             <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="text-center md:text-left">
-                <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
-                  Welcome back, <span className="text-brand-turquoise-400">{profile.primary_job_title || 'Expert'}</span>!
+                <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
+                  Welcome back, <span className="text-brand-turquoise-400">{profile.full_name?.split(' ')[0] || 'Explorer'}</span>!
+                  <br />
+                  <span className="text-2xl md:text-3xl text-neutral-400 font-bold">
+                    {profile.primary_job_title || 'Expert Professional'}
+                  </span>
                 </h2>
-                <p className="text-neutral-400 text-lg max-w-md">
+                <p className="text-neutral-500 text-lg max-w-md font-medium">
                   We've found <span className="text-white font-bold">12 new matches</span> that perfectly fit your profile since yesterday.
                 </p>
               </div>
               <Link 
                 href="/dashboard/jobs" 
-                className="btn-premium px-8 py-4 bg-brand-turquoise-500 text-white rounded-2xl font-black flex items-center space-x-3 shadow-xl"
+                className="btn-premium px-8 py-4 bg-brand-turquoise-500 text-white rounded-2xl font-black flex items-center space-x-3 group"
               >
                 <span>View My Matches</span>
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
+          </div>
+
+          {/* Power Actions Section - MORE PROMINENT */}
+          <div className="grid grid-cols-1 gap-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-brand-orange-500 via-brand-orange-600 to-orange-700 p-1 md:p-1.5 shadow-2xl shadow-brand-orange-500/30"
+            >
+              <div className="relative bg-neutral-900 rounded-[2.9rem] p-8 md:p-12 overflow-hidden">
+                {/* Background Decor */}
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 scale-150 rotate-12"></div>
+                <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-brand-orange-500/10 rounded-full blur-3xl"></div>
+                
+                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
+                  <div className="max-w-2xl text-center lg:text-left">
+                    <div className="inline-flex items-center space-x-2 bg-brand-orange-500/10 border border-brand-orange-500/20 rounded-full px-4 py-1.5 mb-6">
+                      <Sparkles className="w-4 h-4 text-brand-orange-400" />
+                      <span className="text-xs font-black text-brand-orange-400 uppercase tracking-widest">Power Feature</span>
+                    </div>
+                    <h2 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight">
+                      Found a job elsewhere?<br />
+                      <span className="text-brand-orange-400">Tailor your application in seconds.</span>
+                    </h2>
+                    <p className="text-neutral-400 text-lg md:text-xl leading-relaxed mb-8 font-medium">
+                      Paste any job URL or description from LinkedIn, Indeed, or company websites. 
+                      Our AI extracts the data and helps you generate a <span className="text-white font-bold underline decoration-brand-orange-500 underline-offset-4">winning CV & Cover Letter</span> instantly.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="btn-premium px-10 py-5 bg-brand-orange-500 text-white rounded-2xl font-black text-lg flex items-center space-x-3 group hover:shadow-2xl hover:shadow-brand-orange-500/40 transition-all active:scale-95"
+                      >
+                        <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+                        <span>Add External Job Now</span>
+                      </button>
+                      <div className="text-neutral-500 text-sm font-bold flex items-center gap-2 px-4">
+                        <CheckCircle2 className="w-4 h-4 text-brand-orange-500" />
+                        No manual entry required
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative lg:w-1/3 flex items-center justify-center">
+                    {/* Visual representation of the feature */}
+                    <div className="relative w-48 h-48 md:w-64 md:h-64">
+                      <div className="absolute inset-0 bg-brand-orange-500/20 rounded-full animate-ping"></div>
+                      <div className="relative w-full h-full bg-neutral-800 rounded-full border-4 border-brand-orange-500/30 flex items-center justify-center shadow-inner">
+                        <Plus className="w-24 h-24 text-brand-orange-500 drop-shadow-2xl" />
+                      </div>
+                      {/* Floating icons */}
+                      <motion.div 
+                        animate={{ y: [0, -10, 0] }} 
+                        transition={{ duration: 3, repeat: Infinity }}
+                        className="absolute -top-4 -right-4 p-4 bg-white rounded-2xl shadow-xl border border-neutral-100"
+                      >
+                        <Briefcase className="w-8 h-8 text-brand-turquoise-500" />
+                      </motion.div>
+                      <motion.div 
+                        animate={{ y: [0, 10, 0] }} 
+                        transition={{ duration: 4, repeat: Infinity }}
+                        className="absolute -bottom-4 -left-4 p-4 bg-white rounded-2xl shadow-xl border border-neutral-100"
+                      >
+                        <FileText className="w-8 h-8 text-brand-orange-500" />
+                      </motion.div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
 
           {/* Stats / Insights Grid */}
@@ -126,14 +202,6 @@ export default function DashboardPage() {
                 <h3 className="text-xl font-bold text-neutral-900 mb-2">Optimized Profile</h3>
                 <p className="text-neutral-500 leading-relaxed">Keep your professional identity sharp and up-to-date for maximum match accuracy.</p>
               </Link>
-
-              <div className="bg-neutral-50 rounded-[2rem] p-8 border border-neutral-100 border-dashed flex flex-col items-center justify-center text-center">
-                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6">
-                  <Sparkles className="h-7 w-7 text-neutral-300" />
-                </div>
-                <h3 className="text-xl font-bold text-neutral-300 mb-1">Upload CV</h3>
-                <p className="text-neutral-400 text-sm italic">Feature coming soon</p>
-              </div>
             </div>
 
             {/* Side Panel / Career Insights */}
@@ -174,6 +242,15 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Add External Job Modal */}
+        <AddExternalJobModal 
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={() => {
+            // Don't redirect - let user choose what to do next in the modal
+          }}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   )

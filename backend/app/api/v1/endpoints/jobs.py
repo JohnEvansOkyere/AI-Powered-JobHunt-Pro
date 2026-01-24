@@ -43,16 +43,26 @@ class JobResponse(BaseModel):
     company: str
     location: Optional[str]
     description: str
-    job_link: str
+    job_link: Optional[str]  # Nullable for external jobs
     source: str
     source_id: Optional[str]
+    source_url: Optional[str] = None  # New field for external jobs
     posted_date: Optional[datetime]
     scraped_at: datetime
+    added_by_user_id: Optional[uuid.UUID] = None  # User who added external job
     normalized_title: Optional[str]
     normalized_location: Optional[str]
     salary_range: Optional[str]
+    salary_min: Optional[str] = None  # New field
+    salary_max: Optional[str] = None  # New field
+    salary_currency: Optional[str] = None  # New field
     job_type: Optional[str]
     remote_type: Optional[str]
+    remote_option: Optional[str] = None  # New field
+    experience_level: Optional[str] = None  # New field
+    requirements: Optional[str] = None  # JSON array as text
+    responsibilities: Optional[str] = None  # JSON array as text
+    skills: Optional[str] = None  # JSON array as text
     processing_status: str
     created_at: datetime
     updated_at: datetime
@@ -526,4 +536,68 @@ def list_scraping_jobs(
     scraping_jobs = query.order_by(desc(ScrapingJob.created_at)).limit(50).all()
 
     return [ScrapingJobResponse.from_orm(job) for job in scraping_jobs]
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job(
+    job_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a job posting and its associated applications.
+    Only allows deletion of external jobs added by the current user.
+    """
+    from app.models.application import Application
+    
+    # Convert user_id to UUID if it's a string
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    # Find the job
+    job = db.query(Job).filter(Job.id == job_id).first()
+    
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+    
+    # Only allow deletion of external jobs added by the current user
+    if job.source != 'external':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Can only delete external jobs that you added"
+        )
+    
+    if job.added_by_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete jobs that you added"
+        )
+    
+    try:
+        # First, delete all associated applications
+        applications_count = db.query(Application).filter(
+            Application.job_id == job_id
+        ).delete(synchronize_session=False)
+        
+        # Then delete the job
+        db.delete(job)
+        db.commit()
+        
+        logger.info(
+            f"User {user_id} deleted external job {job_id} "
+            f"(with {applications_count} associated application(s))"
+        )
+        return None
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete job {job_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete job: {str(e)}"
+        )
 
