@@ -18,6 +18,7 @@ from app.models.application import Application
 from app.models.job import Job
 from app.services.cv_generator import get_cv_generator
 from app.services.cover_letter_generator import get_cover_letter_generator
+from app.utils.job_scraper import get_job_scraper
 from pydantic import BaseModel, field_serializer
 
 router = APIRouter()
@@ -38,7 +39,8 @@ class GenerateCustomCVRequest(BaseModel):
     
     job_title: str
     company_name: str
-    job_description: str
+    job_description: Optional[str] = None  # Either this OR job_link must be provided
+    job_link: Optional[str] = None  # Either this OR job_description must be provided
     location: Optional[str] = None
     job_type: Optional[str] = None
     remote_type: Optional[str] = None
@@ -52,7 +54,8 @@ class GenerateCoverLetterRequest(BaseModel):
     
     job_title: str
     company_name: str
-    job_description: str
+    job_description: Optional[str] = None  # Either this OR job_link must be provided
+    job_link: Optional[str] = None  # Either this OR job_description must be provided
     location: Optional[str] = None
     job_type: Optional[str] = None
     remote_type: Optional[str] = None
@@ -282,10 +285,11 @@ async def generate_tailored_cv_custom(
     db: Session = Depends(get_db),
 ):
     """
-    Generate a tailored CV from a custom job description pasted by the user.
+    Generate a tailored CV from a custom job description or job link pasted by the user.
     
     - Requires an active CV to be uploaded
-    - User provides job title, company, and job description
+    - User provides job title, company, and EITHER job description OR job link
+    - If job link is provided, we scrape the job description automatically
     - Uses AI to tailor the CV to the custom job requirements
     - Saves the tailored CV to storage
     - Creates a temporary job record for reference
@@ -294,13 +298,53 @@ async def generate_tailored_cv_custom(
     if isinstance(user_id, str):
         user_id = uuid.UUID(user_id)
     
+    # Validate that either job_description or job_link is provided
+    if not request.job_description and not request.job_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either job_description or job_link must be provided"
+        )
+    
+    job_description = request.job_description
+    scraped_data = None
+    
+    # If job link is provided, scrape the job description
+    if request.job_link:
+        try:
+            logger.info(f"Scraping job from URL: {request.job_link}")
+            scraper = get_job_scraper()
+            scraped_data = scraper.scrape_job_from_url(request.job_link)
+            job_description = scraped_data['description']
+            
+            # Use scraped data if title/company/location not provided
+            if not request.job_title and scraped_data.get('title'):
+                request.job_title = scraped_data['title']
+            if not request.company_name and scraped_data.get('company'):
+                request.company_name = scraped_data['company']
+            if not request.location and scraped_data.get('location'):
+                request.location = scraped_data['location']
+                
+            logger.info(f"Successfully scraped job: {request.job_title} at {request.company_name}")
+        except ValueError as e:
+            # Re-raise ValueError with clear message
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            logger.error(f"Error scraping job URL: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to scrape job from URL: {str(e)}. Please paste the job description manually."
+            )
+    
     try:
         cv_generator = get_cv_generator()
         result = await cv_generator.generate_tailored_cv_from_custom_description(
             user_id=str(user_id),
             job_title=request.job_title,
             company_name=request.company_name,
-            job_description=request.job_description,
+            job_description=job_description,
             location=request.location,
             job_type=request.job_type,
             remote_type=request.remote_type,
@@ -332,10 +376,11 @@ async def generate_cover_letter_custom(
     db: Session = Depends(get_db),
 ):
     """
-    Generate a cover letter from a custom job description pasted by the user.
+    Generate a cover letter from a custom job description or job link pasted by the user.
     
     - Requires an active CV to be uploaded (for extracting applicant info)
-    - User provides job title, company, and job description
+    - User provides job title, company, and EITHER job description OR job link
+    - If job link is provided, we scrape the job description automatically
     - Uses AI to generate a personalized cover letter
     - Creates a temporary job record for reference
     """
@@ -343,13 +388,53 @@ async def generate_cover_letter_custom(
     if isinstance(user_id, str):
         user_id = uuid.UUID(user_id)
     
+    # Validate that either job_description or job_link is provided
+    if not request.job_description and not request.job_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either job_description or job_link must be provided"
+        )
+    
+    job_description = request.job_description
+    scraped_data = None
+    
+    # If job link is provided, scrape the job description
+    if request.job_link:
+        try:
+            logger.info(f"Scraping job from URL: {request.job_link}")
+            scraper = get_job_scraper()
+            scraped_data = scraper.scrape_job_from_url(request.job_link)
+            job_description = scraped_data['description']
+            
+            # Use scraped data if title/company/location not provided
+            if not request.job_title and scraped_data.get('title'):
+                request.job_title = scraped_data['title']
+            if not request.company_name and scraped_data.get('company'):
+                request.company_name = scraped_data['company']
+            if not request.location and scraped_data.get('location'):
+                request.location = scraped_data['location']
+                
+            logger.info(f"Successfully scraped job: {request.job_title} at {request.company_name}")
+        except ValueError as e:
+            # Re-raise ValueError with clear message
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            logger.error(f"Error scraping job URL: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to scrape job from URL: {str(e)}. Please paste the job description manually."
+            )
+    
     try:
         cover_letter_generator = get_cover_letter_generator()
         result = await cover_letter_generator.generate_cover_letter_from_custom_description(
             user_id=str(user_id),
             job_title=request.job_title,
             company_name=request.company_name,
-            job_description=request.job_description,
+            job_description=job_description,
             location=request.location,
             job_type=request.job_type,
             remote_type=request.remote_type,

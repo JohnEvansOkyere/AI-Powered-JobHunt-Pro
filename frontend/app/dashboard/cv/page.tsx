@@ -160,10 +160,10 @@ export default function CVPage() {
                 className="inline-flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Sparkles className="h-4 w-4" />
-                <span>Generate Custom CV</span>
+                <span>AI Generator (Paste Any Job)</span>
               </Link>
               <p className="text-sm text-neutral-500">
-                Paste any job description and get a tailored CV instantly
+                Generate tailored CV & cover letter from any job link or description
               </p>
             </div>
           </div>

@@ -13,9 +13,10 @@ export interface GenerateCVRequest {
 }
 
 export interface GenerateCustomCVRequest {
-  job_title: string
-  company_name: string
-  job_description: string
+  job_title?: string
+  company_name?: string
+  job_description?: string
+  job_link?: string
   location?: string
   job_type?: string
   remote_type?: string
@@ -25,9 +26,10 @@ export interface GenerateCustomCVRequest {
 }
 
 export interface GenerateCoverLetterRequest {
-  job_title: string
-  company_name: string
-  job_description: string
+  job_title?: string
+  company_name?: string
+  job_description?: string
+  job_link?: string
   location?: string
   job_type?: string
   remote_type?: string
