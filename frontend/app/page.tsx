@@ -19,11 +19,12 @@ import {
   Search,
   Wand2,
   Brain,
-  Globe,
-  Lock,
   Rocket,
-  Sparkle
+  Sparkle,
+  Globe,
+  Award
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 export default function HomePage() {
   const { isAuthenticated, loading } = useAuth()
@@ -37,50 +38,42 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-neutral-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      <main className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-turquoise-500"></div>
       </main>
     )
   }
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-neutral-100">
+    <div className="min-h-screen bg-white text-neutral-900 selection:bg-brand-turquoise-100 selection:text-brand-turquoise-900">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full glass z-50 border-b border-neutral-800">
+      <nav className="fixed top-0 w-full glass z-50 border-b border-neutral-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-primary-500 via-secondary-500 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <div className="flex items-center space-x-3 group cursor-pointer">
+              <div className="w-10 h-10 bg-gradient-to-br from-brand-turquoise-500 to-brand-turquoise-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-turquoise-500/20 group-hover:scale-110 transition-transform">
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold gradient-text">
-                Veloxa Smart Match
+              <span className="text-xl font-bold tracking-tight text-neutral-900">
+                JobHunt<span className="text-brand-turquoise-600">Pro</span>
               </span>
             </div>
-            <div className="hidden md:flex items-center space-x-10">
-              <Link href="#features" className="text-neutral-400 hover:text-primary-400 transition-colors font-medium">
-                Features
-              </Link>
-              <Link href="#how-it-works" className="text-neutral-400 hover:text-primary-400 transition-colors font-medium">
-                How It Works
-              </Link>
-              <Link href="#benefits" className="text-neutral-400 hover:text-primary-400 transition-colors font-medium">
-                Benefits
-              </Link>
+            
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="#features" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">Features</Link>
+              <Link href="#how-it-works" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">How it works</Link>
+              <Link href="#testimonials" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">Success Stories</Link>
             </div>
+
             <div className="flex items-center space-x-4">
-              <Link
-                href="/auth/login"
-                className="text-neutral-300 hover:text-white transition-colors font-medium px-4 py-2"
-              >
+              <Link href="/auth/login" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-semibold text-sm px-4">
                 Sign In
               </Link>
               <Link
                 href="/auth/signup"
-                className="group px-6 py-3 bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 text-white rounded-xl font-semibold hover:shadow-2xl hover:shadow-primary-500/50 transition-all transform hover:-translate-y-0.5 flex items-center space-x-2"
+                className="btn-premium px-6 py-2.5 bg-brand-turquoise-600 text-white rounded-full font-bold text-sm shadow-lg shadow-brand-turquoise-500/20 hover:shadow-brand-turquoise-500/40"
               >
-                <span>Get Started Free</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                Get Started Free
               </Link>
             </div>
           </div>
@@ -88,347 +81,306 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 gradient-animated opacity-10"></div>
-        
-        {/* Floating orbs */}
-        <div className="absolute top-20 left-10 w-96 h-96 bg-primary-500/20 rounded-full blur-3xl animate-blob"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-secondary-500/20 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-20 left-1/2 w-96 h-96 bg-accent-500/20 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
-
+      <section className="relative pt-40 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-turquoise-50/50 via-white to-white">
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center max-w-5xl mx-auto">
-            {/* Badge */}
-            <div className="inline-flex items-center space-x-2 px-5 py-2.5 glass rounded-full text-sm font-semibold mb-8 animate-fade-in border border-primary-500/30">
-              <Sparkle className="w-4 h-4 text-primary-400" />
-              <span className="text-primary-300">100% Free Forever</span>
-              <span className="text-neutral-400">•</span>
-              <span className="text-neutral-300">No Credit Card Required</span>
-            </div>
-
-            {/* Main Heading */}
-            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-extrabold mb-8 animate-slide-up leading-tight">
-              <span className="block mb-2">Find Your</span>
-              <span className="gradient-text block">Dream Job</span>
-              <span className="block mt-2 text-neutral-300">with AI-Powered Matching</span>
-            </h1>
-
-            {/* Subheading */}
-            <p className="text-xl sm:text-2xl text-neutral-400 mb-12 max-w-3xl mx-auto leading-relaxed animate-slide-up animation-delay-200">
-              Smart job matching that analyzes your skills, experience, and career goals. 
-              Get personalized job recommendations and tailor your CV to each match—all powered by AI.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-5 justify-center items-center mb-20 animate-slide-up animation-delay-400">
-              <Link
-                href="/auth/signup"
-                className="group relative px-8 py-4 bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 text-white rounded-2xl font-bold text-lg hover:shadow-2xl hover:shadow-primary-500/50 transition-all transform hover:-translate-y-1 flex items-center space-x-3 overflow-hidden"
-              >
-                <span className="relative z-10">Start Matching Now</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform relative z-10" />
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Link>
-              <Link
-                href="#how-it-works"
-                className="px-8 py-4 glass border-2 border-neutral-700 text-neutral-200 rounded-2xl font-semibold text-lg hover:border-primary-500 hover:text-primary-400 transition-all shadow-lg"
-              >
-                See How It Works
-              </Link>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap justify-center items-center gap-10 text-neutral-400 animate-fade-in animation-delay-600">
-              <div className="flex items-center space-x-2.5">
-                <Users className="w-5 h-5 text-primary-400" />
-                <span className="font-semibold text-neutral-300">10,000+ Active Users</span>
-              </div>
-              <div className="flex items-center space-x-2.5">
-                <Briefcase className="w-5 h-5 text-secondary-400" />
-                <span className="font-semibold text-neutral-300">50,000+ Job Matches</span>
-              </div>
-              <div className="flex items-center space-x-2.5">
-                <Star className="w-5 h-5 text-accent-400" />
-                <span className="font-semibold text-neutral-300">4.9/5 Rating</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section - Modern Style */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950 relative">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl sm:text-6xl font-extrabold mb-6">
-              <span className="gradient-text">Powerful Features</span>
-              <span className="text-neutral-200"> for Your Career</span>
-            </h2>
-            <p className="text-xl text-neutral-400 max-w-2xl mx-auto">
-              Everything you need to find and land your perfect job, all in one place
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Brain,
-                title: 'AI Job Matching',
-                description: 'Advanced AI algorithms analyze thousands of jobs daily and match you with opportunities that perfectly align with your skills, experience, and career goals.',
-                gradient: 'from-primary-500/20 via-primary-500/10 to-transparent',
-                borderGradient: 'border-primary-500/30',
-                iconGradient: 'from-primary-500 to-primary-600',
-              },
-              {
-                icon: Wand2,
-                title: 'Smart CV Tailoring',
-                description: 'Upload your CV once, then click "Generate CV" for any job match. Our AI automatically tailors your CV to highlight the most relevant skills and experiences for each position.',
-                gradient: 'from-secondary-500/20 via-secondary-500/10 to-transparent',
-                borderGradient: 'border-secondary-500/30',
-                iconGradient: 'from-secondary-500 to-secondary-600',
-              },
-              {
-                icon: Zap,
-                title: 'Instant Applications',
-                description: 'Generate tailored cover letters and application materials in seconds. No more spending hours crafting each application—let AI do the heavy lifting.',
-                gradient: 'from-accent-500/20 via-accent-500/10 to-transparent',
-                borderGradient: 'border-accent-500/30',
-                iconGradient: 'from-accent-500 to-accent-600',
-              },
-              {
-                icon: Search,
-                title: 'Smart Job Search',
-                description: 'Browse thousands of curated tech jobs from multiple sources, updated daily. Filter by location, salary, remote options, and more.',
-                gradient: 'from-primary-500/20 via-primary-500/10 to-transparent',
-                borderGradient: 'border-primary-500/30',
-                iconGradient: 'from-primary-500 to-primary-600',
-              },
-              {
-                icon: FileText,
-                title: 'Professional CV Builder',
-                description: 'Create ATS-friendly resumes and CVs that pass through applicant tracking systems. Our builder ensures your CV gets noticed by recruiters.',
-                gradient: 'from-secondary-500/20 via-secondary-500/10 to-transparent',
-                borderGradient: 'border-secondary-500/30',
-                iconGradient: 'from-secondary-500 to-secondary-600',
-              },
-              {
-                icon: TrendingUp,
-                title: 'Career Insights',
-                description: 'Track your applications, match quality scores, and get actionable insights to improve your success rate. See what\'s working and optimize your approach.',
-                gradient: 'from-accent-500/20 via-accent-500/10 to-transparent',
-                borderGradient: 'border-accent-500/30',
-                iconGradient: 'from-accent-500 to-accent-600',
-              },
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className="group relative p-8 glass rounded-2xl border border-neutral-800 hover:border-transparent transition-all transform hover:-translate-y-2 hover:shadow-2xl overflow-hidden"
-              >
-                {/* Gradient background on hover */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-                
-                {/* Animated border on hover */}
-                <div className={`absolute inset-0 rounded-2xl border-2 ${feature.borderGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-                
-                <div className="relative z-10">
-                  <div className={`w-16 h-16 bg-gradient-to-br ${feature.iconGradient} rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
-                    <feature.icon className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-neutral-100 mb-4 group-hover:text-white transition-colors">
-                    {feature.title}
-                  </h3>
-                  <p className="text-neutral-400 leading-relaxed group-hover:text-neutral-300 transition-colors">
-                    {feature.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-900 relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary-500/5 to-transparent"></div>
-        
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl sm:text-6xl font-extrabold mb-6">
-              <span className="text-neutral-200">How It</span>
-              <span className="gradient-text"> Works</span>
-            </h2>
-            <p className="text-xl text-neutral-400 max-w-2xl mx-auto">
-              Get started in minutes and find your perfect job match
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-12 relative">
-            {/* Connecting line for desktop */}
-            <div className="hidden md:block absolute top-24 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
-
-            {[
-              {
-                step: '1',
-                title: 'Create Your Profile',
-                description: 'Sign up for free and build your professional profile with skills, experience, and preferences. Upload your CV to get started.',
-                icon: Rocket,
-              },
-              {
-                step: '2',
-                title: 'AI Matches Jobs',
-                description: 'Our AI analyzes thousands of jobs daily and matches you with opportunities that fit perfectly. Get personalized recommendations instantly.',
-                icon: Brain,
-              },
-              {
-                step: '3',
-                title: 'Tailor & Apply',
-                description: 'Click "Generate CV" for any job match to get a tailored version of your CV. Then generate personalized cover letters and apply with confidence.',
-                icon: Sparkles,
-              },
-            ].map((step, index) => (
-              <div key={index} className="relative text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-8 relative z-10 shadow-2xl shadow-primary-500/30 transform hover:scale-110 transition-transform">
-                  <step.icon className="w-12 h-12" />
-                </div>
-                <div className="glass rounded-2xl p-8 border border-neutral-800 hover:border-primary-500/50 transition-all">
-                  <h3 className="text-2xl font-bold text-neutral-100 mb-4">
-                    {step.title}
-                  </h3>
-                  <p className="text-neutral-400 leading-relaxed">
-                    {step.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section id="benefits" className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950 relative">
-        <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-5xl sm:text-6xl font-extrabold mb-8">
-                <span className="text-neutral-200">Why Choose</span>
-                <br />
-                <span className="gradient-text">Veloxa Smart Match?</span>
-              </h2>
-              <p className="text-xl text-neutral-400 mb-10 leading-relaxed">
-                Join the future of job searching with AI-powered tools designed for your success. 
-                Every feature is built to help you land your dream job faster.
-              </p>
-              <div className="space-y-5">
-                {[
-                  '100% Free Forever - No hidden fees or subscriptions',
-                  'Save 10+ hours per week on job applications',
-                  '3x higher interview rate with tailored CVs',
-                  'Real-time job matching from multiple sources',
-                  'AI-powered CV tailoring to each job match',
-                  'Privacy-focused - your data stays secure',
-                ].map((benefit, index) => (
-                  <div key={index} className="flex items-start space-x-4 group">
-                    <div className="w-6 h-6 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
-                      <CheckCircle2 className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-lg text-neutral-300 group-hover:text-white transition-colors">{benefit}</span>
-                  </div>
-                ))}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-left"
+            >
+              <div className="inline-flex items-center space-x-2 px-4 py-2 bg-brand-turquoise-50 rounded-full text-xs font-bold text-brand-turquoise-700 mb-6 border border-brand-turquoise-100">
+                <Sparkle className="w-3 h-3" />
+                <span>AI-POWERED JOB SEARCH ENGINE</span>
               </div>
-            </div>
-            <div className="relative">
-              <div className="glass rounded-3xl p-8 border border-neutral-800 shadow-2xl">
-                <div className="space-y-6">
-                  {[
-                    { label: 'Time Saved', value: '10hrs', sub: 'Per Application', gradient: 'from-primary-500 to-primary-600' },
-                    { label: 'Match Accuracy', value: '95%', sub: 'AI-Powered', gradient: 'from-secondary-500 to-secondary-600' },
-                    { label: 'Success Rate', value: '3x', sub: 'Interview Rate', gradient: 'from-accent-500 to-accent-600' },
-                  ].map((stat, index) => (
-                    <div key={index} className={`p-6 bg-gradient-to-br ${stat.gradient} rounded-2xl shadow-lg transform hover:scale-105 transition-transform`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-white/90 text-sm mb-1">{stat.label}</p>
-                          <p className="text-white/70 text-xs">{stat.sub}</p>
-                        </div>
-                        <div className="text-4xl font-extrabold text-white">{stat.value}</div>
-                      </div>
+              
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-neutral-900 mb-6 leading-[1.1] tracking-tight">
+                Land Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-turquoise-600 to-brand-orange-500">Dream Job</span> <br />
+                Faster Than Ever.
+              </h1>
+              
+              <p className="text-lg text-neutral-600 mb-10 max-w-xl leading-relaxed">
+                Stop applying blindly. JobHuntPro uses advanced AI to match your unique skills with the perfect roles and tailors your CV automatically for every application.
+              </p>
+
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  href="/auth/signup"
+                  className="btn-premium px-8 py-4 bg-brand-turquoise-600 text-white rounded-2xl font-bold text-lg flex items-center space-x-3 group"
+                >
+                  <span>Start My Career Journey</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  href="#features"
+                  className="px-8 py-4 bg-white border-2 border-neutral-100 text-neutral-700 rounded-2xl font-bold text-lg hover:border-brand-turquoise-200 transition-all"
+                >
+                  Explore Features
+                </Link>
+              </div>
+
+              <div className="mt-10 flex items-center space-x-6 text-neutral-500">
+                <div className="flex -space-x-3">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center overflow-hidden">
+                      <img src={`https://i.pravatar.cc/150?u=${i}`} alt="user" />
                     </div>
                   ))}
                 </div>
+                <div className="text-sm">
+                  <p className="font-bold text-neutral-900">12k+ Users</p>
+                  <p>Trust JobHuntPro</p>
+                </div>
+                <div className="h-8 w-px bg-neutral-200"></div>
+                <div className="flex items-center space-x-1">
+                  <Star className="w-4 h-4 text-brand-orange-500 fill-brand-orange-500" />
+                  <span className="font-bold text-neutral-900">4.9/5</span>
+                  <span className="text-xs">Trustpilot</span>
+                </div>
               </div>
-              {/* Floating decoration */}
-              <div className="absolute -top-6 -right-6 w-24 h-24 bg-primary-500/20 rounded-full blur-2xl animate-float"></div>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 1 }}
+              className="relative"
+            >
+              <div className="relative z-10 glass rounded-[2.5rem] p-4 shadow-2xl border border-white">
+                <div className="bg-neutral-900 rounded-[2rem] overflow-hidden aspect-[4/3] relative">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-brand-turquoise-500/20 to-brand-orange-500/20"></div>
+                  <div className="p-8 h-full flex flex-col justify-center items-center text-center">
+                    <div className="w-20 h-20 bg-brand-turquoise-500 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
+                      <Brain className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">Analyzing 50k+ Jobs...</h3>
+                    <p className="text-neutral-400 text-sm mb-6">Finding your perfect match based on 42 skills</p>
+                    <div className="w-full max-w-xs bg-neutral-800 h-2 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: '85%' }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="h-full bg-brand-turquoise-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Decorative elements */}
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-orange-200 rounded-full blur-3xl opacity-30 animate-pulse"></div>
+              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-brand-turquoise-200 rounded-full blur-3xl opacity-30 animate-pulse delay-700"></div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section id="features" className="py-24 bg-neutral-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl font-black text-neutral-900 mb-6">Features Built for Conversion</h2>
+            <p className="text-neutral-600 text-lg">We've automated the tedious parts of the job hunt so you can focus on the interviews.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: Target,
+                title: "Precision Matching",
+                desc: "Our AI doesn't just look at keywords; it understands your career trajectory and intent.",
+                color: "brand-turquoise"
+              },
+              {
+                icon: Wand2,
+                title: "Automatic CV Tailoring",
+                desc: "Generate a custom, ATS-optimized CV for every single job with one click.",
+                color: "brand-orange"
+              },
+              {
+                icon: Rocket,
+                title: "One-Click Apply",
+                desc: "Integrated application tracking and cover letter generation to 10x your output.",
+                color: "brand-turquoise"
+              }
+            ].map((feature, idx) => (
+              <div key={idx} className="bg-white p-10 rounded-[2rem] shadow-sm border border-neutral-100 hover:shadow-xl hover:border-brand-turquoise-100 transition-all group">
+                <div className={`w-14 h-14 bg-${feature.color}-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className={`w-7 h-7 text-${feature.color}-600`} />
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900 mb-4">{feature.title}</h3>
+                <p className="text-neutral-500 leading-relaxed">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof / Trust */}
+      <section className="py-20 border-y border-neutral-100">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-10">Our Users Work At</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 grayscale opacity-40">
+            <h2 className="text-2xl font-black italic">Google</h2>
+            <h2 className="text-2xl font-black italic">Amazon</h2>
+            <h2 className="text-2xl font-black italic">Meta</h2>
+            <h2 className="text-2xl font-black italic">Microsoft</h2>
+            <h2 className="text-2xl font-black italic">Apple</h2>
+          </div>
+        </div>
+      </section>
+
+      {/* Modern Dashboard Preview / Value Prop */}
+      <section className="py-24 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-neutral-900 rounded-[3rem] p-12 md:p-20 relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-brand-turquoise-500/10 to-transparent"></div>
+            <div className="grid md:grid-cols-2 gap-16 items-center relative z-10">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-black text-white mb-8 leading-tight">
+                  A Dashboard That <br />
+                  <span className="text-brand-turquoise-400">Works For You.</span>
+                </h2>
+                <ul className="space-y-6">
+                  {[
+                    "Real-time market insights for your job title",
+                    "Success probability score for every match",
+                    "Automated application tracking",
+                    "Direct feedback from AI on CV improvements"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center space-x-4 text-neutral-300">
+                      <div className="w-6 h-6 rounded-full bg-brand-turquoise-500/20 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-brand-turquoise-400" />
+                      </div>
+                      <span className="text-lg">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-12">
+                  <Link href="/auth/signup" className="btn-premium inline-flex items-center space-x-3 px-8 py-4 bg-brand-orange-500 text-white rounded-2xl font-bold">
+                    <span>Explore Dashboard</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </div>
+              </div>
+              <div className="relative">
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+                   <div className="space-y-4">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="h-16 bg-white/5 rounded-xl border border-white/5 flex items-center px-6 justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-brand-turquoise-500/20 rounded-lg"></div>
+                            <div className="space-y-1">
+                              <div className="h-2 w-24 bg-white/20 rounded"></div>
+                              <div className="h-2 w-16 bg-white/10 rounded"></div>
+                            </div>
+                          </div>
+                          <div className="h-2 w-12 bg-brand-orange-500/40 rounded"></div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+                <div className="absolute -bottom-6 -right-6 glass p-6 rounded-2xl shadow-2xl border border-white/10">
+                  <p className="text-white font-bold text-2xl">98%</p>
+                  <p className="text-white/60 text-xs">Match Accuracy</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Final CTA Section */}
-      <section className="py-32 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-animated opacity-20"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h2 className="text-5xl sm:text-6xl font-extrabold text-white mb-8">
-            Ready to Find Your Dream Job?
-          </h2>
-          <p className="text-xl text-neutral-300 mb-12 max-w-2xl mx-auto leading-relaxed">
-            Join thousands of professionals who are already using Veloxa Smart Match to advance their careers. 
-            Start your free journey today.
-          </p>
-          <Link
-            href="/auth/signup"
-            className="inline-flex items-center space-x-3 px-10 py-5 bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 text-white rounded-2xl font-bold text-lg hover:shadow-2xl hover:shadow-primary-500/50 transition-all transform hover:-translate-y-1"
-          >
-            <span>Get Started Free</span>
-            <ArrowRight className="w-6 h-6" />
-          </Link>
-          <p className="text-neutral-400 text-sm mt-8">
-            No credit card required • Set up in 2 minutes • Cancel anytime
-          </p>
+      {/* Testimonials */}
+      <section id="testimonials" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <Award className="w-12 h-12 text-brand-orange-500 mb-6" />
+              <h2 className="text-4xl font-black mb-8 leading-tight italic">
+                "JobHuntPro didn't just find me a job; they found me the right career path. The AI CV tailoring is pure magic."
+              </h2>
+              <div>
+                <p className="font-bold text-xl">Sarah Jenkins</p>
+                <p className="text-neutral-500">Software Engineer at Meta</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-neutral-50 p-8 rounded-3xl mt-12">
+                <p className="text-4xl font-black text-brand-turquoise-600 mb-2">3x</p>
+                <p className="text-sm font-bold text-neutral-600 uppercase">Interview Rate</p>
+              </div>
+              <div className="bg-neutral-50 p-8 rounded-3xl">
+                <p className="text-4xl font-black text-brand-orange-500 mb-2">10hrs</p>
+                <p className="text-sm font-bold text-neutral-600 uppercase">Saved Weekly</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Final */}
+      <section className="py-32 bg-brand-turquoise-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
+          <h2 className="text-5xl md:text-6xl font-black text-white mb-10 leading-tight">Ready to transform <br /> your career?</h2>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
+            <Link href="/auth/signup" className="w-full sm:w-auto px-12 py-5 bg-white text-brand-turquoise-700 rounded-2xl font-black text-xl hover:bg-neutral-50 shadow-2xl transition-all active:scale-95">
+              Get Started Now - It's Free
+            </Link>
+          </div>
+          <p className="text-white/80 mt-10 font-medium">No credit card required. Cancel anytime.</p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-16 px-4 sm:px-6 lg:px-8 bg-neutral-950 border-t border-neutral-800">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div>
+      <footer className="py-20 bg-white border-t border-neutral-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-12">
+            <div className="col-span-1 md:col-span-1">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 via-secondary-500 to-accent-500 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
+                <div className="w-8 h-8 bg-brand-turquoise-500 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-lg font-bold text-white">Veloxa Smart Match</span>
+                <span className="text-lg font-bold">JobHuntPro</span>
               </div>
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                AI-powered job matching platform helping professionals find their dream careers.
+              <p className="text-neutral-500 text-sm leading-relaxed">
+                The AI-powered command center for your next career move. Built for high-performers.
               </p>
             </div>
+            
             <div>
-              <h4 className="font-bold text-white mb-4">Product</h4>
-              <ul className="space-y-3 text-sm text-neutral-400">
-                <li><Link href="#features" className="hover:text-primary-400 transition-colors">Features</Link></li>
-                <li><Link href="#how-it-works" className="hover:text-primary-400 transition-colors">How It Works</Link></li>
-                <li><Link href="#benefits" className="hover:text-primary-400 transition-colors">Benefits</Link></li>
+              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Product</h4>
+              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
+                <li><Link href="#features" className="hover:text-brand-turquoise-600">Features</Link></li>
+                <li><Link href="#how-it-works" className="hover:text-brand-turquoise-600">Algorithm</Link></li>
+                <li><Link href="#" className="hover:text-brand-turquoise-600">CV Builder</Link></li>
               </ul>
             </div>
+
             <div>
-              <h4 className="font-bold text-white mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-neutral-400">
-                <li><Link href="https://veloxarecruit.com" target="_blank" className="hover:text-primary-400 transition-colors">About Veloxa</Link></li>
-                <li><a href="#" className="hover:text-primary-400 transition-colors">Contact</a></li>
+              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Resources</h4>
+              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Career Blog</Link></li>
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Resume Tips</Link></li>
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Salary Guide</Link></li>
               </ul>
             </div>
+
             <div>
-              <h4 className="font-bold text-white mb-4">Legal</h4>
-              <ul className="space-y-3 text-sm text-neutral-400">
-                <li><a href="#" className="hover:text-primary-400 transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-primary-400 transition-colors">Terms of Service</a></li>
+              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Support</h4>
+              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Help Center</Link></li>
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Privacy Policy</Link></li>
+                <li><Link href="#" className="hover:text-brand-turquoise-600">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-neutral-800 pt-8 text-center text-sm text-neutral-500">
-            <p>&copy; {new Date().getFullYear()} Veloxa Smart Match. All rights reserved.</p>
+          <div className="mt-20 pt-8 border-t border-neutral-100 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p className="text-neutral-400 text-sm">&copy; {new Date().getFullYear()} JobHuntPro. All rights reserved.</p>
+            <div className="flex items-center space-x-6">
+              <Link href="#" className="text-neutral-400 hover:text-brand-turquoise-600"><Globe className="w-5 h-5" /></Link>
+              <Link href="#" className="text-neutral-400 hover:text-brand-turquoise-600"><Users className="w-5 h-5" /></Link>
+            </div>
           </div>
         </div>
       </footer>

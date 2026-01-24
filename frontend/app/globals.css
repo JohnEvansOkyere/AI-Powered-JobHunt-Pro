@@ -20,7 +20,7 @@ body {
 }
 
 body {
-  @apply bg-neutral-900 text-neutral-100;
+  @apply bg-white text-neutral-900;
 }
 
 a {
@@ -28,28 +28,24 @@ a {
   text-decoration: none;
 }
 
-/* Custom scrollbar for dark mode */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-neutral-800;
+  @apply bg-neutral-50;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-neutral-700 rounded-lg;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-neutral-600;
+  @apply bg-brand-turquoise-200 rounded-lg hover:bg-brand-turquoise-300 transition-colors;
 }
 
 /* Focus styles */
 @layer base {
   *:focus-visible {
-    @apply outline-2 outline-primary-500 outline-offset-2 rounded;
+    @apply outline-2 outline-brand-turquoise-500 outline-offset-2 rounded;
   }
 }
 
@@ -59,21 +55,39 @@ a {
     text-wrap: balance;
   }
   
-  /* Glass morphism effect */
+  /* Modern Glass morphism */
   .glass {
-    @apply bg-neutral-800/50 backdrop-blur-xl border border-neutral-700/50;
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+
+  .glass-dark {
+    @apply bg-neutral-900/80 backdrop-blur-md border border-neutral-800 shadow-2xl;
   }
   
-  /* Gradient text */
+  /* Brand Gradient text */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-secondary-400 to-accent-400;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-turquoise-600 via-brand-turquoise-500 to-brand-orange-500;
   }
   
-  /* Animated gradient background */
+  /* Professional Animated gradient background */
   .gradient-animated {
-    background: linear-gradient(-45deg, #2563eb, #06b6d4, #7c3aed, #2563eb);
+    background: linear-gradient(-45deg, #14b8a6, #0d9488, #f97316, #14b8a6);
     background-size: 400% 400%;
     animation: gradient 15s ease infinite;
+  }
+
+  /* Button Premium Hover */
+  .btn-premium {
+    @apply relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl active:translate-y-0;
+  }
+
+  .btn-premium::after {
+    content: '';
+    @apply absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300;
+  }
+
+  .btn-premium:hover::after {
+    @apply translate-y-0;
   }
 }
 
