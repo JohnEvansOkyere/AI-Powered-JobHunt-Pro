@@ -90,10 +90,11 @@ class RecommendationGenerator:
 
         logger.info(f"User {user_id}: CV={has_cv}, Profile={has_profile_data}, Interest signals={has_interest_signals}")
 
-        # Get jobs from last 7 days (wider window to ensure enough matches)
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+        # Get jobs from last 14 days (wider window so more jobs are considered for recommendations)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=14)
         recent_jobs = self.db.query(Job).filter(
-            Job.scraped_at >= cutoff_date
+            Job.scraped_at >= cutoff_date,
+            Job.source != "external",  # Only match against scraped jobs
         ).all()
 
         if not recent_jobs:
@@ -136,10 +137,13 @@ class RecommendationGenerator:
 
         for match in top_matches:
             try:
+                # Store match_score as 0.0-1.0 (API multiplies by 100 for display)
+                raw_score = match.get('match_score', 0.0)
+                normalized_score = raw_score / 100.0 if raw_score > 1.0 else raw_score
                 recommendation = JobRecommendation(
                     user_id=user_id,
                     job_id=match['job_id'],
-                    match_score=match.get('match_score', 0.0),
+                    match_score=min(1.0, max(0.0, normalized_score)),
                     match_reason=match.get('match_reason', 'AI-based profile matching'),
                     expires_at=expires_at
                 )

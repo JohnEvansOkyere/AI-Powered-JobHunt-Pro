@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     # Sentry
     SENTRY_DSN: str = Field(default="", description="Sentry DSN for error tracking")
 
+    # Cron / scheduled task auth (optional - for triggering cleanup from external cron)
+    CRON_SECRET: str = Field(
+        default="",
+        description="Secret for cron endpoints (X-Cron-Secret header). If set, required to trigger cleanup.",
+    )
+
     # Job Scraping
     SCRAPING_USER_AGENT: str = Field(
         default="Mozilla/5.0 (compatible; JobHuntBot/1.0)",

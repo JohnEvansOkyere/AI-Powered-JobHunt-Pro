@@ -119,6 +119,15 @@ class ExternalJobParser:
                 "or have anti-bot protection. Please copy the job description text and use the 'From Text' option instead."
             )
 
+        # Reject minimal/generic content (e.g. Dayforce "Find your next adventure" shell)
+        if len(clean_text) < 300 or clean_text.strip().lower() in (
+            'find your next adventure', 'apply now', 'job details',
+        ):
+            raise ValueError(
+                "This URL returned very little content (likely a JavaScript-heavy or login-required page). "
+                "Please open the job in your browser, copy the full job description, and use the 'Paste job description' tab instead."
+            )
+
         # Parse the extracted text using AI
         job_data = await self._parse_with_ai(clean_text, url, domain)
         return job_data
@@ -200,21 +209,24 @@ class ExternalJobParser:
             except (json.JSONDecodeError, TypeError):
                 continue
 
-        # Also try Open Graph and meta tags as a lighter fallback
+        # Also try Open Graph and meta tags as a lighter fallback (only if substantive)
         og_title = soup.find('meta', property='og:title')
         og_description = soup.find('meta', property='og:description')
         meta_description = soup.find('meta', attrs={'name': 'description'})
 
         if og_title and og_description:
-            parts = [
-                f"Title: {og_title.get('content', '')}",
-                f"Description: {og_description.get('content', '')}",
-            ]
-            if meta_description:
-                parts.append(f"Details: {meta_description.get('content', '')}")
-            text = '\n'.join(parts)
-            if len(text) >= 100:
-                return text
+            desc = (og_description.get('content') or '').strip()
+            # Skip generic/empty descriptions (e.g. "Find your next adventure" from Dayforce)
+            if len(desc) >= 200 and desc.lower() not in ('find your next adventure', 'apply now', ''):
+                parts = [
+                    f"Title: {og_title.get('content', '')}",
+                    f"Description: {desc}",
+                ]
+                if meta_description:
+                    parts.append(f"Details: {meta_description.get('content', '')}")
+                text = '\n'.join(parts)
+                if len(text) >= 200:
+                    return text
 
         return None
 
@@ -442,6 +454,25 @@ JSON OUTPUT:"""
                     job_data = json.loads(json_match.group())
                 else:
                     raise e
+
+            # Normalize common AI response keys
+            if not job_data.get('title') and job_data.get('job_title'):
+                job_data['title'] = job_data.pop('job_title', '')
+            if not job_data.get('company') and job_data.get('company_name'):
+                job_data['company'] = job_data.pop('company_name', '')
+
+            # Fallbacks from input text when AI didn't extract required fields
+            if not job_data.get('title') or (isinstance(job_data.get('title'), str) and not job_data['title'].strip()):
+                match = re.search(r'Title:\s*(.+?)(?:\n|$)', truncated_text, re.IGNORECASE)
+                if match:
+                    job_data['title'] = match.group(1).strip()
+            if not job_data.get('company') or (isinstance(job_data.get('company'), str) and not job_data['company'].strip()):
+                if domain and domain not in ('localhost', '127.0.0.1'):
+                    job_data['company'] = domain.replace('www.', '').split('.')[0].title()
+                else:
+                    job_data['company'] = 'Company'
+            if not job_data.get('description') or (isinstance(job_data.get('description'), str) and not job_data['description'].strip()):
+                job_data['description'] = truncated_text[:500].strip() or 'Job description not extracted. Please add details.'
 
             # Validate and clean data
             # 1. Ensure required fields exist and are not empty

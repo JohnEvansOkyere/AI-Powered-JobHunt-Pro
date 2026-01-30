@@ -124,6 +124,18 @@ export async function listApplications(status?: string): Promise<Application[]> 
   return apiClient.get<Application[]>(`/api/v1/applications/${params}`)
 }
 
+export interface DashboardApplicationsStats {
+  applications_total: number
+  submitted_count: number
+}
+
+/**
+ * Get dashboard stats: total applications and submitted count
+ */
+export async function getApplicationsStats(): Promise<DashboardApplicationsStats> {
+  return apiClient.get<DashboardApplicationsStats>('/api/v1/applications/stats')
+}
+
 /**
  * Get download URL for tailored CV
  */

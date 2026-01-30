@@ -7,15 +7,22 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
-import { Briefcase, FileText, User, Sparkles, ArrowRight, TrendingUp, Zap, Target, Plus, ExternalLink, CheckCircle2 } from 'lucide-react'
+import { Briefcase, FileText, User, ArrowRight, TrendingUp, Zap, Target, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { AddExternalJobModal } from '@/components/modals/AddExternalJobModal'
+import { getApplicationsStats } from '@/lib/api/applications'
+import { getRecommendations } from '@/lib/api/jobs'
 
 export default function DashboardPage() {
   const { profile, loading: profileLoading } = useProfile()
   const { user } = useAuth()
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [stats, setStats] = useState<{
+    applicationsTotal: number
+    submittedCount: number
+    recommendationsTotal: number
+  } | null>(null)
 
   useEffect(() => {
     if (!profileLoading && !profile) {
@@ -27,6 +34,29 @@ export default function DashboardPage() {
       return () => clearTimeout(timer)
     }
   }, [profile, profileLoading, router])
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [appStats, recs] = await Promise.all([
+          getApplicationsStats(),
+          getRecommendations(1, 1),
+        ])
+        setStats({
+          applicationsTotal: appStats.applications_total,
+          submittedCount: appStats.submitted_count,
+          recommendationsTotal: recs.total ?? 0,
+        })
+      } catch {
+        setStats({
+          applicationsTotal: 0,
+          submittedCount: 0,
+          recommendationsTotal: 0,
+        })
+      }
+    }
+    loadStats()
+  }, [])
 
   if (profileLoading) {
     return (
@@ -46,12 +76,12 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 md:space-y-10 px-4 sm:px-6">
-          {/* Welcome Section */}
+          {/* Primary: Jobs we recommended for you */}
           <div className="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] bg-neutral-900 p-6 sm:p-8 md:p-12 shadow-2xl">
             <div className="absolute top-0 right-0 w-1/2 sm:w-1/3 h-full bg-gradient-to-l from-brand-turquoise-500/20 to-transparent"></div>
             <div className="relative z-10 flex flex-col gap-6 sm:gap-8">
-              {/* Welcome Text - Full Width on Mobile */}
               <div className="text-center sm:text-left w-full">
+                <p className="text-[10px] sm:text-xs font-bold text-brand-turquoise-400 uppercase tracking-widest mb-2 sm:mb-3">Jobs matched to your profile</p>
                 <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white mb-3 sm:mb-4 leading-tight">
                   <span className="block sm:inline">Welcome back,</span>{' '}
                   <span className="text-brand-turquoise-400 block sm:inline mt-1 sm:mt-0">
@@ -62,10 +92,13 @@ export default function DashboardPage() {
                   {profile.primary_job_title || 'Expert Professional'}
                 </div>
                 <p className="text-sm sm:text-base md:text-lg text-neutral-400 sm:text-neutral-500 max-w-2xl mx-auto sm:mx-0 font-medium leading-relaxed">
-                  We've found <span className="text-white font-bold">12 new matches</span> that perfectly fit your profile since yesterday.
+                  {stats !== null && stats.recommendationsTotal > 0 ? (
+                    <>We've found <span className="text-white font-bold">{stats.recommendationsTotal} match{stats.recommendationsTotal !== 1 ? 'es' : ''}</span> that fit your profile. View them and generate tailored applications.</>
+                  ) : (
+                    <>We find jobs that fit your profile. View matches and generate tailored applications.</>
+                  )}
                 </p>
               </div>
-              {/* Button - Full Width on Mobile, Auto on Desktop */}
               <div className="flex justify-center sm:justify-start">
                 <Link 
                   href="/dashboard/jobs" 
@@ -78,84 +111,41 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Power Actions Section - MORE PROMINENT */}
+          {/* Secondary: Add a job you found elsewhere (LinkedIn, Indeed, etc.) */}
           <div className="grid grid-cols-1 gap-6 sm:gap-8">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-brand-orange-500 via-brand-orange-600 to-orange-700 p-1 sm:p-1.5 shadow-2xl shadow-brand-orange-500/30"
+              className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-neutral-200 bg-white p-6 sm:p-8 md:p-10 shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="relative bg-neutral-900 rounded-[1.9rem] sm:rounded-[2.9rem] p-6 sm:p-8 md:p-12 overflow-hidden">
-                {/* Background Decor */}
-                <div className="absolute top-0 right-0 w-1/2 sm:w-1/2 h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 scale-150 rotate-12"></div>
-                <div className="absolute -bottom-24 -left-24 w-48 sm:w-64 h-48 sm:h-64 bg-brand-orange-500/10 rounded-full blur-3xl"></div>
-                
-                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-10 lg:gap-12">
-                  <div className="w-full lg:max-w-2xl text-center lg:text-left">
-                    <div className="inline-flex items-center space-x-2 bg-brand-orange-500/10 border border-brand-orange-500/20 rounded-full px-3 sm:px-4 py-1.5 mb-4 sm:mb-6">
-                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-brand-orange-400 flex-shrink-0" />
-                      <span className="text-[10px] sm:text-xs font-black text-brand-orange-400 uppercase tracking-widest">Power Feature</span>
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4 sm:mb-6 leading-tight">
-                      Found a job elsewhere?
-                      <br className="hidden sm:block" />
-                      <span className="text-brand-orange-400 block sm:inline mt-1 sm:mt-0">Tailor your application in seconds.</span>
-                    </h2>
-                    <p className="text-sm sm:text-base md:text-lg lg:text-xl text-neutral-400 leading-relaxed mb-6 sm:mb-8 font-medium">
-                      Paste any job URL or description from LinkedIn, Indeed, or company websites. 
-                      Our AI extracts the data and helps you generate a <span className="text-white font-bold underline decoration-brand-orange-500 underline-offset-2 sm:underline-offset-4">winning CV & Cover Letter</span> instantly.
-                    </p>
-                    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
-                      <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="w-full sm:w-auto btn-premium px-6 sm:px-8 md:px-10 py-3.5 sm:py-4 md:py-5 bg-brand-orange-500 text-white rounded-xl sm:rounded-2xl font-black text-sm sm:text-base md:text-lg flex items-center justify-center space-x-3 group hover:shadow-2xl hover:shadow-brand-orange-500/40 transition-all active:scale-95"
-                      >
-                        <Plus className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 group-hover:rotate-90 transition-transform duration-300" />
-                        <span>Add External Job Now</span>
-                      </button>
-                      <div className="text-neutral-400 sm:text-neutral-500 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 px-3 sm:px-4">
-                        <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-brand-orange-500 flex-shrink-0" />
-                        <span>No manual entry required</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative w-full lg:w-1/3 flex items-center justify-center mt-4 lg:mt-0">
-                    {/* Visual representation of the feature - Hidden on very small screens, smaller on mobile */}
-                    <div className="relative w-32 h-32 sm:w-48 sm:h-48 md:w-64 md:h-64">
-                      <div className="absolute inset-0 bg-brand-orange-500/20 rounded-full animate-ping"></div>
-                      <div className="relative w-full h-full bg-neutral-800 rounded-full border-2 sm:border-4 border-brand-orange-500/30 flex items-center justify-center shadow-inner">
-                        <Plus className="w-12 h-12 sm:w-16 sm:h-16 md:w-24 md:h-24 text-brand-orange-500 drop-shadow-2xl" />
-                      </div>
-                      {/* Floating icons - Hidden on mobile, shown on larger screens */}
-                      <motion.div 
-                        animate={{ y: [0, -10, 0] }} 
-                        transition={{ duration: 3, repeat: Infinity }}
-                        className="hidden sm:block absolute -top-2 sm:-top-4 -right-2 sm:-right-4 p-2 sm:p-4 bg-white rounded-xl sm:rounded-2xl shadow-xl border border-neutral-100"
-                      >
-                        <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-brand-turquoise-500" />
-                      </motion.div>
-                      <motion.div 
-                        animate={{ y: [0, 10, 0] }} 
-                        transition={{ duration: 4, repeat: Infinity }}
-                        className="hidden sm:block absolute -bottom-2 sm:-bottom-4 -left-2 sm:-left-4 p-2 sm:p-4 bg-white rounded-xl sm:rounded-2xl shadow-xl border border-neutral-100"
-                      >
-                        <FileText className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-brand-orange-500" />
-                      </motion.div>
-                    </div>
-                  </div>
+              <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8">
+                <div className="w-full lg:max-w-2xl text-center lg:text-left">
+                  <p className="text-[10px] sm:text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2 sm:mb-3">Job you found elsewhere</p>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-neutral-900 mb-3 sm:mb-4 leading-tight">
+                    Found a job on LinkedIn, Indeed, or a company site?
+                  </h2>
+                  <p className="text-sm sm:text-base text-neutral-500 leading-relaxed mb-4 sm:mb-6 font-medium">
+                    Paste the job link or copy-paste the job description. We'll add it to your list and help you generate a tailored CV and cover letter for that role.
+                  </p>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 sm:px-6 py-3 bg-brand-orange-500 text-white rounded-xl font-bold text-sm sm:text-base hover:bg-brand-orange-600 transition-colors active:scale-95"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <span>Paste job link or description</span>
+                  </button>
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Stats / Insights Grid */}
+          {/* Stats / Insights Grid - real data */}
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             {[
-              { label: 'Market Match', val: '98%', icon: Target, color: 'brand-turquoise' },
-              { label: 'CV Strength', val: 'High', icon: Zap, color: 'brand-orange' },
-              { label: 'Applied', val: '24', icon: Briefcase, color: 'brand-turquoise' },
-              { label: 'Interviews', val: '3', icon: TrendingUp, color: 'brand-orange' },
+              { label: 'Recommendations', val: stats !== null ? String(stats.recommendationsTotal) : '—', icon: Target, color: 'brand-turquoise' },
+              { label: 'CV Strength', val: 'Ready', icon: Zap, color: 'brand-orange' },
+              { label: 'Applications', val: stats !== null ? String(stats.applicationsTotal) : '—', icon: Briefcase, color: 'brand-turquoise' },
+              { label: 'Submitted', val: stats !== null ? String(stats.submittedCount) : '—', icon: TrendingUp, color: 'brand-orange' },
             ].map((stat, i) => (
               <div key={i} className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-neutral-100 shadow-sm hover:shadow-md transition-shadow active:scale-95">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 bg-${stat.color}-50 rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>
@@ -181,7 +171,11 @@ export default function DashboardPage() {
                   <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-neutral-200 group-hover:text-brand-turquoise-600 transform group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-2">Job Recommendations</h3>
-                <p className="text-sm sm:text-base text-neutral-500 leading-relaxed">Discover AI-matched roles that align with your 42 unique career markers.</p>
+                <p className="text-sm sm:text-base text-neutral-500 leading-relaxed">
+                  {stats !== null && stats.recommendationsTotal > 0
+                    ? `Discover ${stats.recommendationsTotal} AI-matched role${stats.recommendationsTotal !== 1 ? 's' : ''} that fit your profile.`
+                    : 'Discover AI-matched roles that align with your profile and skills.'}
+                </p>
               </Link>
 
               <Link

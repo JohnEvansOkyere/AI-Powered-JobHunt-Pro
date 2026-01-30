@@ -26,9 +26,12 @@ Midnight UTC (00:00) Schedule:
 ```
 
 **What gets deleted:**
-- Jobs where `scraped_at < NOW() - 7 days`
+- **Scraped jobs only** where `scraped_at < NOW() - 7 days` (user-added external jobs are never deleted)
+- Jobs with saved/applied applications are skipped
 - This happens BEFORE the daily scraping at 6 AM
 - Fresh jobs come in at 6 AM, old jobs are already gone
+
+**Fallback:** Cleanup also runs **after every scheduled scrape** (every 3 days at 6 AM UTC). So even if the process isn’t running at midnight, the next scrape will remove old jobs.
 
 ### Database Flow
 
@@ -49,6 +52,18 @@ Timeline (UTC):
 
 Result: Database always contains 5-9 days of fresh jobs
 ```
+
+### Production: Why cleanup might not run at midnight
+
+The in-process scheduler only runs when the **backend process is running at 00:10 UTC**. On many hosts (Render, Railway, Fly.io, Heroku):
+
+- The process may **sleep** or **restart** and miss the midnight window
+- There may be **no 24/7 guarantee** that the app is up at that exact time
+
+**What we do about it:**
+
+1. **Cleanup after every scrape** – When the scheduler runs a scrape (every 3 days at 6 AM UTC), it also runs cleanup. So old jobs are removed even if midnight never ran.
+2. **HTTP endpoint for external cron** – You can call `POST /api/v1/jobs/cleanup-old` from an external cron (e.g. [cron-job.org](https://cron-job.org)) so cleanup runs even when the app isn’t up at midnight. If you set `CRON_SECRET` in the environment, send it as header: `X-Cron-Secret: <CRON_SECRET>`.
 
 ## Manual Cleanup
 
@@ -82,26 +97,40 @@ python cleanup_old_jobs.py
 💾 Total jobs remaining: 0
 ```
 
-### Option 2: SQL Query (Supabase)
+### Option 2: HTTP endpoint (for external cron)
 
-Run directly in Supabase SQL Editor:
+Trigger cleanup from an external cron (e.g. daily at 00:15 UTC):
+
+```bash
+curl -X POST "https://your-api.com/api/v1/jobs/cleanup-old" \
+  -H "X-Cron-Secret: YOUR_CRON_SECRET"
+```
+
+Set `CRON_SECRET` in your environment; if set, the request must include the same value in the `X-Cron-Secret` header. If `CRON_SECRET` is not set, the endpoint accepts requests without the header (useful for dev only).
+
+### Option 3: SQL Query (Supabase)
+
+Run directly in Supabase SQL Editor (only scraped jobs; exclude external):
 
 ```sql
--- Preview jobs to be deleted
+-- Preview jobs to be deleted (scraped only)
 SELECT
     id,
     title,
     company,
+    source,
     scraped_at,
     NOW() - scraped_at AS age
 FROM jobs
 WHERE scraped_at < NOW() - INTERVAL '7 days'
+  AND source != 'external'
 ORDER BY scraped_at ASC
 LIMIT 20;
 
--- Delete jobs older than 7 days
+-- Delete scraped jobs older than 7 days (keep external jobs)
 DELETE FROM jobs
-WHERE scraped_at < NOW() - INTERVAL '7 days';
+WHERE scraped_at < NOW() - INTERVAL '7 days'
+  AND source != 'external';
 
 -- Verify remaining jobs
 SELECT
@@ -112,7 +141,7 @@ SELECT
 FROM jobs;
 ```
 
-### Option 3: Python Code
+### Option 4: Python Code
 
 ```python
 from datetime import datetime, timedelta

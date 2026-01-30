@@ -122,8 +122,8 @@ export function AddExternalJobModal({ isOpen, onClose, onSuccess }: AddExternalJ
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
             <div className="relative flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-black text-white mb-1">Add External Job</h2>
-                <p className="text-brand-turquoise-100 text-sm">Paste a job URL or description to add it to your list</p>
+                <h2 className="text-2xl font-black text-white mb-1">Add a job you found elsewhere</h2>
+                <p className="text-brand-turquoise-100 text-sm">Paste the job link or copy the full job description — we'll add it and help you tailor your CV & cover letter</p>
               </div>
               <button
                 onClick={handleClose}
@@ -145,7 +145,7 @@ export function AddExternalJobModal({ isOpen, onClose, onSuccess }: AddExternalJ
               }`}
             >
               <LinkIcon className="w-4 h-4" />
-              <span>From URL</span>
+              <span>Paste job link</span>
             </button>
             <button
               onClick={() => setActiveTab('text')}
@@ -156,7 +156,7 @@ export function AddExternalJobModal({ isOpen, onClose, onSuccess }: AddExternalJ
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>From Text</span>
+              <span>Paste job description</span>
             </button>
           </div>
 
@@ -260,7 +260,7 @@ export function AddExternalJobModal({ isOpen, onClose, onSuccess }: AddExternalJ
                         <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                           <p className="text-xs font-bold text-amber-800 mb-1">⚠️ This site requires login</p>
                           <p className="text-xs text-amber-700 leading-relaxed">
-                            LinkedIn, Indeed, and Glassdoor block direct access. Click <strong>"From Text"</strong> above and paste the full job description instead.
+                            LinkedIn, Indeed, and Glassdoor block direct access. Switch to <strong>"Paste job description"</strong> and paste the full job text instead.
                           </p>
                         </div>
                       )}

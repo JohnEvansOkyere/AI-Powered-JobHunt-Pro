@@ -458,6 +458,28 @@ async def generate_cover_letter_custom(
         )
 
 
+@router.get("/stats")
+def get_applications_stats(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get dashboard stats: total applications and submitted count (sent + submitted + interviewing + offer)."""
+    user_id = current_user["id"]
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+
+    base = db.query(Application).filter(Application.user_id == user_id)
+    applications_total = base.count()
+    submitted_count = base.filter(
+        Application.status.in_(("sent", "submitted", "interviewing", "offer"))
+    ).count()
+
+    return {
+        "applications_total": applications_total,
+        "submitted_count": submitted_count,
+    }
+
+
 @router.get("/{application_id}", response_model=ApplicationResponse)
 def get_application(
     application_id: uuid.UUID,

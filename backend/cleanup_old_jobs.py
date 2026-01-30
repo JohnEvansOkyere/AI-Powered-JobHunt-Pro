@@ -37,11 +37,13 @@ def main():
         print(f"📅 Cutoff date: {cutoff_date.strftime('%Y-%m-%d %H:%M:%S')} UTC")
         print(f"   Jobs scraped before this date will be deleted")
         print(f"   (Skipping jobs with saved/applied applications)")
+        print(f"   (Skipping user-added external jobs - only scraped jobs are deleted)")
         print()
 
-        # Find old jobs WITHOUT applications (safe to delete)
+        # Find old scraped jobs only (never delete user-added external jobs)
         old_jobs = db.query(Job).filter(
-            Job.scraped_at < cutoff_date
+            Job.scraped_at < cutoff_date,
+            Job.source != "external",
         ).all()
 
         # Filter out jobs that have applications

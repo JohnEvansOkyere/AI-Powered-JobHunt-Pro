@@ -35,7 +35,15 @@ class AIJobMatcher:
 
     CACHE_EXPIRY_HOURS = 1
     MAX_JOBS_PER_REQUEST = 200  # Check more jobs for better matches
-    MIN_SCORE = 20.0  # Show matches with 20%+ similarity (reasonable threshold)
+    MIN_SCORE = 50.0  # Only recommend matches 50%+; below 40% never shown
+    MIN_PROFILE_SKILLS_IN_JOB = 2  # Require at least 2 profile skills in job (or target title match)
+
+    # Tech stack terms that, when in job title, mean "this role requires X". If user doesn't have X, exclude.
+    JOB_STACK_KEYWORDS_IN_TITLE = frozenset([
+        "php", "symfony", "laravel", ".net", "c#", "asp.net", "ruby", "rails",
+        "java", "spring", "kotlin", "swift", "golang", "nodejs", "node.js",
+        "react", "angular", "vue", "python", "django", "flask", "rust", "scala",
+    ])
 
     def __init__(self):
         """Initialize OpenAI client."""
@@ -390,6 +398,167 @@ class AIJobMatcher:
 
         return 0.0  # No boost
 
+    def _get_profile_skill_keywords(self, profile: UserProfile) -> List[str]:
+        """Extract skill names and target job title words for keyword matching."""
+        import json
+        keywords = []
+
+        # Target job titles (words from primary + secondary)
+        if profile.primary_job_title:
+            for t in profile.primary_job_title.split("|"):
+                keywords.extend(t.strip().lower().split())
+        if profile.secondary_job_titles:
+            secondary = profile.secondary_job_titles
+            if isinstance(secondary, str):
+                try:
+                    secondary = json.loads(secondary)
+                except (json.JSONDecodeError, TypeError):
+                    secondary = [secondary]
+            if isinstance(secondary, list):
+                for t in secondary:
+                    if isinstance(t, str):
+                        keywords.extend(t.lower().split())
+
+        # Technical skills
+        if profile.technical_skills:
+            tech = profile.technical_skills
+            if isinstance(tech, str):
+                try:
+                    tech = json.loads(tech)
+                except (json.JSONDecodeError, TypeError):
+                    tech = [s.strip() for s in tech.split(",")]
+            if isinstance(tech, list):
+                for s in tech:
+                    if isinstance(s, dict) and s.get("skill"):
+                        keywords.append(str(s["skill"]).lower().strip())
+                    elif isinstance(s, str) and s.strip():
+                        keywords.append(s.lower().strip())
+
+        # Tools/technologies
+        if profile.tools_technologies:
+            for t in (
+                profile.tools_technologies
+                if isinstance(profile.tools_technologies, list)
+                else [profile.tools_technologies]
+            ):
+                if isinstance(t, str) and t.strip():
+                    keywords.append(t.lower().strip())
+
+        # Preferred keywords
+        if profile.preferred_keywords:
+            for k in (
+                profile.preferred_keywords
+                if isinstance(profile.preferred_keywords, list)
+                else [profile.preferred_keywords]
+            ):
+                if isinstance(k, str) and k.strip():
+                    keywords.append(k.lower().strip())
+
+        # Dedupe, drop very short or generic words
+        skip = {"the", "and", "or", "a", "an", "of", "in", "to", "for", "at", "with", "&"}
+        seen = set()
+        result = []
+        for w in keywords:
+            w = w.strip()
+            if len(w) < 2 or w in skip or w in seen:
+                continue
+            seen.add(w)
+            result.append(w)
+        return result
+
+    def _calculate_skill_keyword_boost(self, profile: UserProfile, job: Job) -> tuple:
+        """
+        Boost score when profile skills/keywords appear in job title or description.
+        Returns (boost_score 0-25, list of matched keywords).
+        """
+        keywords = self._get_profile_skill_keywords(profile)
+        if not keywords:
+            return 0.0, []
+
+        job_text = f"{job.title or ''} {job.description or ''}".lower()
+        import re
+        job_text = re.sub(r"<[^>]+>", " ", job_text)
+        job_text = job_text.replace("\n", " ")[:3000]
+
+        matched = []
+        boost = 0.0
+        for kw in keywords:
+            if len(kw) < 2:
+                continue
+            # Word boundary or part of a token (e.g. "python" in "python3")
+            if kw in job_text:
+                matched.append(kw)
+                boost += 2.0
+        boost = min(25.0, boost)
+        return boost, matched[:10]
+
+    def _get_job_stack_terms_in_title(self, job: Job) -> set:
+        """Extract tech stack terms that appear in the job title (e.g. PHP, Symfony). Used to exclude mismatches."""
+        title_lower = (job.title or "").lower()
+        found = set()
+        for term in self.JOB_STACK_KEYWORDS_IN_TITLE:
+            t = term.strip().lower()
+            if len(t) < 2:
+                continue
+            # Match whole word or as part of word (e.g. "php" in "php/symfony")
+            if t in title_lower:
+                found.add(t.replace(" ", ""))
+        return found
+
+    def _job_requires_skills_user_lacks(self, profile: UserProfile, job: Job) -> bool:
+        """
+        Return True if the job title explicitly requires a tech stack (e.g. PHP/Symfony)
+        that the user did not list in their profile. Such jobs are excluded for neat, accurate results.
+        """
+        title_stack = self._get_job_stack_terms_in_title(job)
+        if not title_stack:
+            return False
+        user_skills = set(self._get_profile_skill_keywords(profile))
+        user_normalized = {s.replace(" ", "").replace(".", "").replace("/", "") for s in user_skills}
+        for term in title_stack:
+            t_clean = term.replace(".", "").replace(" ", "").replace("/", "")
+            if any(t_clean in u or u in t_clean for u in user_normalized):
+                continue
+            if any(term in s or s in term for s in user_skills):
+                continue
+            logger.info(f"Excluding job (stack mismatch): '{job.title}' requires {term}, not in profile")
+            return True
+        return False
+
+    def _job_aligns_with_profile(self, profile: UserProfile, job: Job) -> bool:
+        """
+        Return True only if the job aligns with the user's career targeting or skills.
+        Requires either: (1) job title contains a target role keyword, or (2) at least
+        MIN_PROFILE_SKILLS_IN_JOB of the user's skills appear in the job. Ensures neat, accurate recommendations.
+        """
+        title_lower = (job.title or "").lower()
+        job_text = f"{title_lower} {(job.description or '')[:1500]}".lower()
+        import re
+        job_text = re.sub(r"<[^>]+>", " ", job_text)
+
+        # 1) Target job title keywords (from primary + secondary)
+        target_words = []
+        if profile.primary_job_title:
+            for t in profile.primary_job_title.split("|"):
+                target_words.extend([w for w in t.strip().lower().split() if len(w) > 2])
+        if profile.secondary_job_titles:
+            sec = profile.secondary_job_titles
+            if isinstance(sec, list):
+                for t in sec:
+                    if isinstance(t, str):
+                        target_words.extend([w for w in t.lower().split() if len(w) > 2])
+        skip = {"engineer", "developer", "the", "and", "or", "primary", "level"}
+        target_words = [w for w in target_words if w not in skip]
+        if target_words and any(w in title_lower for w in target_words):
+            return True
+
+        # 2) At least MIN_PROFILE_SKILLS_IN_JOB profile skills appear in the job
+        _, matched_skills = self._calculate_skill_keyword_boost(profile, job)
+        if len(matched_skills) >= self.MIN_PROFILE_SKILLS_IN_JOB:
+            return True
+
+        return False
+
     async def get_cached_matches(
         self,
         user_id: str,
@@ -559,7 +728,7 @@ class AIJobMatcher:
 
         return filtered
 
-    def _generate_match_reasons(self, score: float, profile: UserProfile, job: Job) -> List[str]:
+    def _generate_match_reasons(self, score: float, profile: UserProfile, job: Job, matched_skills: Optional[List[str]] = None) -> List[str]:
         """Generate human-readable reasons for the match."""
         import json
         reasons = []
@@ -570,6 +739,11 @@ class AIJobMatcher:
             reasons.append("Strong match - great opportunity")
         elif score >= 50:
             reasons.append("Good match - worth applying")
+
+        # Skills/keywords that appear in the job (strong signal)
+        if matched_skills:
+            skills_str = ", ".join(matched_skills[:5])
+            reasons.append(f"Skills match: {skills_str}")
 
         # Check for title alignment (check both primary and secondary titles)
         # Handle pipe-separated primary titles and JSON secondary titles
@@ -678,6 +852,14 @@ class AIJobMatcher:
 
         for job in tech_jobs:
             try:
+                # Exclude jobs that require a tech stack the user didn't list (e.g. PHP/Symfony for an AI/ML profile)
+                if self._job_requires_skills_user_lacks(profile, job):
+                    continue
+                # Require alignment with career targeting or profile skills (neat, accurate results)
+                if not self._job_aligns_with_profile(profile, job):
+                    logger.debug(f"Skipping job (no profile alignment): {job.title}")
+                    continue
+
                 # Create job embedding
                 job_text = self.create_job_text(job)
                 job_embedding = self.get_embedding(job_text)
@@ -696,9 +878,14 @@ class AIJobMatcher:
                 if title_boost > 0:
                     score = min(100, score + title_boost)
 
+                # Keyword/skill overlap boost (profile skills in job title/description)
+                keyword_boost, matched_skills = self._calculate_skill_keyword_boost(profile, job)
+                if keyword_boost > 0:
+                    score = min(100, score + keyword_boost)
+
                 # Only include matches above minimum threshold
                 if score >= self.MIN_SCORE:
-                    reasons = self._generate_match_reasons(score, profile, job)
+                    reasons = self._generate_match_reasons(score, profile, job, matched_skills=matched_skills)
                     reason_text = reasons[0] if reasons else "AI-based profile matching"
 
                     matches.append({

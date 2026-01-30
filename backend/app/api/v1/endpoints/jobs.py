@@ -4,7 +4,7 @@ Job Management API Endpoints
 Handles job listing, searching, filtering, and scraping operations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.v1.dependencies import get_current_user
 from app.core.logging import get_logger
 from app.models.job import Job
@@ -449,6 +450,71 @@ def start_scraping(
         status="pending",
         message="Scraping job started. Check status via /jobs/scraping/{id}"
     )
+
+
+@router.post("/cleanup-old", status_code=status.HTTP_200_OK)
+async def trigger_cleanup_old_jobs(
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    """
+    Trigger cleanup of jobs older than 7 days (scraped jobs only; external jobs are kept).
+
+    Intended for external cron (e.g. cron-job.org) when the in-process scheduler
+    does not run at midnight (e.g. sleeping dyno, restarts). If CRON_SECRET is set
+    in the environment, the request must include header: X-Cron-Secret: <CRON_SECRET>.
+    """
+    if settings.CRON_SECRET and x_cron_secret != settings.CRON_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-Cron-Secret header",
+        )
+    try:
+        from app.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        if not scheduler:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Scheduler not available",
+            )
+        deleted = await scheduler.cleanup_old_jobs()
+        return {"status": "success", "deleted_count": deleted}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cleanup failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Cleanup failed: {str(e)}",
+        )
+
+
+@router.post("/recommendations/generate-all", status_code=status.HTTP_200_OK)
+async def generate_recommendations_for_all_users(
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate recommendations for ALL eligible users (CV or profile with job details).
+
+    Intended for external cron (e.g. cron-job.org) so you don't have to run the script locally.
+    If CRON_SECRET is set, the request must include header: X-Cron-Secret: <CRON_SECRET>.
+    """
+    if settings.CRON_SECRET and x_cron_secret != settings.CRON_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-Cron-Secret header",
+        )
+    try:
+        from app.services.recommendation_generator import RecommendationGenerator
+        generator = RecommendationGenerator(db)
+        stats = await generator.generate_recommendations_for_all_users()
+        return {"status": "success", **stats}
+    except Exception as e:
+        logger.error(f"Generate-all recommendations failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed: {str(e)}",
+        )
 
 
 @router.post("/recommendations/generate")

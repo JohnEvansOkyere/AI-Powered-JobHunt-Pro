@@ -18,13 +18,29 @@ from app.services.recommendation_generator import RecommendationGenerator
 
 logger = get_logger(__name__)
 
-# Tech job keywords (150+ covering all tech roles)
+# Tech job keywords: all tech roles + entry-level, internship, junior, mid, senior
+# First ~15 are used by some scrapers for search/filter; keep role + level mix.
 TECH_JOB_KEYWORDS = [
+    # Core tech roles + levels (first 10–15 used by RemoteOK/Arbeitnow/SerpAPI)
+    "software engineer", "software developer", "developer", "engineer",
+    "internship", "entry level", "junior", "senior", "backend", "frontend",
+    "full stack", "data scientist", "data engineer", "devops", "product manager",
+
+    # More experience levels & role types
+    "intern", "entry-level", "graduate", "new grad", "new graduate", "associate",
+    "mid level", "mid-level", "intermediate", "staff engineer", "principal engineer",
+    "lead engineer", "experienced",
+
     # Software Engineering - General
-    "software engineer", "software developer", "backend engineer",
-    "backend developer", "frontend engineer", "frontend developer",
+    "backend engineer", "backend developer", "frontend engineer", "frontend developer",
     "full stack developer", "full stack engineer", "fullstack developer",
     "web developer", "web engineer", "application developer",
+
+    # Entry-level & junior tech (explicit)
+    "junior software engineer", "junior developer", "junior engineer",
+    "entry level developer", "entry level engineer", "graduate developer",
+    "graduate engineer", "software engineer internship", "developer internship",
+    "engineering internship", "tech internship", "co-op", "coop",
 
     # Mobile Development
     "mobile developer", "mobile engineer", "ios developer", "ios engineer",
@@ -43,15 +59,18 @@ TECH_JOB_KEYWORDS = [
     "golang developer", "go developer", "ruby developer", "rails developer",
     "php developer", "rust developer", "scala developer",
 
-    # Data Science & Analytics
+    # Data Science & Analytics (all levels)
     "data scientist", "data analyst", "senior data scientist",
-    "data science engineer", "quantitative analyst", "research scientist",
+    "junior data scientist", "junior data analyst", "entry level data analyst",
+    "data science engineer", "data science internship", "analytics internship",
+    "quantitative analyst", "research scientist", "research intern",
     "business intelligence analyst", "bi analyst", "bi developer",
     "analytics engineer", "data analytics", "statistical analyst",
 
-    # AI & Machine Learning
+    # AI & Machine Learning (all levels)
     "ai engineer", "ai developer", "ai/ml engineer", "ml engineer",
     "machine learning engineer", "machine learning scientist",
+    "junior ml engineer", "ml internship", "ai internship",
     "deep learning engineer", "nlp engineer", "natural language processing",
     "computer vision engineer", "cv engineer", "ai researcher",
     "applied scientist", "research engineer", "llm engineer",
@@ -62,18 +81,19 @@ TECH_JOB_KEYWORDS = [
     "data pipeline engineer", "data platform engineer",
     "dataops engineer", "analytics engineer",
 
-    # DevOps & Infrastructure
+    # DevOps & Infrastructure (all levels)
     "devops engineer", "site reliability engineer", "sre",
-    "platform engineer", "infrastructure engineer", "cloud engineer",
-    "aws engineer", "azure engineer", "gcp engineer",
-    "kubernetes engineer", "k8s engineer", "docker engineer",
-    "systems engineer", "linux engineer", "unix administrator",
+    "junior devops", "devops internship", "platform engineer",
+    "infrastructure engineer", "cloud engineer", "aws engineer",
+    "azure engineer", "gcp engineer", "kubernetes engineer", "k8s engineer",
+    "docker engineer", "systems engineer", "linux engineer", "unix administrator",
     "network engineer", "network administrator",
 
-    # Design & UX
+    # Design & UX (all levels)
     "ux designer", "ui designer", "ui/ux designer", "ux/ui designer",
-    "product designer", "senior product designer", "lead designer",
-    "graphic designer", "web designer", "visual designer",
+    "product designer", "senior product designer", "junior designer",
+    "design internship", "ux internship", "ui internship",
+    "lead designer", "graphic designer", "web designer", "visual designer",
     "interaction designer", "motion designer", "ux researcher",
     "design lead", "design manager", "creative director",
     "brand designer", "digital designer",
@@ -85,11 +105,11 @@ TECH_JOB_KEYWORDS = [
     "team lead", "director of engineering", "vp engineering",
     "cto", "chief technology officer", "head of engineering",
 
-    # Quality & Testing
+    # Quality & Testing (all levels)
     "qa engineer", "quality assurance engineer", "test engineer",
-    "automation engineer", "test automation engineer", "sdet",
-    "performance engineer", "qa analyst", "quality engineer",
-    "test lead", "qa lead",
+    "junior qa engineer", "qa internship", "automation engineer",
+    "test automation engineer", "sdet", "performance engineer",
+    "qa analyst", "quality engineer", "test lead", "qa lead",
 
     # Security
     "security engineer", "cybersecurity engineer", "infosec engineer",
@@ -260,9 +280,10 @@ class JobScraperScheduler:
             logger.info(f"📅 Deleting jobs scraped before: {cutoff_date.strftime('%Y-%m-%d %H:%M:%S')} UTC")
             logger.info("   (Skipping jobs with saved/applied applications)")
 
-            # Find old jobs
+            # Find old jobs (only scraped jobs - never delete user-added external jobs)
             old_jobs = db.query(Job).filter(
-                Job.scraped_at < cutoff_date
+                Job.scraped_at < cutoff_date,
+                Job.source != "external",
             ).all()
 
             if not old_jobs:
@@ -379,6 +400,13 @@ class JobScraperScheduler:
                     logger.info(f"   {source}: {stats.get('found', 0)} found, "
                               f"{stats.get('stored', 0)} stored, "
                               f"{stats.get('duplicates', 0)} duplicates")
+
+            # Run cleanup after every scrape so old jobs are removed even if
+            # the midnight cron didn't run (e.g. process sleeping in production)
+            logger.info("🧹 Running cleanup of old jobs (>7 days)...")
+            deleted = await self.cleanup_old_jobs()
+            if deleted > 0:
+                logger.info(f"   Cleaned {deleted} old jobs")
 
             return result
 
