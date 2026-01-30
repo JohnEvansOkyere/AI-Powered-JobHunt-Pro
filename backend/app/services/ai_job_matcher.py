@@ -46,24 +46,31 @@ class AIJobMatcher:
     ])
 
     def __init__(self):
-        """Initialize OpenAI client."""
-        # Load from environment (settings will have loaded .env)
+        """Initialize OpenAI client. Graceful degradation if key missing (app does not crash)."""
         from app.core.config import settings
 
-        api_key = settings.OPENAI_API_KEY if hasattr(settings, 'OPENAI_API_KEY') else os.getenv("OPENAI_API_KEY")
-
+        api_key = (getattr(settings, "OPENAI_API_KEY", None) or os.getenv("OPENAI_API_KEY") or "").strip()
         if not api_key:
-            logger.warning("OPENAI_API_KEY not configured - AI matching will fail")
-            raise ValueError("OPENAI_API_KEY not found in environment. Please add it to .env file.")
-
-        self.client = OpenAI(api_key=api_key)
+            logger.warning(
+                "OPENAI_API_KEY not configured - AI matching disabled; recommendations will be empty until key is set."
+            )
+            self.client = None
+            self._available = False
+        else:
+            self.client = OpenAI(api_key=api_key)
+            self._available = True
         self.model = "text-embedding-3-small"  # Fast, cheap, accurate
-        logger.info("AI Job Matcher initialized with OpenAI embeddings")
+        if self._available:
+            logger.info("AI Job Matcher initialized with OpenAI embeddings")
 
     def get_embedding(self, text: str) -> List[float]:
-        """Get embedding vector for text using OpenAI."""
+        """Get embedding vector for text using OpenAI. Returns [] if client unavailable or on error."""
+        if not self._available or not self.client:
+            return []
         try:
-            # Clean text
+            from app.utils.sanitizer import get_sanitizer
+            sanitizer = get_sanitizer()
+            text = sanitizer.sanitize_text(text or "", max_length=8000, check_injection=True)
             text = text.replace("\n", " ").strip()
             if not text:
                 return []
@@ -810,6 +817,10 @@ class AIJobMatcher:
         Returns:
             List of matches with job_id, match_score, and match_reason
         """
+        if not self._available:
+            logger.warning("AI Job Matcher unavailable (OPENAI_API_KEY not set) - returning no matches")
+            return []
+
         # Get user profile (required for matching)
         profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
 

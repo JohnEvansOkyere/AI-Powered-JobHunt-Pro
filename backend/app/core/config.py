@@ -146,6 +146,12 @@ class Settings(BaseSettings):
         """Check if running in development environment."""
         return self.ENVIRONMENT == "development"
 
+    @property
+    def is_openai_configured(self) -> bool:
+        """Check if OpenAI API key is set (for AI matching/recommendations). App does not crash if missing."""
+        key = getattr(self, "OPENAI_API_KEY", None) or ""
+        return bool(key and isinstance(key, str) and key.strip() != "")
+
 
 # Global settings instance
 settings = Settings()

@@ -359,6 +359,9 @@ class ExternalJobParser:
         Returns:
             Dictionary with extracted job details
         """
+        from app.utils.sanitizer import get_sanitizer
+        sanitizer = get_sanitizer()
+        text = sanitizer.sanitize_text(text or "", max_length=6000, check_injection=True)
         # Truncate text if too long, keeping first 5000 chars for efficiency
         truncated_text = text[:5000]
         char_limit_note = " [Note: Text was truncated to 5000 characters]" if len(text) > 5000 else ""

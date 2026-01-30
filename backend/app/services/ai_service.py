@@ -2,7 +2,7 @@
 AI Service Layer
 
 High-level service for common AI operations with built-in error handling,
-cost optimization, and usage tracking.
+cost optimization, usage tracking, and input sanitization.
 """
 
 import json
@@ -13,6 +13,14 @@ from app.ai.usage_tracker import get_usage_tracker
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _sanitize_for_ai(text: str, max_length: int = 8000) -> str:
+    """Sanitize user-provided text before sending to AI (injection + HTML + length)."""
+    if not text or not isinstance(text, str):
+        return ""
+    from app.utils.sanitizer import get_sanitizer
+    return get_sanitizer().sanitize_text(text, max_length=max_length, check_injection=True)
 
 
 class AIService:
@@ -48,6 +56,10 @@ class AIService:
         Returns:
             dict: Structured CV data
         """
+        cv_text = _sanitize_for_ai(cv_text or "", max_length=4000)
+        if not cv_text.strip():
+            return self._get_empty_cv_structure()
+
         prompt = f"""Extract structured information from this CV/resume. Return a JSON object with the following structure:
 
 {{
@@ -97,7 +109,7 @@ class AIService:
 }}
 
 CV Text:
-{cv_text[:4000]}
+{cv_text}
 
 Return only valid JSON, no markdown formatting."""
         
@@ -162,10 +174,11 @@ Return only valid JSON, no markdown formatting."""
         Returns:
             str: Tailored CV content
         """
+        job_description = _sanitize_for_ai(job_description or "", max_length=2000)
         prompt = f"""Tailor this CV for the following job description. Highlight relevant skills and experience.
 
 Job Description:
-{job_description[:2000]}
+{job_description}
 
 CV Data:
 {str(cv_data)[:3000]}
@@ -207,11 +220,13 @@ Provide a tailored version of the CV that emphasizes relevant experience and ski
         Returns:
             str: Generated cover letter
         """
+        company_name = _sanitize_for_ai(company_name or "", max_length=200)
+        job_description = _sanitize_for_ai(job_description or "", max_length=2000)
         prompt = f"""Write a professional cover letter for the following position:
 
 Company: {company_name}
 Job Description:
-{job_description[:2000]}
+{job_description}
 
 Applicant Information:
 {str(cv_data.get('personal_info', {}))[:500]}

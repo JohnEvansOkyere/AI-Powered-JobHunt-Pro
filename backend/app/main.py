@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.api.v1.router import api_router
 from app.middleware import ErrorHandlerMiddleware, RequestLoggingMiddleware
+from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 
 logger = get_logger(__name__)
 
@@ -86,10 +87,13 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Error Handler Middleware (Second - catches all exceptions)
+    # Request body size limit (prevent memory exhaustion DoS; 10MB default)
+    app.add_middleware(RequestSizeLimitMiddleware)
+
+    # Error Handler Middleware (catches all exceptions)
     app.add_middleware(ErrorHandlerMiddleware)
 
-    # Request Logging Middleware (Third - logs all requests)
+    # Request Logging Middleware (logs all requests)
     app.add_middleware(RequestLoggingMiddleware)
 
     # Trusted Host Middleware (production)

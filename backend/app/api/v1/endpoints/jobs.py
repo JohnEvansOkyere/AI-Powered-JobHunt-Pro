@@ -26,7 +26,7 @@ from app.services.job_matching_service_optimized import get_optimized_matching_s
 from app.services.ai_job_matcher import get_ai_job_matcher
 from app.services.recommendation_generator import RecommendationGenerator
 from app.tasks.job_scraping import scrape_jobs_task
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, Field, field_serializer
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -114,7 +114,7 @@ class ScrapeJobsRequest(BaseModel):
     sources: List[str]
     keywords: Optional[List[str]] = None
     location: Optional[str] = None
-    max_results_per_source: int = 50
+    max_results_per_source: int = Field(default=50, ge=1, le=100, description="Max results per source (1-100)")
 
 
 class ScrapeJobsResponse(BaseModel):
@@ -173,16 +173,18 @@ async def search_jobs(
     """
     query = db.query(Job)
     
-    # Text search
+    # Text search (sanitize length to avoid expensive full scans; max 100 chars)
     if q:
-        search_term = f"%{q}%"
-        query = query.filter(
-            or_(
-                Job.title.ilike(search_term),
-                Job.company.ilike(search_term),
-                Job.description.ilike(search_term)
+        q = (q or "").strip()[:100]
+        if q:
+            search_term = f"%{q}%"
+            query = query.filter(
+                or_(
+                    Job.title.ilike(search_term),
+                    Job.company.ilike(search_term),
+                    Job.description.ilike(search_term)
+                )
             )
-        )
     
     # Source filter
     if source:

@@ -177,16 +177,16 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             traceback=traceback.format_exc(),
         )
 
-        # In production, hide detailed error information
+        # Never send tracebacks to clients (log only). Avoid leaking internals even in DEBUG.
         if settings.is_production:
             message = "An unexpected error occurred. Please contact support."
             details = {}
-        else:
+        elif settings.DEBUG:
             message = f"{error_type}: {str(exc)}"
-            details = {
-                "error_type": error_type,
-                "traceback": traceback.format_exc(),
-            }
+            details = {"error_type": error_type}
+        else:
+            message = "An unexpected error occurred. Please contact support."
+            details = {}
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

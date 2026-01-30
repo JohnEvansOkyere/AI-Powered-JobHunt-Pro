@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class UsageRecord:
-    """Record of a single AI API call."""
+    """Record of a single AI API call (per-user for rate limiting)."""
     task_type: str
     provider: str
     input_tokens: int
@@ -26,6 +26,7 @@ class UsageRecord:
     timestamp: datetime = field(default_factory=datetime.utcnow)
     success: bool = True
     error: Optional[str] = None
+    user_id: Optional[str] = None  # For per-user rate limiting; None = system/background
 
 
 class UsageTracker:
@@ -57,10 +58,11 @@ class UsageTracker:
         output_tokens: int,
         cost: float,
         success: bool = True,
-        error: Optional[str] = None
+        error: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         """
-        Record an AI API usage.
+        Record an AI API usage (user_id used for per-user rate limiting).
         
         Args:
             task_type: Type of task
@@ -70,6 +72,7 @@ class UsageTracker:
             cost: Cost in USD
             success: Whether the call succeeded
             error: Error message if failed
+            user_id: User ID for per-user rate limits; None for system/background
         """
         with self.lock:
             record = UsageRecord(
@@ -79,7 +82,8 @@ class UsageTracker:
                 output_tokens=output_tokens,
                 cost=cost,
                 success=success,
-                error=error
+                error=error,
+                user_id=user_id,
             )
             self.records.append(record)
             
@@ -93,38 +97,38 @@ class UsageTracker:
             cutoff = datetime.utcnow() - timedelta(hours=24)
             self.records = [r for r in self.records if r.timestamp > cutoff]
     
-    def check_rate_limit(self, user_id: str, provider: str, max_requests: int = 60) -> bool:
+    def check_rate_limit(self, user_id: Optional[str], provider: str, max_requests: int = 60) -> bool:
         """
-        Check if user has exceeded rate limit for a provider.
+        Check if user has exceeded rate limit for a provider (per-user).
+        
+        Rate limiting is per user so one user cannot exhaust the system quota.
+        When user_id is None (e.g. background job), we allow the request (no per-user cap).
         
         Args:
-            user_id: User ID
+            user_id: User ID (None = system/background, not counted toward any user limit)
             provider: Provider name
-            max_requests: Maximum requests per minute
+            max_requests: Maximum requests per minute per user
             
         Returns:
             bool: True if within limit, False if exceeded
         """
+        if user_id is None:
+            return True
         with self.lock:
             now = datetime.utcnow()
             window_start = now - self.rate_limit_window
-            
-            # Count requests in current window
-            key = f"{user_id}:{provider}"
             recent_requests = [
                 r for r in self.records
                 if r.timestamp > window_start
                 and r.provider == provider
+                and r.user_id == user_id
             ]
-            
-            # For now, we don't track per-user, so use global limit
-            # TODO: Add user_id to UsageRecord for per-user tracking
             count = len(recent_requests)
-            
             if count >= max_requests:
-                logger.warning(f"Rate limit exceeded: {count} requests in last minute for {provider}")
+                logger.warning(
+                    f"Rate limit exceeded for user {user_id}: {count} requests in last minute for {provider}"
+                )
                 return False
-            
             return True
     
     def get_usage_stats(self, hours: int = 24) -> Dict[str, any]:

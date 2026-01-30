@@ -286,7 +286,8 @@ class ModelRouter:
                 (name for name, p in self.providers.items() if p == provider),
                 "unknown"
             )
-            if not self.usage_tracker.check_rate_limit(user_id, provider_name):
+            max_per_minute = getattr(settings, "AI_RATE_LIMIT_PER_MINUTE", 60)
+            if not self.usage_tracker.check_rate_limit(user_id, provider_name, max_requests=max_per_minute):
                 logger.warning(f"Rate limit exceeded for user {user_id}")
                 # Try fallback provider
                 fallback_provider = self.get_provider(
@@ -330,7 +331,8 @@ class ModelRouter:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     cost=cost,
-                    success=True
+                    success=True,
+                    user_id=user_id,
                 )
                 
                 logger.info(
@@ -355,7 +357,8 @@ class ModelRouter:
                 output_tokens=0,
                 cost=0.0,
                 success=False,
-                error=str(e)
+                error=str(e),
+                user_id=user_id,
             )
             
             # Try fallback if not already using it
@@ -386,7 +389,8 @@ class ModelRouter:
                                 input_tokens=fallback_input_tokens,
                                 output_tokens=fallback_output_tokens,
                                 cost=fallback_cost,
-                                success=True
+                                success=True,
+                                user_id=user_id,
                             )
                             logger.info(f"Fallback generation succeeded using {fallback_provider.__class__.__name__}")
                             return fallback_result
