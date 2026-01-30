@@ -38,6 +38,24 @@ class RecommendationGenerator:
         self.recommendations_per_user = 50  # Store top 50 matches per user
         self.expiry_days = 3  # Recommendations expire after 3 days
 
+    def user_eligible_for_recommendations(self, user_id: str) -> bool:
+        """
+        Check if user has enough data to generate recommendations (CV, profile, or interest signals).
+        Used to trigger on-demand generation for new users with empty recommendation list.
+        """
+        cv = self.db.query(CV).filter(CV.user_id == user_id).order_by(CV.created_at.desc()).first()
+        profile = self.db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        interested_job_ids = self._get_user_interested_job_ids(user_id)
+
+        has_cv = cv is not None
+        has_profile_data = bool(
+            profile
+            and (profile.primary_job_title or profile.secondary_job_titles or profile.technical_skills)
+        )
+        has_interest_signals = len(interested_job_ids) > 0
+
+        return has_cv or has_profile_data or has_interest_signals
+
     async def generate_recommendations_for_user(self, user_id: str) -> int:
         """
         Generate recommendations for a single user using CV, profile, AND application history.
@@ -345,6 +363,34 @@ class RecommendationGenerator:
         logger.info("=" * 80)
 
         return stats
+
+    def get_eligible_user_ids_with_zero_recommendations(self) -> List[str]:
+        """
+        Return user IDs that are eligible for recommendations (CV or profile) but
+        currently have zero active recommendations. Used by scheduler on startup
+        so new users get recommendations without waiting for the 2-day run.
+        """
+        now = datetime.now(timezone.utc)
+        users_with_cvs = {str(r[0]) for r in self.db.query(CV.user_id).distinct().all()}
+        users_with_profiles = {
+            str(r[0]) for r in self.db.query(UserProfile.user_id).filter(
+                or_(
+                    UserProfile.primary_job_title.isnot(None),
+                    UserProfile.technical_skills.isnot(None),
+                )
+            ).distinct().all()
+        }
+        eligible = list(users_with_cvs | users_with_profiles)
+        if not eligible:
+            return []
+
+        # Users who have at least one active recommendation
+        users_with_recs = {
+            str(r[0]) for r in self.db.query(JobRecommendation.user_id).filter(
+                JobRecommendation.expires_at > now,
+            ).distinct().all()
+        }
+        return [uid for uid in eligible if uid not in users_with_recs]
 
     def cleanup_expired_recommendations(self) -> int:
         """

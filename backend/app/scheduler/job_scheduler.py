@@ -9,6 +9,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
@@ -181,6 +182,33 @@ class JobScraperScheduler:
 
         except Exception as e:
             logger.error(f"❌ Error generating recommendations: {e}", exc_info=True)
+            db.rollback()
+        finally:
+            db.close()
+
+    async def generate_recommendations_for_empty_users(self):
+        """
+        Generate recommendations only for users who are eligible but have zero
+        recommendations. Runs once shortly after scheduler start so new users
+        get recommendations without waiting for the 2-day periodic run.
+        """
+        db: Session = SessionLocal()
+        try:
+            generator = RecommendationGenerator(db)
+            user_ids = generator.get_eligible_user_ids_with_zero_recommendations()
+            if not user_ids:
+                logger.info("🎯 No users with zero recommendations to backfill")
+                return
+            logger.info(f"🎯 Backfilling recommendations for {len(user_ids)} user(s) with zero recommendations")
+            for user_id in user_ids:
+                try:
+                    count = await generator.generate_recommendations_for_user(user_id)
+                    if count > 0:
+                        logger.info(f"   Generated {count} recommendations for user {user_id}")
+                except Exception as e:
+                    logger.error(f"   Failed for user {user_id}: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error in generate_recommendations_for_empty_users: {e}", exc_info=True)
             db.rollback()
         finally:
             db.close()
@@ -484,6 +512,17 @@ class JobScraperScheduler:
                 max_instances=1,
             )
 
+            # One-time run shortly after start: generate for users with zero recommendations
+            # so new users get recommendations without waiting for the 2-day periodic run
+            run_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+            self.scheduler.add_job(
+                func=self.generate_recommendations_for_empty_users,
+                trigger=DateTrigger(run_date=run_at),
+                id="on_start_recommendations_empty_users",
+                name="On-start: Recommendations for users with zero",
+                replace_existing=True,
+            )
+
             self.scheduler.start()
 
             logger.info("✅ Job scraper scheduler started successfully")
@@ -500,6 +539,7 @@ class JobScraperScheduler:
             logger.info("   - Scrapes jobs posted within last 3 days")
             logger.info("   - Keeps only jobs from last 7 days in database")
             logger.info("   - Uses CV + Profile data for recommendations")
+            logger.info("   - On start: backfill recommendations for users with zero (60s delay)")
             logger.info("=" * 60)
             logger.info("🔄 Next scraping: " + str(self.scheduler.get_job('periodic_job_scraping').next_run_time))
             logger.info("🔄 Next recommendations: " + str(self.scheduler.get_job('periodic_recommendation_generation').next_run_time))

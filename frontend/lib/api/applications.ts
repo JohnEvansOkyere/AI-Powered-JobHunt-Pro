@@ -52,6 +52,17 @@ export interface GenerateCVResponse {
   created_at?: string
 }
 
+export type ApplicationStatus =
+  | 'saved'
+  | 'draft'
+  | 'reviewed'
+  | 'finalized'
+  | 'sent'
+  | 'submitted'
+  | 'interviewing'
+  | 'rejected'
+  | 'offer'
+
 export interface Application {
   id: string
   user_id: string
@@ -60,9 +71,26 @@ export interface Application {
   tailored_cv_path?: string
   cover_letter?: string
   application_email?: string
-  status: 'draft' | 'reviewed' | 'finalized' | 'sent'
+  status: ApplicationStatus
   created_at: string
   updated_at: string
+}
+
+export interface JobDetails {
+  id: string
+  title: string
+  company: string
+  location?: string
+  job_link?: string
+  source?: string
+  posted_date?: string
+  salary_range?: string
+  job_type?: string
+  remote_type?: string
+}
+
+export interface ApplicationWithJob extends Application {
+  job?: JobDetails | null
 }
 
 /**
@@ -117,11 +145,11 @@ export async function getApplicationForJob(jobId: string): Promise<Application |
 }
 
 /**
- * List all applications for the current user
+ * List all applications for the current user (with job details)
  */
-export async function listApplications(status?: string): Promise<Application[]> {
+export async function listApplications(status?: string): Promise<ApplicationWithJob[]> {
   const params = status ? `?status_filter=${status}` : ''
-  return apiClient.get<Application[]>(`/api/v1/applications/${params}`)
+  return apiClient.get<ApplicationWithJob[]>(`/api/v1/applications/${params}`)
 }
 
 export interface DashboardApplicationsStats {

@@ -4,54 +4,28 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { FileText, Download, Eye, Clock, CheckCircle, XCircle, Bookmark, Trash2, ExternalLink } from 'lucide-react'
+import { Download, Eye, Clock, CheckCircle, XCircle, Bookmark, Trash2, ExternalLink } from 'lucide-react'
 import { getSavedJobs, unsaveJob, Application as SavedApplication } from '@/lib/api/savedJobs'
+import { listApplications, getCVDownloadUrl, type ApplicationWithJob, type ApplicationStatus } from '@/lib/api/applications'
 import { toast } from 'react-hot-toast'
 
-interface Application {
-  id: string
-  jobTitle: string
-  company: string
-  status: 'draft' | 'generated' | 'sent'
-  createdAt: string
-  updatedAt: string
-  hasCV: boolean
-  hasCoverLetter: boolean
-  hasEmail: boolean
-}
+const IN_PROGRESS_STATUSES: ApplicationStatus[] = ['draft', 'reviewed', 'finalized']
+const SUBMITTED_STATUSES: ApplicationStatus[] = ['sent', 'submitted', 'interviewing', 'offer']
 
-// Mock data
-const mockApplications: Application[] = [
-  {
-    id: '1',
-    jobTitle: 'Senior Software Engineer',
-    company: 'Tech Corp',
-    status: 'generated',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    hasCV: true,
-    hasCoverLetter: true,
-    hasEmail: true,
-  },
-  {
-    id: '2',
-    jobTitle: 'Full Stack Developer',
-    company: 'StartupXYZ',
-    status: 'draft',
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    hasCV: true,
-    hasCoverLetter: false,
-    hasEmail: false,
-  },
-]
+function isInProgress(status: ApplicationStatus) {
+  return IN_PROGRESS_STATUSES.includes(status)
+}
+function isSubmitted(status: ApplicationStatus) {
+  return SUBMITTED_STATUSES.includes(status)
+}
 
 type TabType = 'saved' | 'draft' | 'submitted'
 
 export default function ApplicationsPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('saved')
-  const [applications] = useState<Application[]>(mockApplications)
+  const [applications, setApplications] = useState<ApplicationWithJob[]>([])
+  const [loadingApplications, setLoadingApplications] = useState(false)
   const [savedJobs, setSavedJobs] = useState<SavedApplication[]>([])
   const [loadingSaved, setLoadingSaved] = useState(false)
 
@@ -60,6 +34,23 @@ export default function ApplicationsPage() {
       loadSavedJobs()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    loadApplications()
+  }, [])
+
+  const loadApplications = async () => {
+    try {
+      setLoadingApplications(true)
+      const list = await listApplications()
+      setApplications(list)
+    } catch (error) {
+      console.error('Error loading applications:', error)
+      toast.error('Failed to load applications')
+    } finally {
+      setLoadingApplications(false)
+    }
+  }
 
   const loadSavedJobs = async () => {
     try {
@@ -97,24 +88,54 @@ export default function ApplicationsPage() {
     return diffDays
   }
 
-  const getStatusBadge = (status: Application['status']) => {
-    const styles = {
+  const getStatusBadge = (status: ApplicationStatus) => {
+    const styles: Record<string, string> = {
       draft: 'bg-yellow-100 text-yellow-800',
-      generated: 'bg-blue-100 text-blue-800',
+      reviewed: 'bg-blue-100 text-blue-800',
+      finalized: 'bg-blue-100 text-blue-800',
       sent: 'bg-green-100 text-green-800',
+      submitted: 'bg-green-100 text-green-800',
+      interviewing: 'bg-green-100 text-green-800',
+      offer: 'bg-green-100 text-green-800',
+      saved: 'bg-neutral-100 text-neutral-700',
+      rejected: 'bg-red-100 text-red-800',
     }
-    const labels = {
+    const labels: Record<string, string> = {
       draft: 'Draft',
-      generated: 'Ready',
+      reviewed: 'Ready',
+      finalized: 'Ready',
       sent: 'Sent',
+      submitted: 'Submitted',
+      interviewing: 'Interviewing',
+      offer: 'Offer',
+      saved: 'Saved',
+      rejected: 'Rejected',
     }
     return (
       <span
-        className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status]}`}
+        className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] ?? 'bg-neutral-100 text-neutral-700'}`}
       >
-        {labels[status]}
+        {labels[status] ?? status}
       </span>
     )
+  }
+
+  const handleViewApplication = (jobId: string) => {
+    router.push(`/dashboard/applications/generate/${jobId}`)
+  }
+
+  const handleDownloadCV = async (application: ApplicationWithJob) => {
+    if (!application.tailored_cv_path) {
+      toast.error('No CV generated yet for this application')
+      return
+    }
+    try {
+      const { download_url } = await getCVDownloadUrl(application.id)
+      window.open(download_url, '_blank')
+    } catch (error) {
+      console.error('Error getting download URL:', error)
+      toast.error('Failed to get download link')
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -171,7 +192,7 @@ export default function ApplicationsPage() {
                 >
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4" />
-                    <span>In Progress ({applications.filter(a => a.status === 'draft' || a.status === 'generated').length})</span>
+                    <span>In Progress ({applications.filter(a => isInProgress(a.status)).length})</span>
                   </div>
                 </button>
                 <button
@@ -186,7 +207,7 @@ export default function ApplicationsPage() {
                 >
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4" />
-                    <span>Submitted ({applications.filter(a => a.status === 'sent').length})</span>
+                    <span>Submitted ({applications.filter(a => isSubmitted(a.status)).length})</span>
                   </div>
                 </button>
               </nav>
@@ -290,7 +311,12 @@ export default function ApplicationsPage() {
           {/* In Progress Tab */}
           {activeTab === 'draft' && (
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
-              {applications.filter(a => a.status === 'draft' || a.status === 'generated').length === 0 ? (
+              {loadingApplications ? (
+                <div className="p-12 text-center">
+                  <Clock className="h-12 w-12 text-primary-600 mx-auto mb-4 animate-spin" />
+                  <p className="text-neutral-600">Loading applications...</p>
+                </div>
+              ) : applications.filter(a => isInProgress(a.status)).length === 0 ? (
                 <div className="p-12 text-center">
                   <Clock className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
                   <p className="text-neutral-600 mb-2">No applications in progress</p>
@@ -300,7 +326,7 @@ export default function ApplicationsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-neutral-200">
-                  {applications.filter(a => a.status === 'draft' || a.status === 'generated').map((application) => (
+                  {applications.filter(a => isInProgress(a.status)).map((application) => (
                     <div
                       key={application.id}
                       className="p-6 hover:bg-neutral-50 transition-colors"
@@ -309,15 +335,15 @@ export default function ApplicationsPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-semibold text-neutral-800">
-                              {application.jobTitle}
+                              {application.job?.title ?? 'Application'}
                             </h3>
                             {getStatusBadge(application.status)}
                           </div>
-                          <p className="text-neutral-600 mb-4">{application.company}</p>
+                          <p className="text-neutral-600 mb-4">{application.job?.company ?? '—'}</p>
 
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="flex items-center space-x-2">
-                              {application.hasCV ? (
+                              {application.tailored_cv_path ? (
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-neutral-400" />
@@ -325,7 +351,7 @@ export default function ApplicationsPage() {
                               <span className="text-sm text-neutral-600">CV</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {application.hasCoverLetter ? (
+                              {application.cover_letter ? (
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-neutral-400" />
@@ -333,7 +359,7 @@ export default function ApplicationsPage() {
                               <span className="text-sm text-neutral-600">Cover Letter</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {application.hasEmail ? (
+                              {application.application_email ? (
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-neutral-400" />
@@ -343,21 +369,23 @@ export default function ApplicationsPage() {
                           </div>
 
                           <div className="flex items-center space-x-4 text-xs text-neutral-500">
-                            <span>Created: {formatDate(application.createdAt)}</span>
-                            <span>Updated: {formatDate(application.updatedAt)}</span>
+                            <span>Created: {formatDate(application.created_at)}</span>
+                            <span>Updated: {formatDate(application.updated_at)}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center space-x-2 ml-4">
                           <button
+                            onClick={() => handleViewApplication(application.job_id)}
                             className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Preview"
+                            title="View / Edit application"
                           >
                             <Eye className="h-5 w-5" />
                           </button>
                           <button
+                            onClick={() => handleDownloadCV(application)}
                             className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Download"
+                            title="Download CV"
                           >
                             <Download className="h-5 w-5" />
                           </button>
@@ -373,7 +401,12 @@ export default function ApplicationsPage() {
           {/* Submitted Tab */}
           {activeTab === 'submitted' && (
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
-              {applications.filter(a => a.status === 'sent').length === 0 ? (
+              {loadingApplications ? (
+                <div className="p-12 text-center">
+                  <Clock className="h-12 w-12 text-primary-600 mx-auto mb-4 animate-spin" />
+                  <p className="text-neutral-600">Loading applications...</p>
+                </div>
+              ) : applications.filter(a => isSubmitted(a.status)).length === 0 ? (
                 <div className="p-12 text-center">
                   <CheckCircle className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
                   <p className="text-neutral-600 mb-2">No submitted applications yet</p>
@@ -383,7 +416,7 @@ export default function ApplicationsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-neutral-200">
-                  {applications.filter(a => a.status === 'sent').map((application) => (
+                  {applications.filter(a => isSubmitted(a.status)).map((application) => (
                     <div
                       key={application.id}
                       className="p-6 hover:bg-neutral-50 transition-colors"
@@ -392,28 +425,30 @@ export default function ApplicationsPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-semibold text-neutral-800">
-                              {application.jobTitle}
+                              {application.job?.title ?? 'Application'}
                             </h3>
                             {getStatusBadge(application.status)}
                           </div>
-                          <p className="text-neutral-600 mb-4">{application.company}</p>
+                          <p className="text-neutral-600 mb-4">{application.job?.company ?? '—'}</p>
 
                           <div className="flex items-center space-x-4 text-xs text-neutral-500">
-                            <span>Created: {formatDate(application.createdAt)}</span>
-                            <span>Submitted: {formatDate(application.updatedAt)}</span>
+                            <span>Created: {formatDate(application.created_at)}</span>
+                            <span>Submitted: {formatDate(application.updated_at)}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center space-x-2 ml-4">
                           <button
+                            onClick={() => handleViewApplication(application.job_id)}
                             className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Preview"
+                            title="View application"
                           >
                             <Eye className="h-5 w-5" />
                           </button>
                           <button
+                            onClick={() => handleDownloadCV(application)}
                             className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Download"
+                            title="Download CV"
                           >
                             <Download className="h-5 w-5" />
                           </button>

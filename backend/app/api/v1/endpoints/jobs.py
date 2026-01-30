@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional
 from datetime import datetime, timedelta
+import asyncio
 import uuid
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.config import settings
 from app.api.v1.dependencies import get_current_user
 from app.core.logging import get_logger
@@ -33,6 +34,24 @@ scraper_service = JobScraperService()
 matching_service = JobMatchingService()
 optimized_matching_service = get_optimized_matching_service()
 ai_matcher = get_ai_job_matcher()  # AI-powered semantic matching
+
+
+async def _background_generate_recommendations_for_user(user_id_str: str) -> None:
+    """
+    Run recommendation generation for a user in the background (own DB session).
+    Used when GET /recommendations returns 0 for an eligible user so new users
+    get recommendations without waiting for the 2-day scheduler.
+    """
+    db = SessionLocal()
+    try:
+        generator = RecommendationGenerator(db)
+        count = await generator.generate_recommendations_for_user(user_id_str)
+        if count > 0:
+            logger.info(f"Background: generated {count} recommendations for user {user_id_str}")
+    except Exception as e:
+        logger.error(f"Background recommendation generation failed for {user_id_str}: {e}", exc_info=True)
+    finally:
+        db.close()
 
 
 # Pydantic models
@@ -296,7 +315,9 @@ async def get_recommendations(
     Get pre-computed job recommendations for the current user.
 
     Returns recommendations sorted by match score (highest first).
-    Recommendations are generated daily by background scheduler.
+    When the user has zero recommendations but is eligible (has profile/CV),
+    generation is triggered in the background so new users get recommendations
+    without waiting for the 2-day scheduler. Refresh the page after a short wait.
     """
     user_id = current_user["id"]
     if isinstance(user_id, str):
@@ -319,7 +340,12 @@ async def get_recommendations(
     recommendations = query.offset(offset).limit(page_size).all()
 
     if not recommendations:
-        # No recommendations found - return empty result
+        # No recommendations: if user is eligible (profile/CV/interest), trigger background generation
+        # so new users get recommendations without waiting for the 2-day scheduler.
+        generator = RecommendationGenerator(db)
+        if generator.user_eligible_for_recommendations(str(user_id)):
+            logger.info(f"User {user_id} has 0 recommendations but is eligible - triggering background generation")
+            asyncio.create_task(_background_generate_recommendations_for_user(str(user_id)))
         return JobSearchResponse(
             jobs=[],
             total=0,

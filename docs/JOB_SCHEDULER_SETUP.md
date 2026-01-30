@@ -99,6 +99,17 @@ The scheduler searches for jobs in these categories:
 
 ---
 
+## New-user recommendations (no 2-day wait)
+
+Recommendations are normally generated **every 2 days at 7:00 AM UTC**. So that new users get recommendations right away:
+
+1. **On first request** – When a user with **zero recommendations** (and an eligible profile/CV) calls `GET /recommendations`, the API triggers **background generation** for that user and returns an empty list. After a short wait (e.g. refresh or open “View my matches” again), recommendations appear.
+2. **On scheduler start** – About **60 seconds after** the backend starts, the scheduler runs a one-time job that generates recommendations **only for users who have zero recommendations**. So after a deploy or restart, new users are backfilled without waiting for the next 2-day run.
+
+Once a user has recommendations, the normal 2-day schedule continues to refresh them. New users no longer need to wait two days for their first recommendations.
+
+---
+
 ## Usage
 
 ### Automatic (Recommended)
