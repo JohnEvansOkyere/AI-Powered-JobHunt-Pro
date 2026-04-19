@@ -32,6 +32,7 @@ so you don't need `PYTHONPATH` gymnastics.
 | `start_celery_worker.sh` | Starts a Celery worker. See `docs/deployment/CELERY.md`. |
 | `start_celery_beat.sh` | Starts Celery Beat (periodic scheduler). |
 | `fix_connection.sh` | Dev-only helper for common Supabase connectivity errors. |
+| `submit_whatsapp_templates.py` | Prints JSON bodies + curl examples for the three Meta Cloud API templates (§6.10 of the V2 plan). Pass `--execute` to POST each body to `/{WABA_ID}/message_templates` (needs `WHATSAPP_BUSINESS_ACCOUNT_ID` + token with `whatsapp_business_management`). |
 
 ## scrape/
 

@@ -30,6 +30,11 @@ psql "$DATABASE_URL" -f migrations/007_remove_cv_tailoring.sql
 psql "$DATABASE_URL" -f migrations/008_recommendations_v2.sql
 psql "$DATABASE_URL" -f migrations/009_add_whatsapp.sql
 
+Configure Meta to call your API **callback URL**
+`https://<your-api-host>/api/v1/webhooks/whatsapp` (GET for verify, POST for
+events). Set `WHATSAPP_VERIFY_TOKEN` to match the verify token you enter in
+Meta, and `WHATSAPP_APP_SECRET` for `X-Hub-Signature-256` verification.
+
 # 2. Clean up orphaned tailored-CV files from Supabase Storage
 cd backend
 venv/bin/python scripts/maintenance/delete_tailored_cvs.py

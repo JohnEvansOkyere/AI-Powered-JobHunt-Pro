@@ -203,6 +203,18 @@ class Settings(BaseSettings):
         default="v20.0",
         description="Meta Graph API version; bump when Meta deprecates the current one.",
     )
+    WHATSAPP_TEMPLATE_OTP: str = Field(
+        default="otp_verification",
+        description="Pre-approved Cloud API template name for phone verification (AUTH category).",
+    )
+    WHATSAPP_TEMPLATE_DIGEST: str = Field(
+        default="daily_job_digest",
+        description="Pre-approved template for Tier-1 digest (MARKETING category).",
+    )
+    WHATSAPP_TEMPLATE_UNSUBSCRIBE: str = Field(
+        default="unsubscribe_confirmation",
+        description="Optional confirmation template after STOP (UTILITY category).",
+    )
 
     # Guardrails.
     WHATSAPP_MAX_SENDS_PER_DAY: int = Field(
@@ -228,6 +240,10 @@ class Settings(BaseSettings):
     WHATSAPP_OTP_MAX_PER_DAY: int = Field(
         default=10,
         description="Max OTP sends per user per day.",
+    )
+    WHATSAPP_DEBUG_LOG_OTP: bool = Field(
+        default=False,
+        description="If True, log OTP codes at WARNING (local dev only; never enable in production).",
     )
 
     @field_validator("WHATSAPP_SEND_MODE", mode="before")

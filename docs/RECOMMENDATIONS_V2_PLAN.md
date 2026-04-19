@@ -466,14 +466,17 @@ Each phase is a self-contained PR and can be reviewed independently. Phases can 
 - [x] WhatsApp settings block in `app/core/config.py` (master switch defaults OFF, `WHATSAPP_SEND_MODE` defaults to `dry_run`, guardrail caps).
 - [x] Smoke tests in `backend/tests/test_whatsapp_schema.py` (model/column drift + send-mode clamping).
 
-**4b. Cloud API client + opt-in flow — next**
+**4b. Cloud API client + opt-in flow — DONE (backend; frontend next)**
 - [ ] Submit the three Meta templates for approval (do first; overlaps with code work).
 - [ ] Config + secrets in `.env.example`.
-- [ ] `backend/app/integrations/whatsapp.py` — thin wrapper around the Cloud API (`send_template`, `verify_webhook_signature`), honouring `WHATSAPP_SEND_MODE=dry_run`.
-- [ ] Endpoints: `POST /notifications/whatsapp/opt-in`, `POST /notifications/whatsapp/verify`, `POST /notifications/whatsapp/opt-out`, `GET /notifications/whatsapp/status`.
-- [ ] Webhook endpoint `POST /webhooks/whatsapp` with signature verification, STOP handling, status-update persistence.
+- [x] `backend/app/integrations/whatsapp.py` — Cloud API client (`send_template`, `verify_webhook_signature`), `WHATSAPP_SEND_MODE=dry_run` skips HTTP; live/sandbox gated by `WHATSAPP_ENABLED` + token/phone-number-id checks; client-side RPS throttle.
+- [x] `backend/app/core/redis_client.py` — async Redis singleton for OTP + rate limits (`REDIS_URL`).
+- [x] `backend/app/services/whatsapp_otp.py` — HMAC-hashed OTP in Redis, hourly/daily send caps.
+- [x] Endpoints (Bearer auth): `POST /api/v1/notifications/whatsapp/opt-in`, `POST .../verify`, `POST .../opt-out`, `GET .../status`, `POST .../preferences` (digest time + IANA timezone).
+- [x] Webhook: `GET|POST /api/v1/webhooks/whatsapp` — Meta verify handshake; POST verifies `X-Hub-Signature-256` when `WHATSAPP_APP_SECRET` is set; persists inbound events; updates `whatsapp_messages` by `provider_message_id`; STOP keywords flip `notification_preferences.whatsapp_opted_in` off.
+- [x] `backend/scripts/ops/submit_whatsapp_templates.py` — template JSON + optional `--execute` submission.
+- [x] Tests: `tests/test_whatsapp_phase4b.py` (HMAC, dry-run client, webhook verify, webhook POST).
 - [ ] Frontend: profile settings panel for WhatsApp — phone input, verify code box, digest time, timezone picker, opt-out toggle.
-- [ ] Rate limits on OTP sends.
 
 ### Phase 5 — WhatsApp digest dispatcher (2 days)
 
