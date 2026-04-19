@@ -20,12 +20,10 @@ dependencies = [
     "psycopg2-binary==2.9.10",
     "sqlalchemy>=2.0.0",
 
-    # Scheduler
-    "apscheduler>=3.10.0",
-
     # Environment and Config
     "python-dotenv",
-    "celery",
+    "celery>=5.3.0",
+    "redis>=5.0.0",
     "pydantic>=2.11.7,<3.0",
     "pydantic-settings>=2.3.0",
 

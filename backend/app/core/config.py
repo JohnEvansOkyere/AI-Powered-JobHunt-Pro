@@ -85,6 +85,16 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0", description="Celery result backend URL"
     )
 
+    # Scheduler
+    # After the Phase 2 migration (see docs/RECOMMENDATIONS_V2_PLAN.md §7),
+    # Celery Beat owns all periodic jobs. Set to "disabled" to bypass the
+    # in-process startup hook entirely (useful if ops need to stop periodic
+    # work without redeploying).
+    SCHEDULER_MODE: str = Field(
+        default="celery",
+        description="Scheduler mode: 'celery' (Celery Beat) or 'disabled'.",
+    )
+
     # CORS
     CORS_ORIGINS: Union[str, List[str]] = Field(
         default=["http://localhost:3000"],

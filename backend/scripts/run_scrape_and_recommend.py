@@ -31,8 +31,8 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-# Import keywords from scheduler to keep them in sync
-from app.scheduler.job_scheduler import TECH_JOB_KEYWORDS
+# Shared tech-keyword catalogue
+from app.constants import TECH_JOB_KEYWORDS
 
 
 async def run_scraping(db, sources: list = None, max_per_source: int = 100):

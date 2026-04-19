@@ -442,11 +442,13 @@ Each phase is a self-contained PR and can be reviewed independently. Phases can 
 - [ ] New endpoint `GET /api/v1/recommendations?tier=`; deprecate `/jobs/recommendations` behind a 307 redirect for one release.
 - [ ] Unit and integration tests for tiering, embedding cache reuse, rerank JSON parse failure, empty Tier-1 path, provider fallback path.
 
-### Phase 2 — Scheduler migration (1–2 days)
+### Phase 2 — Scheduler migration (1–2 days) — **DONE**
 
-- [ ] Port APScheduler jobs in `backend/app/scheduler/job_scheduler.py` to Celery Beat tasks in `backend/app/tasks/periodic_tasks.py`.
-- [ ] Delete `app.scheduler` package; remove its start/stop from `main.py` lifespan.
-- [ ] Document the Celery Beat command in `docs/DEPLOYMENT.md`.
+- [x] Port APScheduler jobs in `backend/app/scheduler/job_scheduler.py` to Celery Beat tasks in `backend/app/tasks/periodic_tasks.py`.
+- [x] Delete `app.scheduler` package; remove its start/stop from `main.py` lifespan.
+- [x] Document the Celery Beat command in `docs/deployment/CELERY.md`.
+- [x] Add `SCHEDULER_MODE` flag (`celery` | `disabled`) as a safety switch.
+- [x] Add smoke test (`tests/test_periodic_tasks.py`) asserting the Beat schedule.
 
 ### Phase 3 — Frontend 3-tier UI (2–3 days)
 

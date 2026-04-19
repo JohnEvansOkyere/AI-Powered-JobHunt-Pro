@@ -435,14 +435,9 @@ async def trigger_cleanup_old_jobs(
             detail="Invalid or missing X-Cron-Secret header",
         )
     try:
-        from app.scheduler import get_scheduler
-        scheduler = get_scheduler()
-        if not scheduler:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Scheduler not available",
-            )
-        deleted = await scheduler.cleanup_old_jobs()
+        from app.tasks.periodic_tasks import trigger_cleanup_old_jobs_sync
+
+        deleted = trigger_cleanup_old_jobs_sync()
         return {"status": "success", "deleted_count": deleted}
     except HTTPException:
         raise

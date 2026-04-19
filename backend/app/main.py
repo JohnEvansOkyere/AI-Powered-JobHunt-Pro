@@ -29,36 +29,24 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan context manager for startup and shutdown events.
+    Lifespan context manager for startup and shutdown.
 
-    Handles:
-    - Database connection initialization
-    - Background task initialization (APScheduler for job scraping)
-    - Cleanup on shutdown
+    Periodic work (scraping, recommendation generation, cleanup) is owned by
+    Celery Beat — not the FastAPI process. See docs/RECOMMENDATIONS_V2_PLAN.md
+    §7 Phase 2 and docs/deployment/CELERY.md for the runtime commands.
     """
-    # Startup
-    logger.info("🚀 Starting application...")
-
-    # Start the job scraper scheduler
-    try:
-        from app.scheduler import start_scheduler, stop_scheduler
-        scheduler = start_scheduler()
-        logger.info("✅ Job scraper scheduler started successfully")
-    except Exception as e:
-        logger.error(f"❌ Failed to start job scraper scheduler: {e}", exc_info=True)
-        scheduler = None
+    logger.info(
+        "🚀 Starting application (scheduler_mode=%s)...", settings.SCHEDULER_MODE
+    )
+    if settings.SCHEDULER_MODE not in {"celery", "disabled"}:
+        logger.warning(
+            "Unknown SCHEDULER_MODE=%s; treating as 'disabled'",
+            settings.SCHEDULER_MODE,
+        )
 
     yield
 
-    # Shutdown
     logger.info("🛑 Shutting down application...")
-    if scheduler:
-        try:
-            from app.scheduler import stop_scheduler
-            stop_scheduler()
-            logger.info("✅ Job scraper scheduler stopped")
-        except Exception as e:
-            logger.error(f"❌ Error stopping scheduler: {e}", exc_info=True)
 
 
 def create_application() -> FastAPI:
