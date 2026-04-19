@@ -246,17 +246,19 @@ function EmptyTier1() {
         <Star className="w-5 h-5 text-amber-500" />
       </div>
       <h3 className="text-sm font-semibold text-neutral-900 mb-1">
-        Nothing highly recommended yet
+        No top picks this cycle
       </h3>
       <p className="text-xs text-neutral-500 max-w-xs mx-auto leading-relaxed mb-4">
-        We need a bit more signal. Add a target title, key skills, and an active CV.
+        Tier 1 is only the strongest matches. Close roles often land in{' '}
+        <strong className="font-medium text-neutral-600">Likely a fit</strong>. Refresh after
+        profile or CV changes, or check back when new jobs are scraped.
       </p>
       <Link
         href="/dashboard/profile"
-        className="inline-flex items-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium rounded-lg transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-800 text-xs font-medium rounded-lg transition-colors"
       >
         <User className="w-3.5 h-3.5" />
-        Enrich profile
+        Review profile and CV
         <ArrowRight className="w-3.5 h-3.5" />
       </Link>
     </div>
@@ -316,8 +318,11 @@ export default function RecommendationsPage() {
     }
   }, [])
 
+  // Load every tier on mount. Previously only tier1 ran — tier2/tier3 stayed at
+  // loading: true forever, so desktop columns 2–3 showed skeletons indefinitely.
   useEffect(() => {
-    loadTier('tier1')
+    const tiers: Tier[] = ['tier1', 'tier2', 'tier3']
+    void Promise.all(tiers.map((t) => loadTier(t)))
   }, [loadTier])
 
   const handleTabChange = (tier: TabId) => {
@@ -362,10 +367,13 @@ export default function RecommendationsPage() {
         toast.success('Refreshing recommendations. Check back in a minute.')
         loadedRef.current.clear()
         setTierStates({
-          tier1: { ...INITIAL_TIER_STATE, loading: false },
-          tier2: { ...INITIAL_TIER_STATE, loading: false },
-          tier3: { ...INITIAL_TIER_STATE, loading: false },
+          tier1: { ...INITIAL_TIER_STATE },
+          tier2: { ...INITIAL_TIER_STATE },
+          tier3: { ...INITIAL_TIER_STATE },
         })
+        void Promise.all(
+          (['tier1', 'tier2', 'tier3'] as const).map((t) => loadTier(t)),
+        )
       }
     } catch {
       toast.error('Could not refresh. Try again later.')
