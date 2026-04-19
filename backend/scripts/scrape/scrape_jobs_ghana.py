@@ -6,14 +6,14 @@ populating an empty database or getting a wider range of jobs.
 
 Usage:
     cd backend
-    python scrape_jobs_ghana.py
+    python scripts/scrape/scrape_jobs_ghana.py
 """
 
 import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import SessionLocal
 from app.services.job_scraper_service import JobScraperService

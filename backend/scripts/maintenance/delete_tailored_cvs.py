@@ -32,11 +32,11 @@ Exit codes: 0 on success, 1 on any error.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from pathlib import Path
 from typing import Iterable, List
 
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKEND_DIR = str(Path(__file__).resolve().parents[2])
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 

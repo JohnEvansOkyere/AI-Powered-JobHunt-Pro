@@ -9,8 +9,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env file
-env_path = Path(__file__).parent.parent / ".env"
+# Load .env file from the backend directory
+env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(env_path)
 
 print("=" * 60)

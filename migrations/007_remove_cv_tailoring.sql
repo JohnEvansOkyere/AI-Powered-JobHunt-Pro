@@ -9,7 +9,7 @@
 --
 -- Rollback (manual): re-add the dropped columns as nullable. Historical
 -- tailored-CV files must be re-uploaded; they are deleted from Storage
--- by `backend/scripts/delete_tailored_cvs.py`.
+-- by `backend/scripts/maintenance/delete_tailored_cvs.py`.
 
 BEGIN;
 

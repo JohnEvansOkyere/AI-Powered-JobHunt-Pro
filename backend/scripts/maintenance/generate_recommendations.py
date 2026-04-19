@@ -3,7 +3,7 @@ Manual script to generate recommendations for all users.
 
 Usage:
     cd backend
-    python generate_recommendations.py
+    python scripts/maintenance/generate_recommendations.py
 
 This script:
 - Generates job recommendations for all users with CVs
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 # Add backend to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import SessionLocal
 from app.services.recommendation_generator import RecommendationGenerator

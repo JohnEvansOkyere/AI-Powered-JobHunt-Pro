@@ -121,7 +121,7 @@ Migration `migrations/007_remove_cv_tailoring.sql`:
 
 ### 4.3 Storage cleanup
 
-One-time script (`backend/scripts/delete_tailored_cvs.py`):
+One-time script (`backend/scripts/maintenance/delete_tailored_cvs.py`):
 
 - List all objects in `cvs` bucket under prefix `tailored-cvs/`.
 - Delete them all. Log counts per user.
@@ -423,7 +423,7 @@ Each phase is a self-contained PR and can be reviewed independently. Phases can 
 - [ ] Confirm open questions (§9).
 - [ ] Write `migrations/007_remove_cv_tailoring.sql`.
 - [ ] Delete `cv_generator.py`, `cover_letter_generator.py`, related endpoints, frontend pages (§4.1).
-- [ ] Script `backend/scripts/delete_tailored_cvs.py` to wipe `tailored-cvs/` prefix.
+- [ ] Script `backend/scripts/maintenance/delete_tailored_cvs.py` to wipe `tailored-cvs/` prefix.
 - [ ] Run full backend test suite; ensure no references remain.
 - [ ] Update `README.md`, remove tailoring docs.
 

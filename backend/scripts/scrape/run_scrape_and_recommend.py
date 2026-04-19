@@ -16,11 +16,11 @@ Usage:
 import asyncio
 import argparse
 import sys
-import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the backend package root to sys.path so `from app.*` imports work
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import SessionLocal
 from app.core.config import settings

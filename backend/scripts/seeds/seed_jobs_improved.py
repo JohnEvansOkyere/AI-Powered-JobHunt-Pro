@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 import time
 
 # Add backend to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal

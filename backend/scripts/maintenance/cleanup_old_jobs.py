@@ -19,7 +19,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
-sys.path.insert(0, '/home/grejoy/Projects/AI-Powered-JobHunt-Pro/backend')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import get_db
 from app.models.job import Job

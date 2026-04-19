@@ -1,53 +1,44 @@
 """
-Scrape jobs posted within the last 5 days.
-This gives a wider window than the default 2 days.
+Test script to scrape jobs without date restrictions.
+This bypasses the 2-day filter to get any available jobs for testing.
 
 Usage:
     cd backend
-    python scrape_jobs_5days.py
+    python scripts/scrape/scrape_jobs_test.py
 """
 
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.core.database import SessionLocal
 from app.services.job_scraper_service import JobScraperService
 
 
 async def main():
-    """Scrape jobs from last 5 days."""
+    """Scrape jobs without date restrictions for testing."""
     print("=" * 80)
-    print("🚀 JOB SCRAPING (Last 5 Days)")
+    print("🚀 TEST JOB SCRAPING (No Date Filter)")
     print("=" * 80)
+    print()
+    print("This will scrape ANY available jobs from RemoteOK")
+    print("(Ignoring the 2-day posted date filter)")
     print()
 
     db = SessionLocal()
     scraper = JobScraperService()
 
     try:
-        # Calculate 5 days ago
-        min_date = datetime.now(timezone.utc) - timedelta(days=5)
-
-        print(f"Scraping jobs posted after: {min_date.strftime('%Y-%m-%d %H:%M')} UTC")
-        print("Sources: RemoteOK (most reliable free source)")
-        print("Expected time: 1-2 minutes")
-        print()
-
-        # Scrape from RemoteOK with 5-day window
+        # Scrape from RemoteOK only (most reliable free source)
         result = await scraper.scrape_jobs(
             sources=["remoteok"],
-            keywords=[
-                "software engineer", "developer", "python", "react",
-                "backend", "frontend", "full stack", "devops"
-            ],
+            keywords=["software engineer", "python developer", "react developer", "backend developer"],
             location="Worldwide",
-            max_results_per_source=100,
+            max_results_per_source=50,
             db=db,
-            min_posted_date=min_date  # 5 days ago
+            min_posted_date=None  # No date filter - get any jobs
         )
 
         print()
@@ -68,42 +59,31 @@ async def main():
             print("Next steps:")
             print("   1. Check database: python check_database.py")
             print("   2. Generate recommendations: python generate_recommendations.py")
-            print("   3. Test in frontend: Jobs page → 'Recommended for You' tab")
         else:
-            print("⚠️  No new jobs stored from last 5 days.")
+            print("⚠️  No new jobs were stored.")
             print()
-            print("Let me try getting ANY available jobs for testing...")
-            print()
+            print("Trying alternative approach - direct RemoteOK scrape...")
 
-            # Fallback: Get any jobs without date filter
+            # Try alternative direct scrape
             from app.scrapers.remoteok_scraper import RemoteOKScraper
+            from datetime import datetime, timezone as tz
 
             remoteok = RemoteOKScraper()
-            print("Fetching jobs from RemoteOK (no date filter)...")
-
-            jobs = await remoteok.scrape(
+            jobs = remoteok.scrape(
                 keywords=["developer"],
                 location="",
                 max_results=50
             )
 
-            print(f"Found {len(jobs)} jobs")
-            print()
+            print(f"   Found {len(jobs)} jobs from RemoteOK")
 
             if jobs:
+                # Store jobs manually
                 from app.models.job import Job
-
                 stored = 0
-                for job_data in jobs[:30]:  # Store first 30
+
+                for job_data in jobs[:20]:  # Store first 20
                     try:
-                        # Check if already exists
-                        exists = db.query(Job).filter(
-                            Job.source_id == job_data.get('source_id')
-                        ).first()
-
-                        if exists:
-                            continue
-
                         job = Job(
                             title=job_data.get('title', 'Unknown'),
                             company=job_data.get('company', 'Unknown'),
@@ -112,23 +92,21 @@ async def main():
                             job_link=job_data.get('job_link', ''),
                             source='remoteok',
                             source_id=job_data.get('source_id', ''),
-                            scraped_at=datetime.now(timezone.utc),
+                            scraped_at=datetime.now(tz.utc),
                             posted_date=job_data.get('posted_date')
                         )
                         db.add(job)
                         stored += 1
                     except Exception as e:
+                        print(f"   ⚠️  Failed to store job: {e}")
                         continue
 
-                if stored > 0:
-                    db.commit()
-                    print(f"✅ Stored {stored} jobs!")
-                    print()
-                    print("Next steps:")
-                    print("   1. Check database: python check_database.py")
-                    print("   2. Generate recommendations: python generate_recommendations.py")
-                else:
-                    print("⚠️  All jobs were duplicates")
+                db.commit()
+                print(f"   ✅ Stored {stored} jobs!")
+                print()
+                print("Next steps:")
+                print("   1. Check database: python check_database.py")
+                print("   2. Generate recommendations: python generate_recommendations.py")
 
         print("=" * 80)
 

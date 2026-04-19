@@ -1,59 +1,88 @@
 #!/usr/bin/env python3
 """
-Simple Job Seeding Script - Fallback Version
+RemoteOK Job Seeding Script
 
-This script fetches ALL jobs from Remotive (no search query) to avoid API errors.
-This is the most reliable way to get initial job data.
+Uses RemoteOK.com's free public API (no API key needed).
+Alternative to Remotive when it's down.
 """
 
-import asyncio
 import sys
 from pathlib import Path
 import requests
 from datetime import datetime
+import time
 
 # Add backend to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.job import Job
 
-def fetch_all_remotive_jobs():
-    """Fetch all jobs from Remotive API (no search query)."""
-    url = "https://remotive.io/api/remote-jobs"
+
+def fetch_remoteok_jobs():
+    """
+    Fetch jobs from RemoteOK public API.
+
+    API: https://remoteok.com/api
+    Documentation: https://github.com/remoteok/remote-jobs
+    """
+    url = "https://remoteok.com/api"
+
+    # RemoteOK requires a user agent
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (compatible; JobHuntBot/1.0; +https://github.com/yourusername/jobhunt)'
+    }
 
     try:
-        print("🔄 Fetching all jobs from Remotive API...")
-        resp = requests.get(url, timeout=30)
+        print("🔄 Fetching jobs from RemoteOK API...")
+        resp = requests.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
+
+        # RemoteOK returns JSON array, first item is metadata
         data = resp.json()
-        jobs = data.get("jobs", [])
-        print(f"   ✅ Received {len(jobs)} jobs from Remotive")
+
+        # Skip first item (it's metadata/legal notice)
+        jobs = data[1:] if len(data) > 1 else []
+
+        print(f"   ✅ Received {len(jobs)} jobs from RemoteOK")
         return jobs
+
     except Exception as e:
-        print(f"   ❌ Failed to fetch from Remotive: {e}")
+        print(f"   ❌ Failed to fetch from RemoteOK: {e}")
         return []
 
 
-def parse_remotive_date(dt_str):
-    """Parse Remotive date string."""
-    if not dt_str:
+def parse_remoteok_date(timestamp):
+    """Parse RemoteOK timestamp (epoch seconds)."""
+    if not timestamp:
         return None
     try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        return datetime.fromtimestamp(int(timestamp))
     except Exception:
         return None
 
 
+def extract_tags(job_data):
+    """Extract tags from RemoteOK job."""
+    tags = []
+
+    # RemoteOK has tags array
+    if 'tags' in job_data and isinstance(job_data['tags'], list):
+        tags.extend(job_data['tags'])
+
+    return tags[:10]  # Limit to 10 tags
+
+
 def save_jobs_to_db(jobs_data, db: Session):
-    """Save Remotive jobs to database."""
+    """Save RemoteOK jobs to database."""
     saved = 0
     skipped = 0
 
     for job_data in jobs_data:
         try:
-            job_link = job_data.get("url") or job_data.get("slug")
+            # RemoteOK provides 'url' field
+            job_link = job_data.get('url')
             if not job_link:
                 skipped += 1
                 continue
@@ -64,18 +93,23 @@ def save_jobs_to_db(jobs_data, db: Session):
                 skipped += 1
                 continue
 
+            # Extract location
+            location = job_data.get('location', 'Remote')
+            if not location or location == 'false':
+                location = 'Remote'
+
             # Create new job
             job = Job(
-                title=job_data.get("title", "Unknown"),
-                company=job_data.get("company_name", "Unknown"),
-                location=job_data.get("candidate_required_location", "Remote"),
-                description=job_data.get("description", ""),
+                title=job_data.get('position', 'Unknown Position'),
+                company=job_data.get('company', 'Unknown Company'),
+                location=location,
+                description=job_data.get('description', ''),
                 job_link=job_link,
-                source="remotive",
-                source_id=str(job_data.get("id")),
-                posted_date=parse_remotive_date(job_data.get("publication_date")),
-                job_type=job_data.get("job_type"),
-                remote_type="remote",
+                source="remoteok",
+                source_id=str(job_data.get('id', '')),
+                posted_date=parse_remoteok_date(job_data.get('date')),
+                job_type=None,  # RemoteOK doesn't specify job type
+                remote_type="remote",  # All RemoteOK jobs are remote
                 processing_status="pending"
             )
 
@@ -83,7 +117,7 @@ def save_jobs_to_db(jobs_data, db: Session):
             saved += 1
 
         except Exception as e:
-            print(f"   ⚠️  Skipped job: {e}")
+            print(f"   ⚠️  Skipped job '{job_data.get('position', 'unknown')}': {e}")
             skipped += 1
             continue
 
@@ -104,7 +138,7 @@ def save_jobs_to_db(jobs_data, db: Session):
 def main():
     """Main entry point."""
     print("=" * 70)
-    print("Simple Job Seeding - Remotive All Jobs")
+    print("RemoteOK Job Seeding")
     print("=" * 70)
     print()
 
@@ -119,14 +153,14 @@ def main():
         print(f"❌ Database connection failed: {e}")
         return
 
-    # Fetch jobs from Remotive
-    jobs_data = fetch_all_remotive_jobs()
+    # Fetch jobs from RemoteOK
+    jobs_data = fetch_remoteok_jobs()
 
     if not jobs_data:
         print("\n❌ No jobs fetched. Please check:")
         print("   1. Internet connection")
-        print("   2. Remotive.io is accessible")
-        print("   3. Try again in a few minutes (rate limiting)")
+        print("   2. RemoteOK.com is accessible")
+        print("   3. Try alternative: python seed_jobs_adzuna.py")
         return
 
     # Save to database

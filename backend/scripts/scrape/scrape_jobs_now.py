@@ -7,13 +7,13 @@ no worker) so developers can scrape on demand without Redis.
 
 Usage:
     cd backend
-    python scrape_jobs_now.py
+    python scripts/scrape/scrape_jobs_now.py
 """
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.tasks.periodic_tasks import scrape_recent_jobs
 
@@ -54,7 +54,7 @@ def main() -> None:
 
     if result.get("stored", 0) > 0:
         print("✅ Fresh jobs are now in the database.")
-        print("Next step: python generate_recommendations.py")
+        print("Next step: python scripts/maintenance/generate_recommendations.py")
     else:
         print("⚠️  No new jobs stored — likely all duplicates or no matches.")
 
