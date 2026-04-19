@@ -54,6 +54,7 @@ Equivalent scheduled task: `scheduler.scrape_recent_jobs` (every 3 days,
 | `cleanup_old_jobs.py` | Application-aware cleanup. Deletes jobs older than 7 days that have **no applications attached**; keeps everything else so users never lose their history. |
 | `generate_recommendations.py` | Run the recommendation generator for all eligible users, now. |
 | `delete_tailored_cvs.py` | One-time wipe of the orphaned `tailored-cvs/` Supabase Storage prefix. Run after applying migration `007_remove_cv_tailoring.sql`. |
+| `backfill_embeddings.py` | One-time backfill of the `job_embeddings` / `user_embeddings` cache after applying migration `008_recommendations_v2.sql`. Supports `--dry-run`, `--force`, `--jobs-only`, `--users-only`, `--limit`. Idempotent — the pipeline short-circuits on unchanged `source_hash`. |
 
 Equivalent scheduled tasks: `scheduler.cleanup_old_jobs`,
 `scheduler.generate_recommendations_for_all`.
