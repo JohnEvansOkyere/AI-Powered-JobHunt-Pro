@@ -460,10 +460,16 @@ Each phase is a self-contained PR and can be reviewed independently. Phases can 
 
 ### Phase 4 — WhatsApp foundation (3–5 days)
 
+**4a. Schema + config — DONE**
+- [x] `migrations/009_add_whatsapp.sql` for `notification_preferences`, `whatsapp_messages`, `whatsapp_incoming_events` (with status CHECK, idempotency-key unique index, `updated_at` trigger).
+- [x] SQLAlchemy models in `backend/app/models/notification.py`, exported from `app.models`.
+- [x] WhatsApp settings block in `app/core/config.py` (master switch defaults OFF, `WHATSAPP_SEND_MODE` defaults to `dry_run`, guardrail caps).
+- [x] Smoke tests in `backend/tests/test_whatsapp_schema.py` (model/column drift + send-mode clamping).
+
+**4b. Cloud API client + opt-in flow — next**
 - [ ] Submit the three Meta templates for approval (do first; overlaps with code work).
-- [ ] `migrations/009_add_whatsapp.sql` for `notification_preferences`, `whatsapp_messages`, `whatsapp_incoming_events`.
 - [ ] Config + secrets in `.env.example`.
-- [ ] `backend/app/services/whatsapp_client.py` — thin wrapper around the Cloud API (`send_template`, `verify_webhook_signature`).
+- [ ] `backend/app/integrations/whatsapp.py` — thin wrapper around the Cloud API (`send_template`, `verify_webhook_signature`), honouring `WHATSAPP_SEND_MODE=dry_run`.
 - [ ] Endpoints: `POST /notifications/whatsapp/opt-in`, `POST /notifications/whatsapp/verify`, `POST /notifications/whatsapp/opt-out`, `GET /notifications/whatsapp/status`.
 - [ ] Webhook endpoint `POST /webhooks/whatsapp` with signature verification, STOP handling, status-update persistence.
 - [ ] Frontend: profile settings panel for WhatsApp — phone input, verify code box, digest time, timezone picker, opt-out toggle.

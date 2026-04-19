@@ -9,6 +9,11 @@ from app.models.job_recommendation import JobRecommendation
 from app.models.application import Application
 from app.models.scraping_job import ScrapingJob
 from app.models.embeddings import JobEmbedding, UserEmbedding
+from app.models.notification import (
+    NotificationPreferences,
+    WhatsappIncomingEvent,
+    WhatsappMessage,
+)
 
 __all__ = [
     "User",
@@ -21,5 +26,7 @@ __all__ = [
     "ScrapingJob",
     "JobEmbedding",
     "UserEmbedding",
+    "NotificationPreferences",
+    "WhatsappMessage",
+    "WhatsappIncomingEvent",
 ]
-

@@ -162,6 +162,82 @@ class Settings(BaseSettings):
         description="Hard timeout for a single rerank request before fallback kicks in.",
     )
 
+    # ---- WhatsApp Business Cloud API (docs/RECOMMENDATIONS_V2_PLAN.md §6) ----
+    # All sends are gated by WHATSAPP_ENABLED so unconfigured environments
+    # (CI, local dev without Meta access) no-op instead of 500ing. When
+    # WHATSAPP_SEND_MODE is "dry_run" the client logs the payload and skips
+    # the network call — useful for e2e tests and staging without a verified
+    # sender.
+    WHATSAPP_ENABLED: bool = Field(
+        default=False,
+        description="Master switch. Set to True only when credentials are valid + templates approved.",
+    )
+    WHATSAPP_SEND_MODE: str = Field(
+        default="dry_run",
+        description="Send mode: 'live' (call Meta), 'dry_run' (log + skip), 'sandbox' (send to test numbers only).",
+    )
+
+    # Cloud API credentials (required when WHATSAPP_ENABLED=True).
+    WHATSAPP_APP_ID: str = Field(default="", description="Meta App ID.")
+    WHATSAPP_APP_SECRET: str = Field(
+        default="",
+        description="Meta App secret. Used for the X-Hub-Signature-256 webhook HMAC.",
+    )
+    WHATSAPP_PHONE_NUMBER_ID: str = Field(
+        default="",
+        description="Meta Cloud API phone number id (NOT the display phone number).",
+    )
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = Field(
+        default="",
+        description="WABA id. Needed for template submission, not sending.",
+    )
+    WHATSAPP_ACCESS_TOKEN: str = Field(
+        default="",
+        description="System-user access token with whatsapp_business_messaging scope.",
+    )
+    WHATSAPP_VERIFY_TOKEN: str = Field(
+        default="",
+        description="Arbitrary shared secret used in Meta's webhook verification handshake.",
+    )
+    WHATSAPP_GRAPH_API_VERSION: str = Field(
+        default="v20.0",
+        description="Meta Graph API version; bump when Meta deprecates the current one.",
+    )
+
+    # Guardrails.
+    WHATSAPP_MAX_SENDS_PER_DAY: int = Field(
+        default=5000,
+        description="Global circuit breaker. If exceeded, dispatcher pauses itself.",
+    )
+    WHATSAPP_MAX_SENDS_PER_USER_PER_DAY: int = Field(
+        default=1,
+        description="Per-user cap. Prevents digest re-run bugs from spamming a candidate.",
+    )
+    WHATSAPP_PROVIDER_RPS: int = Field(
+        default=5,
+        description="Client-side rate limit (requests/sec) against the Cloud API.",
+    )
+    WHATSAPP_OTP_TTL_SECONDS: int = Field(
+        default=600,
+        description="How long a verification OTP stays valid in Redis.",
+    )
+    WHATSAPP_OTP_MAX_PER_HOUR: int = Field(
+        default=3,
+        description="Max OTP sends per user per hour (abuse guard).",
+    )
+    WHATSAPP_OTP_MAX_PER_DAY: int = Field(
+        default=10,
+        description="Max OTP sends per user per day.",
+    )
+
+    @field_validator("WHATSAPP_SEND_MODE", mode="before")
+    @classmethod
+    def _validate_send_mode(cls, v) -> str:
+        allowed = {"live", "dry_run", "sandbox"}
+        if isinstance(v, str) and v.strip().lower() in allowed:
+            return v.strip().lower()
+        return "dry_run"
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v) -> List[str]:

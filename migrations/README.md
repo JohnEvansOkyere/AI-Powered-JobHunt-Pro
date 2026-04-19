@@ -15,6 +15,7 @@ order against the production database (and any staging/dev copy).
 | `005_add_external_jobs_support.sql` | Should already be applied | Columns/indexes for the external-jobs flow (the flow itself is retired, the columns stay) |
 | `007_remove_cv_tailoring.sql` | **Apply** | Drops `tailored_cv_path`, `cover_letter`, `application_email`, `ai_model_used`, `generation_prompt`, `generation_settings`, `user_edits` from `applications`; tightens the `status` enum to `saved / applied / dismissed / hidden / interviewing / rejected / offer` and backfills legacy values |
 | `008_recommendations_v2.sql` | **Apply** | Enables `pgvector`, creates `job_embeddings` and `user_embeddings` (model-tagged), extends `job_recommendations` with `tier` + sub-score columns + `user_id` FK, adds supporting indexes |
+| `009_add_whatsapp.sql` | **Apply** | Creates `notification_preferences` (WhatsApp opt-in + digest time + timezone + opt-out), `whatsapp_messages` (append-only send audit with unique-by-idempotency-key index), `whatsapp_incoming_events` (webhook audit for status + user replies), plus a trigger that keeps `notification_preferences.updated_at` fresh |
 
 All migrations are wrapped in `BEGIN/COMMIT` and use `IF [NOT] EXISTS`, so
 re-running them is safe.
@@ -27,10 +28,14 @@ If you're bringing a fresh environment up to date:
 # 1. Apply migrations in order
 psql "$DATABASE_URL" -f migrations/007_remove_cv_tailoring.sql
 psql "$DATABASE_URL" -f migrations/008_recommendations_v2.sql
+psql "$DATABASE_URL" -f migrations/009_add_whatsapp.sql
 
 # 2. Clean up orphaned tailored-CV files from Supabase Storage
 cd backend
 venv/bin/python scripts/maintenance/delete_tailored_cvs.py
+
+# 3. Backfill the embedding cache so Tier 1 / Tier 2 have something to show
+venv/bin/python scripts/maintenance/backfill_embeddings.py
 ```
 
 If you administer the database via the Supabase SQL editor, paste the files
