@@ -37,7 +37,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const completionPercentage = calculateProfileCompletion(profile)
-  const initials = (user?.email?.[0] || 'U').toUpperCase()
+  const candidateName = String(
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.user_metadata?.display_name ||
+    'Candidate'
+  )
+  const initials = candidateName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'U'
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -91,7 +103,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {profile?.primary_job_title || 'Job seeker'}
                 </p>
                 <p className="text-xs text-neutral-500 truncate">
-                  {user?.email}
+                  {candidateName}
                 </p>
               </div>
             </div>
@@ -168,7 +180,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex-1" />
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-neutral-500">
-                {user?.email}
+                {candidateName}
               </span>
               <div className="w-8 h-8 rounded-full bg-brand-turquoise-50 text-brand-turquoise-700 flex items-center justify-center font-semibold text-xs border border-brand-turquoise-100">
                 {initials}
