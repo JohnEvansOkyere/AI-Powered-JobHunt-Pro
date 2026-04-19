@@ -35,12 +35,9 @@ AI-Powered-JobHunt-Pro/
 │   │   └── services/    # AI matching, job scraping services
 ├── docs/                 # Documentation
 │   ├── SUPABASE_SETUP_COMPLETE.sql  # Complete database setup
-│   ├── README.md                    # Documentation index
-│   ├── setup/                       # Setup guides
-│   ├── features/                    # Feature documentation
-│   ├── deployment/                  # Deployment guides
-│   ├── troubleshooting/             # Troubleshooting guides
-│   └── audits/                      # Audit reports
+│   ├── JOB_SCHEDULER_SETUP.md       # Scheduler documentation
+│   ├── TECH_JOB_SCRAPING_COMPLETE.md # Scraping guide
+│   └── SCHEDULER_MIGRATION_COMPLETE.md # Migration summary
 └── README.md            # This file
 ```
 
@@ -71,7 +68,7 @@ AI-Powered-JobHunt-Pro/
    cd backend
    pip install -r requirements.txt
    cp .env.example .env
-   # Edit .env with your Supabase and OpenAI keys
+   # Edit .env: Supabase, DATABASE_URL, SECRET_KEY, AI keys (e.g. GEMINI_API_KEY), REDIS_URL, optional WhatsApp
    uvicorn app.main:app --host 0.0.0.0 --port 8000
    ```
 
@@ -90,17 +87,16 @@ AI-Powered-JobHunt-Pro/
 
 ### Documentation
 
-- **Documentation Index**: [docs/README.md](docs/README.md) - Organized documentation map
-- **Setup**: [docs/setup/SETUP.md](docs/setup/SETUP.md) - Detailed setup instructions
+- **Setup**: [docs/SETUP.md](docs/SETUP.md) - Detailed setup instructions
 - **Database**: [docs/SUPABASE_SETUP_COMPLETE.sql](docs/SUPABASE_SETUP_COMPLETE.sql) - Complete database schema
-- **Job Scraping**: [docs/features/jobs/JOB_SCHEDULER_SETUP.md](docs/features/jobs/JOB_SCHEDULER_SETUP.md) - Automated scraping setup
-- **Project Plan**: [docs/planning/PROJECT_PLAN.md](docs/planning/PROJECT_PLAN.md) - Development roadmap
+- **Job Scraping**: [docs/JOB_SCHEDULER_SETUP.md](docs/JOB_SCHEDULER_SETUP.md) - Automated scraping setup
+- **Project Plan**: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) - Development roadmap
 
 ### Troubleshooting
 
 Encountering errors? Check our guides:
-- [Errors and Solutions](docs/troubleshooting/ERRORS_AND_SOLUTIONS.md) - Complete error catalog
-- [Troubleshooting Guide](docs/troubleshooting/TROUBLESHOOTING.md) - Common issues and fixes
+- [Errors and Solutions](docs/ERRORS_AND_SOLUTIONS.md) - Complete error catalog
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and fixes
 
 ## 📊 Key Features Explained
 
@@ -111,7 +107,7 @@ Encountering errors? Check our guides:
 - **Freshness**: Only jobs posted within last 2 days
 - **Deduplication**: Automatic prevention of duplicate entries
 
-See [docs/features/jobs/JOB_SCHEDULER_SETUP.md](docs/features/jobs/JOB_SCHEDULER_SETUP.md) for details.
+See [docs/JOB_SCHEDULER_SETUP.md](docs/JOB_SCHEDULER_SETUP.md) for details.
 
 ### AI Job Matching
 - **Technology**: OpenAI embeddings (text-embedding-3-small)
@@ -156,3 +152,4 @@ See [docs/features/jobs/JOB_SCHEDULER_SETUP.md](docs/features/jobs/JOB_SCHEDULER
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) file for details.
+
