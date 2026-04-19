@@ -9,7 +9,76 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
       colors: {
+        // shadcn/ui semantic tokens — driven by CSS variables in globals.css.
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        // --------------------------------------------------------------
+        // Editorial brand palette (VeloxaHire marketing surface)
+        // --------------------------------------------------------------
+        // Warm off-white canvas — used as the default body background.
+        cream: {
+          50: '#fdfbf6',
+          100: '#f7f3ec',
+          200: '#ece4d2',
+          300: '#ddd0b5',
+          400: '#c6b28c',
+          500: '#a08f6a',
+        },
+        // Deep near-black inks with a subtle green cast.
+        ink: {
+          400: '#5f6b65',
+          500: '#3d4a44',
+          600: '#26332e',
+          700: '#1b2a25',
+          800: '#14201c',
+          900: '#0b1210',
+          950: '#050908',
+        },
+        // Forest-green family (footer + deep accents).
+        forest: {
+          400: '#2f7d6a',
+          500: '#1f5a4d',
+          600: '#164539',
+          700: '#103329',
+          800: '#0b241d',
+          900: '#071712',
+        },
+        // Warm amber — used sparingly as highlight on dark surfaces.
+        ember: {
+          400: '#e4b86d',
+          500: '#d4a04d',
+          600: '#b88535',
+          700: '#8c6427',
+        },
         brand: {
           turquoise: {
             50: '#f0fdfa',
@@ -39,12 +108,16 @@ const config: Config = {
           },
         },
         primary: {
+          // shadcn alias
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+          // existing VeloxaHire brand scale — still usable as `bg-primary-500` etc.
           50: '#f0fdfa',
           100: '#ccfbf1',
           200: '#99f6e4',
           300: '#5eead4',
           400: '#2dd4bf',
-          500: '#14b8a6', // Mapping Primary to Turquoise
+          500: '#14b8a6',
           600: '#0d9488',
           700: '#0f766e',
           800: '#115e59',
@@ -52,12 +125,16 @@ const config: Config = {
           950: '#042f2e',
         },
         secondary: {
+          // shadcn alias
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+          // existing brand orange scale
           50: '#fff7ed',
           100: '#ffedd5',
           200: '#fed7aa',
           300: '#fdba74',
           400: '#fb923c',
-          500: '#f97316', // Mapping Secondary to Orange
+          500: '#f97316',
           600: '#ea580c',
           700: '#c2410c',
           800: '#9a3412',
@@ -80,6 +157,21 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        // Editorial serif — use via `font-display` on marketing headlines.
+        display: [
+          'var(--font-fraunces)',
+          'ui-serif',
+          'Georgia',
+          'Cambria',
+          'Times New Roman',
+          'serif',
+        ],
+        serif: [
+          'var(--font-fraunces)',
+          'ui-serif',
+          'Georgia',
+          'serif',
+        ],
       },
       animation: {
         'fade-in': 'fadeIn 0.6s ease-out',

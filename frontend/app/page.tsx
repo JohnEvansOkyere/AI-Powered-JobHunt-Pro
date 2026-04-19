@@ -1,386 +1,865 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import Link from 'next/link'
-import { 
-  Sparkles, 
-  Target, 
-  Zap, 
-  Shield, 
-  TrendingUp, 
-  CheckCircle2,
+import { motion, useReducedMotion } from 'framer-motion'
+import {
   ArrowRight,
-  Star,
-  Users,
-  Briefcase,
+  Target,
+  ShieldCheck,
+  CheckCircle2,
   FileText,
-  Search,
-  Wand2,
-  Brain,
-  Rocket,
-  Sparkle,
-  Globe,
-  Award
+  Layers,
+  Crosshair,
+  LineChart,
+  Quote,
+  Mail,
+  Phone,
+  MapPin,
+  Linkedin,
+  Menu,
+  X,
+  ChevronDown,
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { BackgroundPaths } from '@/components/ui/background-paths'
+
+// ---------------------------------------------------------------------------
+// Small building blocks
+// ---------------------------------------------------------------------------
+
+function WordMark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`font-display font-semibold tracking-tight ${className}`}>
+      Veloxa<span className="italic font-light">Hire</span>
+    </span>
+  )
+}
+
+function Logo({ size = 32 }: { size?: number }) {
+  return (
+    <Image
+      src="/logo.png"
+      alt="VeloxaHire"
+      width={size}
+      height={size}
+      priority
+      className="object-contain"
+    />
+  )
+}
+
+// Minimal "live match" tile shown inside the demo card.
+function MatchTile({
+  title,
+  company,
+  location,
+  score,
+  highlight,
+  delay = 0,
+}: {
+  title: string
+  company: string
+  location: string
+  score: number
+  highlight?: boolean
+  delay?: number
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay }}
+      className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-4 ${
+        highlight
+          ? 'border-forest-500/30 bg-forest-500/5'
+          : 'border-ink-900/10 bg-cream-50'
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+              highlight
+                ? 'bg-forest-600 text-cream-100 border-forest-600'
+                : 'bg-cream-100 text-ink-500 border-ink-900/10'
+            }`}
+          >
+            {score}% match
+          </span>
+          {highlight && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-ember-700 bg-ember-500/15 border border-ember-500/30 rounded-md px-2 py-0.5 font-semibold uppercase tracking-wider">
+              Top pick
+            </span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-ink-900 mt-1.5 truncate">{title}</p>
+        <p className="text-xs text-ink-500 truncate">
+          {company} · {location}
+        </p>
+      </div>
+      <ArrowRight className="w-4 h-4 text-ink-400 flex-shrink-0" />
+    </motion.div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function HomePage() {
   const { isAuthenticated, loading } = useAuth()
   const router = useRouter()
+  const reduceMotion = useReducedMotion()
+  const [navOpen, setNavOpen] = useState(false)
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      router.push('/dashboard')
-    }
+    if (!loading && isAuthenticated) router.push('/dashboard')
   }, [isAuthenticated, loading, router])
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-turquoise-500"></div>
+      <main className="min-h-screen flex items-center justify-center bg-cream-100">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-forest-600" />
       </main>
     )
   }
 
+  const fadeUp = reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 16 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, margin: '-80px' },
+        transition: { duration: 0.5, ease: 'easeOut' },
+      }
+
   return (
-    <div className="min-h-screen bg-white text-neutral-900 selection:bg-brand-turquoise-100 selection:text-brand-turquoise-900">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full glass z-50 border-b border-neutral-100">
+    <div className="min-h-screen bg-cream-100 text-ink-900 selection:bg-forest-500/20 selection:text-forest-700">
+      {/* ================================================================ */}
+      {/* Nav — dark-glass so it reads over the ink hero and the cream body */}
+      {/* ================================================================ */}
+      <nav className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-ink-900/70 border-b border-cream-100/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-3 group cursor-pointer">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-turquoise-500 to-brand-turquoise-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-turquoise-500/20 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-neutral-900">
-                JobHunt<span className="text-brand-turquoise-600">Pro</span>
-              </span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <Link href="#features" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">Features</Link>
-              <Link href="#how-it-works" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">How it works</Link>
-              <Link href="#testimonials" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-medium text-sm">Success Stories</Link>
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <Logo size={30} />
+              <WordMark className="text-base text-cream-100 group-hover:text-ember-400 transition-colors" />
+            </Link>
+
+            <div className="hidden md:flex items-center gap-8 text-sm">
+              <Link
+                href="#how"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                How it works
+              </Link>
+              <Link
+                href="#features"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                Features
+              </Link>
+              <Link
+                href="#faq"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                FAQ
+              </Link>
+              <Link
+                href="#contact"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                Contact
+              </Link>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <Link href="/auth/login" className="text-neutral-600 hover:text-brand-turquoise-600 transition-colors font-semibold text-sm px-4">
-                Sign In
+            <div className="hidden md:flex items-center gap-2">
+              <Link
+                href="/auth/login"
+                className="px-4 py-2 text-sm font-medium text-cream-100/80 hover:text-cream-100 transition-colors rounded-lg"
+              >
+                Sign in
               </Link>
               <Link
                 href="/auth/signup"
-                className="btn-premium px-6 py-2.5 bg-brand-turquoise-600 text-white rounded-full font-bold text-sm shadow-lg shadow-brand-turquoise-500/20 hover:shadow-brand-turquoise-500/40"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-ink-900 bg-cream-100 hover:bg-cream-50 rounded-full shadow-sm transition-colors"
               >
-                Get Started Free
+                Get started
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
+
+            <button
+              onClick={() => setNavOpen((v) => !v)}
+              className="md:hidden p-2 -mr-2 text-cream-100"
+              aria-label="Toggle menu"
+            >
+              {navOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
+          {navOpen && (
+            <div className="md:hidden border-t border-cream-100/10 py-4 space-y-2 text-sm">
+              {[
+                ['How it works', '#how'],
+                ['Features', '#features'],
+                ['FAQ', '#faq'],
+                ['Contact', '#contact'],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setNavOpen(false)}
+                  className="block px-2 py-2 text-cream-100/80"
+                >
+                  {label}
+                </Link>
+              ))}
+              <div className="flex gap-2 pt-2 border-t border-cream-100/10">
+                <Link
+                  href="/auth/login"
+                  className="flex-1 text-center py-2 border border-cream-100/30 rounded-full font-medium text-cream-100"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="flex-1 text-center py-2 bg-cream-100 text-ink-900 rounded-full font-semibold"
+                >
+                  Get started
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-40 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-turquoise-50/50 via-white to-white">
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-left"
-            >
-              <div className="inline-flex items-center space-x-2 px-4 py-2 bg-brand-turquoise-50 rounded-full text-xs font-bold text-brand-turquoise-700 mb-6 border border-brand-turquoise-100">
-                <Sparkle className="w-3 h-3" />
-                <span>AI-POWERED JOB SEARCH ENGINE</span>
-              </div>
-              
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-neutral-900 mb-6 leading-[1.1] tracking-tight">
-                Land Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-turquoise-600 to-brand-orange-500">Dream Job</span> <br />
-                Faster Than Ever.
-              </h1>
-              
-              <p className="text-lg text-neutral-600 mb-10 max-w-xl leading-relaxed">
-                Stop applying blindly. JobHuntPro uses advanced AI to match your unique skills with the perfect roles and tailors your CV automatically for every application.
-              </p>
+      {/* ================================================================ */}
+      {/* Hero — dark ink background, off-white serif title                */}
+      {/* ================================================================ */}
+      <BackgroundPaths
+        eyebrow="Built for candidates, not job boards"
+        title="Find the job that fits you"
+        lede="Upload your CV once. We'll read between the lines, learn what you actually want next, and hand you a short, honest shortlist of roles worth your Monday morning."
+        ctaLabel="Build my shortlist — it's free"
+        ctaHref="/auth/signup"
+        secondaryCtaLabel="See how it works"
+        secondaryCtaHref="#how"
+      />
 
-              <div className="flex flex-wrap gap-4">
-                <Link
-                  href="/auth/signup"
-                  className="btn-premium px-8 py-4 bg-brand-turquoise-600 text-white rounded-2xl font-bold text-lg flex items-center space-x-3 group"
-                >
-                  <span>Start My Career Journey</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link
-                  href="#features"
-                  className="px-8 py-4 bg-white border-2 border-neutral-100 text-neutral-700 rounded-2xl font-bold text-lg hover:border-brand-turquoise-200 transition-all"
-                >
-                  Explore Features
-                </Link>
-              </div>
+      {/* ================================================================ */}
+      {/* Quiet reassurance bullets — sit below the hero                   */}
+      {/* ================================================================ */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 border-b border-ink-900/10 bg-cream-50">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-ink-500">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-forest-500" />
+            Free to start
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-forest-500" />
+            No credit card
+          </div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-forest-500" />
+            Your CV stays private
+          </div>
+        </div>
+      </section>
 
-              <div className="mt-10 flex items-center space-x-6 text-neutral-500">
-                <div className="flex -space-x-3">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-neutral-100 flex items-center justify-center overflow-hidden">
-                      <img src={`https://i.pravatar.cc/150?u=${i}`} alt="user" />
+      {/* ================================================================ */}
+      {/* Live-match demo                                                  */}
+      {/* ================================================================ */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="max-w-3xl mx-auto text-center mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
+            A peek inside your shortlist
+          </p>
+          <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-ink-900">
+            The jobs worth your time,{' '}
+            <span className="italic font-medium text-forest-600">waiting</span> when you log in.
+          </h2>
+          <p className="mt-5 text-base sm:text-lg text-ink-500 leading-relaxed">
+            No endless scrolling. No twenty tabs open. Just a short list you can actually read over
+            coffee &mdash; with the best roles already at the top.
+          </p>
+        </div>
+
+        <div className="max-w-2xl mx-auto">
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+          >
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-br from-forest-500/15 to-ember-500/10 rounded-[2.5rem] blur-2xl -z-10" />
+
+              <div className="bg-cream-50 rounded-3xl border border-ink-900/10 shadow-xl shadow-ink-900/5 overflow-hidden">
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-ink-900/10 bg-cream-100">
+                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
+                  <span className="ml-3 text-xs text-ink-500 font-medium">
+                    Your matches · updated just now
+                  </span>
+                </div>
+
+                <div className="p-5 space-y-3 bg-cream-50">
+                  <MatchTile
+                    title="Senior Data Scientist — ML"
+                    company="Northwind Labs"
+                    location="Remote"
+                    score={96}
+                    highlight
+                    delay={0.2}
+                  />
+                  <MatchTile
+                    title="Applied AI Engineer"
+                    company="Lumen AI"
+                    location="Hybrid · London"
+                    score={88}
+                    delay={0.35}
+                  />
+                  <MatchTile
+                    title="Machine Learning Scientist"
+                    company="Wave"
+                    location="Remote"
+                    score={82}
+                    delay={0.5}
+                  />
+
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
+                      <span>Scanning 8,421 new roles</span>
+                      <span className="font-semibold text-forest-600">Live</span>
                     </div>
-                  ))}
-                </div>
-                <div className="text-sm">
-                  <p className="font-bold text-neutral-900">12k+ Users</p>
-                  <p>Trust JobHuntPro</p>
-                </div>
-                <div className="h-8 w-px bg-neutral-200"></div>
-                <div className="flex items-center space-x-1">
-                  <Star className="w-4 h-4 text-brand-orange-500 fill-brand-orange-500" />
-                  <span className="font-bold text-neutral-900">4.9/5</span>
-                  <span className="text-xs">Trustpilot</span>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1 }}
-              className="relative"
-            >
-              <div className="relative z-10 glass rounded-[2.5rem] p-4 shadow-2xl border border-white">
-                <div className="bg-neutral-900 rounded-[2rem] overflow-hidden aspect-[4/3] relative">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-brand-turquoise-500/20 to-brand-orange-500/20"></div>
-                  <div className="p-8 h-full flex flex-col justify-center items-center text-center">
-                    <div className="w-20 h-20 bg-brand-turquoise-500 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
-                      <Brain className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Analyzing 50k+ Jobs...</h3>
-                    <p className="text-neutral-400 text-sm mb-6">Finding your perfect match based on 42 skills</p>
-                    <div className="w-full max-w-xs bg-neutral-800 h-2 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: '85%' }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        className="h-full bg-brand-turquoise-500"
+                    <div className="h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                      <motion.div
+                        initial={{ width: '0%' }}
+                        animate={{ width: ['0%', '100%'] }}
+                        transition={{
+                          duration: 2.4,
+                          repeat: Infinity,
+                          ease: 'easeInOut',
+                        }}
+                        className="h-full bg-gradient-to-r from-forest-500 to-forest-700"
                       />
                     </div>
                   </div>
                 </div>
               </div>
-              {/* Decorative elements */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-orange-200 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-brand-turquoise-200 rounded-full blur-3xl opacity-30 animate-pulse delay-700"></div>
-            </motion.div>
+
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="hidden md:flex absolute -bottom-6 -left-6 bg-cream-50 rounded-2xl border border-ink-900/10 shadow-lg p-4 items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-forest-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">3× more interviews</p>
+                  <p className="text-xs text-ink-500">Average across early users</p>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Trust strip                                                      */}
+      {/* ================================================================ */}
+      <section className="py-10 border-y border-ink-900/10 bg-cream-200/40">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-10 text-xs">
+          <span className="uppercase tracking-[0.22em] font-semibold text-ink-500">
+            Trusted across the Veloxa family
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 font-display font-semibold text-ink-500">
+            <span>Veloxa Recruit</span>
+            <span className="w-1 h-1 rounded-full bg-ink-500/40 hidden md:block" />
+            <span>VeloxaHire</span>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="py-24 bg-neutral-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-4xl font-black text-neutral-900 mb-6">Features Built for Conversion</h2>
-            <p className="text-neutral-600 text-lg">We've automated the tedious parts of the job hunt so you can focus on the interviews.</p>
-          </div>
+      {/* ================================================================ */}
+      {/* How it works                                                     */}
+      {/* ================================================================ */}
+      <section id="how" className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+        <div className="max-w-6xl mx-auto">
+          <motion.div {...fadeUp} className="max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
+              How it works
+            </p>
+            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-ink-900">
+              Tell us your story once.
+              <span className="block italic font-medium text-forest-600">
+                We&rsquo;ll do the hunting forever.
+              </span>
+            </h2>
+            <p className="mt-5 text-ink-500 leading-relaxed text-lg">
+              Three small steps on your side. After that we keep watch on every new role posted
+              &mdash; and only tap you on the shoulder when something&rsquo;s genuinely worth it.
+            </p>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="mt-16 grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: Target,
-                title: "Precision Matching",
-                desc: "Our AI doesn't just look at keywords; it understands your career trajectory and intent.",
-                color: "brand-turquoise"
+                n: '01',
+                icon: FileText,
+                title: 'Bring your CV',
+                body:
+                  "Drop it in. We'll turn it into a profile you can tidy, tweak, or add to — no retyping, no forms that go on forever.",
               },
               {
-                icon: Wand2,
-                title: "Automatic CV Tailoring",
-                desc: "Generate a custom, ATS-optimized CV for every single job with one click.",
-                color: "brand-orange"
+                n: '02',
+                icon: Crosshair,
+                title: 'Tell us what good looks like',
+                body:
+                  "The kind of role, where you'd love to work, remote or office, the salary you're after. The clearer you are, the better we get at finding you the right ones.",
               },
               {
-                icon: Rocket,
-                title: "One-Click Apply",
-                desc: "Integrated application tracking and job-fit ranking to focus your search.",
-                color: "brand-turquoise"
-              }
-            ].map((feature, idx) => (
-              <div key={idx} className="bg-white p-10 rounded-[2rem] shadow-sm border border-neutral-100 hover:shadow-xl hover:border-brand-turquoise-100 transition-all group">
-                <div className={`w-14 h-14 bg-${feature.color}-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className={`w-7 h-7 text-${feature.color}-600`} />
+                n: '03',
+                icon: LineChart,
+                title: 'Open your shortlist',
+                body:
+                  "While you get on with life, we're reading thousands of new roles for you — and saving only the ones that actually fit. You open it like opening your inbox, calmly.",
+              },
+            ].map((step, i) => (
+              <motion.div
+                key={step.n}
+                {...fadeUp}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
+                className="relative rounded-2xl border border-ink-900/10 bg-cream-50 p-8 hover:border-forest-500/30 hover:shadow-sm transition-all"
+              >
+                <span className="font-display text-sm font-semibold tracking-[0.18em] text-ember-600">
+                  {step.n}
+                </span>
+                <div className="mt-5 w-11 h-11 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
+                  <step.icon className="w-5 h-5 text-forest-600" />
                 </div>
-                <h3 className="text-xl font-bold text-neutral-900 mb-4">{feature.title}</h3>
-                <p className="text-neutral-500 leading-relaxed">{feature.desc}</p>
-              </div>
+                <h3 className="mt-6 font-display font-semibold text-xl text-ink-900">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm text-ink-500 leading-relaxed">{step.body}</p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Social Proof / Trust */}
-      <section className="py-20 border-y border-neutral-100">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-10">Our Users Work At</p>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 grayscale opacity-40">
-            <h2 className="text-2xl font-black italic">Google</h2>
-            <h2 className="text-2xl font-black italic">Amazon</h2>
-            <h2 className="text-2xl font-black italic">Meta</h2>
-            <h2 className="text-2xl font-black italic">Microsoft</h2>
-            <h2 className="text-2xl font-black italic">Apple</h2>
-          </div>
-        </div>
-      </section>
+      {/* ================================================================ */}
+      {/* Features bento                                                   */}
+      {/* ================================================================ */}
+      <section
+        id="features"
+        className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-200/40 border-y border-ink-900/10"
+      >
+        <div className="max-w-6xl mx-auto">
+          <motion.div {...fadeUp} className="max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
+              What you get
+            </p>
+            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-ink-900">
+              A calmer,{' '}
+              <span className="italic font-medium text-forest-600">kinder</span> way to job-hunt.
+            </h2>
+            <p className="mt-5 text-ink-500 leading-relaxed text-lg max-w-xl">
+              You&rsquo;re not looking for a thousand jobs. You&rsquo;re looking for the right one.
+              Here&rsquo;s how VeloxaHire helps you get there without the burnout.
+            </p>
+          </motion.div>
 
-      {/* Modern Dashboard Preview / Value Prop */}
-      <section className="py-24 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-neutral-900 rounded-[3rem] p-12 md:p-20 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-brand-turquoise-500/10 to-transparent"></div>
-            <div className="grid md:grid-cols-2 gap-16 items-center relative z-10">
+          <div className="mt-16 grid md:grid-cols-6 gap-5">
+            <motion.div
+              {...fadeUp}
+              className="md:col-span-4 rounded-2xl bg-cream-50 border border-ink-900/10 p-8 flex flex-col justify-between min-h-[280px]"
+            >
               <div>
-                <h2 className="text-4xl md:text-5xl font-black text-white mb-8 leading-tight">
-                  A Dashboard That <br />
-                  <span className="text-brand-turquoise-400">Works For You.</span>
-                </h2>
-                <ul className="space-y-6">
-                  {[
-                    "Real-time market insights for your job title",
-                    "Success probability score for every match",
-                    "Automated application tracking",
-                    "Direct feedback from AI on CV improvements"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center space-x-4 text-neutral-300">
-                      <div className="w-6 h-6 rounded-full bg-brand-turquoise-500/20 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-brand-turquoise-400" />
-                      </div>
-                      <span className="text-lg">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-12">
-                  <Link href="/auth/signup" className="btn-premium inline-flex items-center space-x-3 px-8 py-4 bg-brand-orange-500 text-white rounded-2xl font-bold">
-                    <span>Explore Dashboard</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </Link>
+                <div className="w-11 h-11 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-forest-600" />
                 </div>
+                <h3 className="mt-6 font-display font-semibold text-2xl text-ink-900 leading-tight">
+                  We read the job. We don&rsquo;t just match words.
+                </h3>
+                <p className="mt-3 text-ink-500 text-sm leading-relaxed max-w-lg">
+                  A good recruiter reads a job spec end to end and thinks &ldquo;would this person
+                  be happy here?&rdquo; We do the same &mdash; quietly, for thousands of roles,
+                  every day. So when something lands at the top of your list, there&rsquo;s a
+                  proper reason.
+                </p>
               </div>
-              <div className="relative">
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-                   <div className="space-y-4">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="h-16 bg-white/5 rounded-xl border border-white/5 flex items-center px-6 justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 bg-brand-turquoise-500/20 rounded-lg"></div>
-                            <div className="space-y-1">
-                              <div className="h-2 w-24 bg-white/20 rounded"></div>
-                              <div className="h-2 w-16 bg-white/10 rounded"></div>
-                            </div>
-                          </div>
-                          <div className="h-2 w-12 bg-brand-orange-500/40 rounded"></div>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-                <div className="absolute -bottom-6 -right-6 glass p-6 rounded-2xl shadow-2xl border border-white/10">
-                  <p className="text-white font-bold text-2xl">98%</p>
-                  <p className="text-white/60 text-xs">Match Accuracy</p>
-                </div>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {[
+                  'Right kind of role',
+                  'Your skills',
+                  'Right level',
+                  'Fresh today',
+                  'Remote-friendly',
+                ].map((t) => (
+                  <span
+                    key={t}
+                    className="text-xs font-medium bg-cream-100 border border-ink-900/10 text-ink-500 rounded-full px-2.5 py-1"
+                  >
+                    {t}
+                  </span>
+                ))}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
+            </motion.div>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <Award className="w-12 h-12 text-brand-orange-500 mb-6" />
-              <h2 className="text-4xl font-black mb-8 leading-tight italic">
-                "JobHuntPro didn't just find me a job; they found me the right career path. The AI CV tailoring is pure magic."
-              </h2>
-              <div>
-                <p className="font-bold text-xl">Sarah Jenkins</p>
-                <p className="text-neutral-500">Software Engineer at Meta</p>
+            <motion.div
+              {...fadeUp}
+              transition={{ duration: 0.5, delay: 0.05 }}
+              className="md:col-span-2 rounded-2xl bg-cream-50 border border-ink-900/10 p-8 min-h-[280px] flex flex-col"
+            >
+              <div className="w-11 h-11 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
+                <Layers className="w-5 h-5 text-forest-600" />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-neutral-50 p-8 rounded-3xl mt-12">
-                <p className="text-4xl font-black text-brand-turquoise-600 mb-2">3x</p>
-                <p className="text-sm font-bold text-neutral-600 uppercase">Interview Rate</p>
-              </div>
-              <div className="bg-neutral-50 p-8 rounded-3xl">
-                <p className="text-4xl font-black text-brand-orange-500 mb-2">10hrs</p>
-                <p className="text-sm font-bold text-neutral-600 uppercase">Saved Weekly</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Final */}
-      <section className="py-32 bg-brand-turquoise-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h2 className="text-5xl md:text-6xl font-black text-white mb-10 leading-tight">Ready to transform <br /> your career?</h2>
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
-            <Link href="/auth/signup" className="w-full sm:w-auto px-12 py-5 bg-white text-brand-turquoise-700 rounded-2xl font-black text-xl hover:bg-neutral-50 shadow-2xl transition-all active:scale-95">
-              Get Started Now - It's Free
-            </Link>
-          </div>
-          <p className="text-white/80 mt-10 font-medium">No credit card required. Cancel anytime.</p>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-20 bg-white border-t border-neutral-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-12">
-            <div className="col-span-1 md:col-span-1">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-brand-turquoise-500 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-lg font-bold">JobHuntPro</span>
-              </div>
-              <p className="text-neutral-500 text-sm leading-relaxed">
-                The AI-powered command center for your next career move. Built for high-performers.
+              <h3 className="mt-6 font-display font-semibold text-xl text-ink-900">
+                Know where to look first.
+              </h3>
+              <p className="mt-3 text-sm text-ink-500 leading-relaxed">
+                Your <strong className="font-semibold text-ink-700">Top picks</strong> for busy
+                days, <strong className="font-semibold text-ink-700">strong fits</strong> when you
+                want to explore, and a fresh catalogue of everything new &mdash; so you never miss
+                the door you didn&rsquo;t know was open.
               </p>
+            </motion.div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Testimonial + stats                                              */}
+      {/* ================================================================ */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+          <motion.div {...fadeUp}>
+            <div className="w-10 h-10 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center mb-7">
+              <Quote className="w-5 h-5 text-forest-600" />
             </div>
-            
-            <div>
-              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Product</h4>
-              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
-                <li><Link href="#features" className="hover:text-brand-turquoise-600">Features</Link></li>
-                <li><Link href="#how-it-works" className="hover:text-brand-turquoise-600">Algorithm</Link></li>
-                <li><Link href="#" className="hover:text-brand-turquoise-600">CV Builder</Link></li>
+            <p className="font-display text-3xl sm:text-4xl text-ink-900 leading-[1.15] tracking-tight">
+              <span className="italic text-ink-500">&ldquo;</span>
+              I was spending evenings refreshing job boards. VeloxaHire does that for me now, and
+              it picks <em className="text-forest-600 not-italic font-medium">better</em> than I do.
+              I stopped guessing which roles were worth my time.
+              <span className="italic text-ink-500">&rdquo;</span>
+            </p>
+            <div className="mt-7 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-forest-500/15 border border-forest-500/20 flex items-center justify-center font-display font-semibold text-forest-700">
+                P
+              </div>
+              <div>
+                <p className="font-semibold text-ink-900">Nana Kwasi Agyeman, Senior ML Engineer</p>
+                <p className="text-sm text-ink-500">Early-access user</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div {...fadeUp} className="grid grid-cols-2 gap-5">
+            {[
+              { big: '3×', small: 'More interviews worth taking' },
+              { big: '10h', small: 'Hours handed back to your week' },
+              { big: '2×', small: 'Fresh shortlists, every day' },
+              { big: '96%', small: 'Top picks candidates open' },
+            ].map((s) => (
+              <div
+                key={s.small}
+                className="rounded-2xl border border-ink-900/10 bg-cream-50 p-6 hover:border-forest-500/30 transition-colors"
+              >
+                <p className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-forest-600">
+                  {s.big}
+                </p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500">
+                  {s.small}
+                </p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* FAQ                                                              */}
+      {/* ================================================================ */}
+      <section
+        id="faq"
+        className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-200/40 border-y border-ink-900/10"
+      >
+        <div className="max-w-3xl mx-auto">
+          <motion.div {...fadeUp} className="text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
+              FAQ
+            </p>
+            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-ink-900">
+              Honest <span className="italic font-medium text-forest-600">answers.</span>
+            </h2>
+          </motion.div>
+
+          <div className="mt-14 space-y-3">
+            {[
+              {
+                q: 'Is VeloxaHire really free?',
+                a: "Yes. Signing up, uploading your CV, and getting your shortlist costs nothing. We'll add optional power-user features later, but finding you good jobs will always have a free plan — candidates shouldn't pay to be seen.",
+              },
+              {
+                q: 'Who can see my CV?',
+                a: "Only you. Your CV is locked to your account. No recruiter, no employer, nobody in the \u201cVeloxa family\u201d can peek at it. An employer only sees your profile when you click apply. And if you change your mind, one click deletes the lot.",
+              },
+              {
+                q: 'How is this different from a job board?',
+                a: "Job boards list everything and leave you to sift. We read each role the way a recruiter would, compare it to you, and only put the genuine fits in front of you. Less scrolling, better jobs — every time.",
+              },
+              {
+                q: 'Where do the jobs come from?',
+                a: "From the big job boards, specialist sites, and roles our partners across the Veloxa family are hiring for. You get a full picture of the market — in one calm list, refreshed twice a day.",
+              },
+              {
+                q: 'Will I get spammed?',
+                a: "No. VeloxaHire doesn't share your email with anyone. We'll only email you when there's something genuinely worth your time — and you can dial that down to weekly in one click.",
+              },
+            ].map((f, i) => {
+              const open = openFaq === i
+              return (
+                <motion.div
+                  key={f.q}
+                  {...fadeUp}
+                  transition={{ duration: 0.35, delay: i * 0.05 }}
+                  className={`rounded-xl border bg-cream-50 overflow-hidden transition-colors ${
+                    open ? 'border-forest-500/30' : 'border-ink-900/10'
+                  }`}
+                >
+                  <button
+                    onClick={() => setOpenFaq(open ? null : i)}
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                  >
+                    <span className="font-display font-semibold text-lg text-ink-900">
+                      {f.q}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-ink-400 transition-transform flex-shrink-0 ${
+                        open ? 'rotate-180 text-forest-600' : ''
+                      }`}
+                    />
+                  </button>
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      height: open ? 'auto' : 0,
+                      opacity: open ? 1 : 0,
+                    }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <p className="px-5 pb-5 text-sm text-ink-500 leading-relaxed">{f.a}</p>
+                  </motion.div>
+                </motion.div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Final CTA — deep ink + forest gradient, mirrors the hero          */}
+      {/* ================================================================ */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+        <motion.div
+          {...fadeUp}
+          className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-ink-900 via-ink-800 to-forest-700 text-cream-100 px-8 py-16 md:py-20 md:px-16 relative overflow-hidden"
+        >
+          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-ember-500/20 blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-forest-500/25 blur-3xl" />
+          <div className="relative z-10 max-w-2xl">
+            <h2 className="font-display font-bold text-4xl sm:text-5xl tracking-tight leading-[1.05]">
+              The best job you&rsquo;ll have next year is{' '}
+              <span className="italic font-medium text-ember-400">
+                probably posted this week.
+              </span>
+            </h2>
+            <p className="mt-6 text-cream-100/75 text-lg max-w-xl leading-relaxed">
+              Let VeloxaHire find it quietly in the background. Sign up in under a minute &mdash;
+              the first shortlist is on us.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <Link
+                href="/auth/signup"
+                className="inline-flex items-center gap-2 px-7 py-3.5 bg-cream-100 text-ink-900 rounded-full font-semibold hover:bg-cream-50 transition-colors shadow-sm"
+              >
+                Build my shortlist
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/auth/login"
+                className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
+              >
+                I&rsquo;ve got an account
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Footer — forest-green canvas, cream text, ember accents          */}
+      {/* ================================================================ */}
+      <footer id="contact" className="relative bg-forest-700 text-cream-100/85 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, rgba(247,243,236,1) 1px, transparent 0)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-forest-500/30 blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-10">
+          <div className="grid md:grid-cols-12 gap-12">
+            <div className="md:col-span-5">
+              <Link href="/" className="flex items-center gap-2.5">
+                <Logo size={36} />
+                <WordMark className="text-lg text-cream-100" />
+              </Link>
+              <p className="mt-5 text-sm text-cream-100/70 leading-relaxed max-w-sm">
+                VeloxaHire is the candidate-side platform of the Veloxa family — built with the
+                same hiring specialists behind Veloxa Recruit.
+              </p>
+              <div className="mt-7 space-y-3 text-sm">
+                <a
+                  href="mailto:hello@veloxarecruit.com"
+                  className="flex items-center gap-3 text-cream-100/80 hover:text-ember-400 transition-colors"
+                >
+                  <Mail className="w-4 h-4 text-ember-500" />
+                  hello@veloxarecruit.com
+                </a>
+                <div className="flex items-start gap-3 text-cream-100/80">
+                  <Phone className="w-4 h-4 text-ember-500 mt-0.5 flex-shrink-0" />
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <a
+                      href="tel:+233544954643"
+                      className="hover:text-ember-400 transition-colors"
+                    >
+                      +233 544 954 643
+                    </a>
+                    <span className="text-cream-100/40">/</span>
+                    <a
+                      href="tel:+233556272090"
+                      className="hover:text-ember-400 transition-colors"
+                    >
+                      +233 556 272 090
+                    </a>
+                  </span>
+                </div>
+                <a
+                  href="https://www.linkedin.com/company/veloxa-technology-limited"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-cream-100/80 hover:text-ember-400 transition-colors"
+                >
+                  <Linkedin className="w-4 h-4 text-ember-500" />
+                  Veloxa Technology Limited
+                </a>
+                <div className="flex items-start gap-3 text-cream-100/80">
+                  <MapPin className="w-4 h-4 text-ember-500 mt-0.5 flex-shrink-0" />
+                  <span>Accra, Ghana</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
+                Product
+              </h4>
+              <ul className="space-y-3 text-sm text-cream-100/80">
+                <li>
+                  <Link href="#how" className="hover:text-ember-400 transition-colors">
+                    How it works
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#features" className="hover:text-ember-400 transition-colors">
+                    Features
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#faq" className="hover:text-ember-400 transition-colors">
+                    FAQ
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/auth/signup" className="hover:text-ember-400 transition-colors">
+                    Create account
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            <div>
-              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Resources</h4>
-              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Career Blog</Link></li>
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Resume Tips</Link></li>
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Salary Guide</Link></li>
+            <div className="md:col-span-2">
+              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
+                Family
+              </h4>
+              <ul className="space-y-3 text-sm text-cream-100/80">
+                <li>
+                  <a
+                    href="https://veloxarecruit.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-ember-400 transition-colors"
+                  >
+                    Veloxa Recruit
+                  </a>
+                </li>
+                <li>
+                  <Link href="/" className="hover:text-ember-400 transition-colors">
+                    VeloxaHire
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            <div>
-              <h4 className="font-bold text-sm uppercase tracking-widest text-neutral-400 mb-6">Support</h4>
-              <ul className="space-y-4 text-neutral-600 font-medium text-sm">
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Help Center</Link></li>
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Privacy Policy</Link></li>
-                <li><Link href="#" className="hover:text-brand-turquoise-600">Terms of Service</Link></li>
+            <div className="md:col-span-3">
+              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
+                Legal
+              </h4>
+              <ul className="space-y-3 text-sm text-cream-100/80">
+                <li>
+                  <Link href="#" className="hover:text-ember-400 transition-colors">
+                    Privacy policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="hover:text-ember-400 transition-colors">
+                    Terms of service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="hover:text-ember-400 transition-colors">
+                    Cookie policy
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
-          <div className="mt-20 pt-8 border-t border-neutral-100 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-neutral-400 text-sm">&copy; {new Date().getFullYear()} JobHuntPro. All rights reserved.</p>
-            <div className="flex items-center space-x-6">
-              <Link href="#" className="text-neutral-400 hover:text-brand-turquoise-600"><Globe className="w-5 h-5" /></Link>
-              <Link href="#" className="text-neutral-400 hover:text-brand-turquoise-600"><Users className="w-5 h-5" /></Link>
-            </div>
+
+          <div className="mt-16 pt-6 border-t border-cream-100/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-cream-100/55">
+              &copy; {new Date().getFullYear()} VeloxaHire. Part of the Veloxa family. All rights
+              reserved.
+            </p>
+            <p className="text-xs text-cream-100/45 font-display italic">
+              Built in Accra · for candidates, not recruiters.
+            </p>
           </div>
         </div>
       </footer>

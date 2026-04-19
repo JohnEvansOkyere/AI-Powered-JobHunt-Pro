@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { signIn, signInWithOAuth } from '@/lib/auth'
 import { toast } from 'react-hot-toast'
 import { Sparkles, ArrowRight, Lock, Mail, Eye, EyeOff } from 'lucide-react'
@@ -46,19 +47,24 @@ export default function LoginPage() {
         className="max-w-md w-full"
       >
         <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center space-x-3 group mb-8">
-            <div className="w-12 h-12 bg-brand-turquoise-600 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-turquoise-500/20 group-hover:scale-110 transition-transform">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-2xl font-black tracking-tight text-neutral-900">
-              JobHunt<span className="text-brand-turquoise-600">Pro</span>
+          <Link href="/" className="inline-flex items-center gap-2.5 group mb-8">
+            <Image
+              src="/logo.png"
+              alt="VeloxaHire"
+              width={36}
+              height={36}
+              priority
+              className="object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="text-2xl font-semibold tracking-tight text-neutral-900">
+              Veloxa<span className="text-brand-turquoise-700">Hire</span>
             </span>
           </Link>
-          <h2 className="text-3xl font-black text-neutral-900">
-            Welcome Back
+          <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
+            Welcome back
           </h2>
-          <p className="mt-2 text-neutral-500 font-medium">
-            Log in to your command center
+          <p className="mt-2 text-neutral-500">
+            Sign in to see your latest matches.
           </p>
         </div>
 

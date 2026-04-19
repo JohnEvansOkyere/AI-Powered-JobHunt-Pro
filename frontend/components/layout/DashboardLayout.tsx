@@ -2,6 +2,7 @@
 
 import { ReactNode, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
@@ -57,12 +58,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo / header */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-neutral-100">
-            <Link href="/dashboard" className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-brand-turquoise-600 flex items-center justify-center">
-                <span className="text-white text-sm font-semibold">J</span>
-              </div>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <Image
+                src="/logo.png"
+                alt="VeloxaHire"
+                width={28}
+                height={28}
+                priority
+                className="object-contain"
+              />
               <span className="text-base font-semibold tracking-tight text-neutral-900">
-                JobHunt<span className="text-brand-turquoise-600">Pro</span>
+                Veloxa<span className="text-brand-turquoise-700">Hire</span>
               </span>
             </Link>
             <button

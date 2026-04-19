@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Redis for Celery broker and result backend
+  redis:
+    image: redis:7-alpine
+    container_name: ai-job-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # Celery Worker for background tasks
+  celery_worker:
+    build: ./backend
+    container_name: ai-job-platform-celery-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Celery Beat for scheduled tasks
+  celery_beat:
+    build: ./backend
+    container_name: ai-job-platform-celery-beat
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Backend API (optional - if you want to run it via Docker)
+  # backend:
+  #   build: ./backend
+  #   container_name: ai-job-platform-backend
+  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./backend:/app
+  #   env_file:
+  #     - ./backend/.env
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
