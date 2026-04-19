@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = Field(..., description="Supabase project URL")
     SUPABASE_KEY: str = Field(..., description="Supabase anon/public key")
     SUPABASE_SERVICE_KEY: str = Field(..., description="Supabase service role key")
+    SUPABASE_JWT_SECRET: str = Field(
+        default="",
+        description="Supabase JWT secret for local access-token verification",
+    )
     SUPABASE_STORAGE_BUCKET: str = Field(
         default="cvs", description="Supabase storage bucket name for CVs"
     )
@@ -116,6 +120,38 @@ class Settings(BaseSettings):
         default=10, description="Scraping rate limit per minute"
     )
 
+    # ---- Recommendations V2 AI routing (docs/RECOMMENDATIONS_V2_PLAN.md §3.1) ----
+    # Default to Gemini for both embedding and reranking (free-tier friendly).
+    # Flip to OpenAI only if you explicitly want to pay for latency/capacity.
+    AI_EMBEDDING_PROVIDER: str = Field(
+        default="gemini",
+        description="Provider for embeddings: 'gemini' (default, free), 'openai'.",
+    )
+    AI_EMBEDDING_MODEL: str = Field(
+        default="text-embedding-004",
+        description="Embedding model name. Must match job_embeddings.model at match time.",
+    )
+    AI_RERANK_PROVIDER: str = Field(
+        default="gemini",
+        description="Provider for top-K LLM reranker: 'gemini' (default, free), 'groq', 'openai'.",
+    )
+    AI_RERANK_MODEL: str = Field(
+        default="gemini-1.5-flash",
+        description="Rerank model name.",
+    )
+    AI_PROVIDER_FALLBACK_ENABLED: bool = Field(
+        default=True,
+        description="If True, a primary failure/timeout will fall back once to the paid provider.",
+    )
+    AI_EMBEDDING_TIMEOUT_SECONDS: float = Field(
+        default=5.0,
+        description="Hard timeout for a single embedding request before fallback kicks in.",
+    )
+    AI_RERANK_TIMEOUT_SECONDS: float = Field(
+        default=15.0,
+        description="Hard timeout for a single rerank request before fallback kicks in.",
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v) -> List[str]:
@@ -155,4 +191,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
-

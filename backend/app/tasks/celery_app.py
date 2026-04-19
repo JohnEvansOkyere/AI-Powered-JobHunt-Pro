@@ -16,6 +16,7 @@ celery_app = Celery(
         "app.tasks.job_scraping",
         "app.tasks.ai_processing",
         "app.tasks.periodic_tasks",  # Scheduled tasks
+        "app.tasks.embeddings",  # Recommendations V2 embedding cache
     ],
 )
 

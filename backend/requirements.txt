@@ -23,6 +23,7 @@ google-generativeai>=0.3.0
 groq>=0.3.0
 tiktoken>=0.7.0  # Updated: Pre-built wheels available
 numpy>=1.24.0  # For embeddings cosine similarity
+pgvector>=0.2.5  # pgvector SQLAlchemy types for Recommendations V2
 
 # Voice Services (Optional - comment out if not using)
 elevenlabs>=0.2.27
