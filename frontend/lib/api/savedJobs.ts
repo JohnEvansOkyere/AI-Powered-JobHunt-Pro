@@ -18,9 +18,6 @@ export interface Application {
   user_id: string
   job_id: string
   cv_id?: string
-  tailored_cv_path?: string
-  cover_letter?: string
-  application_email?: string
   status: string
   saved_at?: string
   expires_at?: string
@@ -30,9 +27,7 @@ export interface Application {
 }
 
 export async function saveJob(jobId: string): Promise<Application> {
-  return apiClient.post<Application>(
-    `/api/v1/applications/save-job/${jobId}`
-  )
+  return apiClient.post<Application>(`/api/v1/applications/save-job/${jobId}`)
 }
 
 export async function unsaveJob(jobId: string): Promise<void> {
@@ -40,11 +35,9 @@ export async function unsaveJob(jobId: string): Promise<void> {
 }
 
 export async function getSavedJobs(): Promise<Application[]> {
-  return apiClient.get<Application[]>(
-    '/api/v1/applications/saved-jobs'
-  )
+  return apiClient.get<Application[]>('/api/v1/applications/saved-jobs')
 }
 
 export function checkIfJobSaved(jobId: string, savedJobs: Application[]): boolean {
-  return savedJobs.some(app => app.job_id === jobId)
+  return savedJobs.some((app) => app.job_id === jobId)
 }

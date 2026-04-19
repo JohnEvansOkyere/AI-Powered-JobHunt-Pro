@@ -2,10 +2,18 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { CVSection } from '@/components/profile/CVSection'
 import { useProfile } from '@/hooks/useProfile'
 import { calculateProfileCompletion, getMissingSections } from '@/lib/profile-utils'
 import { useRouter } from 'next/navigation'
-import { User, Briefcase, Award, Settings, AlertCircle } from 'lucide-react'
+import {
+  User,
+  Briefcase,
+  Award,
+  Settings,
+  AlertCircle,
+  Pencil,
+} from 'lucide-react'
 
 export default function ProfilePage() {
   const { profile, loading } = useProfile()
@@ -16,7 +24,7 @@ export default function ProfilePage() {
       <ProtectedRoute>
         <DashboardLayout>
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-700"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-turquoise-600" />
           </div>
         </DashboardLayout>
       </ProtectedRoute>
@@ -28,19 +36,19 @@ export default function ProfilePage() {
       <ProtectedRoute>
         <DashboardLayout>
           <div className="max-w-4xl mx-auto">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-              <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-neutral-800 mb-2">
-                No Profile Found
+            <div className="bg-white rounded-xl border border-neutral-200 p-8 text-center">
+              <AlertCircle className="h-8 w-8 text-neutral-400 mx-auto mb-3" />
+              <h2 className="text-base font-semibold text-neutral-900 mb-1">
+                No profile found
               </h2>
-              <p className="text-neutral-600 mb-4">
-                Complete your profile to get personalized job matches
+              <p className="text-sm text-neutral-500 mb-5">
+                Complete your profile to get personalized job matches.
               </p>
               <button
                 onClick={() => router.push('/profile/setup')}
-                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="inline-flex items-center px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                Complete Profile
+                Complete profile
               </button>
             </div>
           </div>
@@ -55,149 +63,140 @@ export default function ProfilePage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-5">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-neutral-800 mb-2">
-                  My Profile
-                </h1>
-                <p className="text-neutral-600">
-                  Manage your professional profile and preferences
-                </p>
-              </div>
-              <button
-                onClick={() => router.push('/profile/setup')}
-                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center space-x-2"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Edit Profile</span>
-              </button>
+          <header className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+                Your profile
+              </h1>
+              <p className="text-sm text-neutral-500 mt-0.5">
+                This is what we use to rank roles for you.
+              </p>
             </div>
-          </div>
+            <button
+              onClick={() => router.push('/profile/setup')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </button>
+          </header>
 
-          {/* Completion Status */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-neutral-800">
-                Profile Completion
+          {/* Completion */}
+          <section className="bg-white rounded-xl border border-neutral-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-neutral-900">
+                Profile completion
               </h2>
-              <span className="text-2xl font-bold text-primary-600">
+              <span className="text-sm font-semibold text-neutral-900 tabular-nums">
                 {completionPercentage}%
               </span>
             </div>
-            <div className="w-full bg-neutral-200 rounded-full h-3 mb-4">
+            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
               <div
-                className="bg-primary-600 h-3 rounded-full transition-all duration-300"
+                className="h-full bg-brand-turquoise-500 rounded-full transition-all duration-500"
                 style={{ width: `${completionPercentage}%` }}
               />
             </div>
             {missingSections.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-yellow-800 mb-2">
-                  Missing Sections:
-                </p>
-                <ul className="text-sm text-yellow-700 space-y-1">
-                  {missingSections.map((section) => (
-                    <li key={section} className="flex items-center space-x-2">
-                      <span className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></span>
-                      <span>{section}</span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="mt-4 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-neutral-500 mr-1">Still missing:</span>
+                {missingSections.map((section) => (
+                  <span
+                    key={section}
+                    className="inline-flex items-center text-xs text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-md px-1.5 py-0.5"
+                  >
+                    {section}
+                  </span>
+                ))}
               </div>
             )}
-          </div>
+          </section>
+
+          {/* CV upload + management */}
+          <CVSection />
 
           {/* Career Targeting */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6 mb-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <User className="h-5 w-5 text-primary-600" />
-              <h2 className="text-lg font-semibold text-neutral-800">
-                Career Targeting
+          <section className="bg-white rounded-xl border border-neutral-200 p-5">
+            <header className="flex items-center gap-2 mb-4">
+              <User className="h-4 w-4 text-neutral-600" />
+              <h2 className="text-sm font-semibold text-neutral-900">
+                Career targeting
               </h2>
-            </div>
+            </header>
             <div className="space-y-4">
-              {/* Job Titles */}
               <div>
-                <label className="text-sm font-medium text-neutral-600 mb-2 block">
-                  Target Job Titles
+                <label className="text-xs font-medium text-neutral-500 mb-1.5 block uppercase tracking-wide">
+                  Target job titles
                 </label>
-                {profile.primary_job_title || (profile.secondary_job_titles && profile.secondary_job_titles.length > 0) ? (
-                  <div className="flex flex-wrap gap-2">
+                {profile.primary_job_title ||
+                (profile.secondary_job_titles && profile.secondary_job_titles.length > 0) ? (
+                  <div className="flex flex-wrap gap-1.5">
                     {profile.primary_job_title && (
-                      <span className="inline-flex items-center px-3 py-1.5 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-brand-turquoise-700 bg-brand-turquoise-50 border border-brand-turquoise-100 rounded-md">
                         {profile.primary_job_title}
-                        <span className="ml-1 text-xs text-primary-600">(Primary)</span>
+                        <span className="text-[10px] text-brand-turquoise-600">primary</span>
                       </span>
                     )}
-                    {profile.secondary_job_titles && profile.secondary_job_titles.map((title, index) => (
+                    {profile.secondary_job_titles?.map((title, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium"
+                        className="px-2 py-0.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-md"
                       >
                         {title}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-neutral-400">Not specified</p>
+                  <p className="text-sm text-neutral-400">Not specified</p>
                 )}
               </div>
 
-              {/* Other info in grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-neutral-600">
-                    Seniority Level
-                  </label>
-                  <p className="text-neutral-800 mt-1 capitalize">
-                    {profile.seniority_level || <span className="text-neutral-400">Not specified</span>}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-neutral-600">
-                    Work Preference
-                  </label>
-                  <p className="text-neutral-800 mt-1 capitalize">
-                    {profile.work_preference || <span className="text-neutral-400">Not specified</span>}
-                  </p>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-neutral-100">
+                <InfoField
+                  label="Seniority"
+                  value={profile.seniority_level}
+                  capitalize
+                />
+                <InfoField
+                  label="Work preference"
+                  value={profile.work_preference}
+                  capitalize
+                />
                 {profile.desired_industries && profile.desired_industries.length > 0 && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-neutral-600">
-                      Desired Industries
+                    <label className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                      Industries
                     </label>
-                    <p className="text-neutral-800 mt-1">
+                    <p className="text-sm text-neutral-900 mt-1">
                       {profile.desired_industries.join(', ')}
                     </p>
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Skills */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6 mb-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <Award className="h-5 w-5 text-primary-600" />
-              <h2 className="text-lg font-semibold text-neutral-800">
-                Skills & Expertise
+          <section className="bg-white rounded-xl border border-neutral-200 p-5">
+            <header className="flex items-center gap-2 mb-4">
+              <Award className="h-4 w-4 text-neutral-600" />
+              <h2 className="text-sm font-semibold text-neutral-900">
+                Skills & expertise
               </h2>
-            </div>
+            </header>
 
-            {/* Technical Skills */}
             {profile.technical_skills && profile.technical_skills.length > 0 && (
               <div className="mb-4">
-                <label className="text-sm font-medium text-neutral-600 mb-2 block">
-                  Technical Skills
+                <label className="text-xs font-medium text-neutral-500 mb-1.5 block uppercase tracking-wide">
+                  Technical
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {profile.technical_skills.map((skill, index) => (
                     <span
                       key={index}
-                      className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm"
+                      className="px-2 py-0.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-md"
                     >
                       {skill.skill}
                     </span>
@@ -206,17 +205,16 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Soft Skills */}
             {profile.soft_skills && profile.soft_skills.length > 0 && (
               <div>
-                <label className="text-sm font-medium text-neutral-600 mb-2 block">
-                  Soft Skills
+                <label className="text-xs font-medium text-neutral-500 mb-1.5 block uppercase tracking-wide">
+                  Soft
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {profile.soft_skills.map((skill, index) => (
                     <span
                       key={index}
-                      className="px-3 py-1 bg-accent-100 text-accent-700 rounded-full text-sm"
+                      className="px-2 py-0.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-md"
                     >
                       {skill}
                     </span>
@@ -227,36 +225,40 @@ export default function ProfilePage() {
 
             {(!profile.technical_skills || profile.technical_skills.length === 0) &&
               (!profile.soft_skills || profile.soft_skills.length === 0) && (
-                <p className="text-neutral-400">No skills added yet</p>
+                <p className="text-sm text-neutral-400">No skills added yet</p>
               )}
-          </div>
+          </section>
 
-          {/* Work Experience */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6 mb-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <Briefcase className="h-5 w-5 text-primary-600" />
-              <h2 className="text-lg font-semibold text-neutral-800">
-                Work Experience
+          {/* Experience */}
+          <section className="bg-white rounded-xl border border-neutral-200 p-5">
+            <header className="flex items-center gap-2 mb-4">
+              <Briefcase className="h-4 w-4 text-neutral-600" />
+              <h2 className="text-sm font-semibold text-neutral-900">
+                Work experience
               </h2>
-            </div>
+            </header>
             {profile.experience && profile.experience.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {profile.experience.map((exp, index) => (
                   <div
                     key={index}
-                    className="p-4 bg-neutral-50 rounded-lg border border-neutral-200"
+                    className="rounded-lg border border-neutral-200 p-3"
                   >
-                    <h3 className="font-semibold text-neutral-800">{exp.role}</h3>
-                    <p className="text-sm text-neutral-600 mt-1">{exp.company}</p>
-                    <p className="text-xs text-neutral-500 mt-1">{exp.duration}</p>
+                    <h3 className="text-sm font-semibold text-neutral-900">
+                      {exp.role}
+                    </h3>
+                    <p className="text-xs text-neutral-600 mt-0.5">
+                      {exp.company}
+                      {exp.duration && <span className="text-neutral-400"> · {exp.duration}</span>}
+                    </p>
                     {exp.achievements && exp.achievements.length > 0 && (
-                      <ul className="mt-3 space-y-1">
+                      <ul className="mt-2 space-y-1">
                         {exp.achievements.map((achievement, idx) => (
                           <li
                             key={idx}
-                            className="text-sm text-neutral-700 flex items-start space-x-2"
+                            className="text-xs text-neutral-700 flex items-start gap-1.5"
                           >
-                            <span className="text-primary-600 mt-1">•</span>
+                            <span className="text-neutral-400 mt-[3px]">•</span>
                             <span>{achievement}</span>
                           </li>
                         ))}
@@ -266,41 +268,58 @@ export default function ProfilePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-neutral-400">No work experience added yet</p>
+              <p className="text-sm text-neutral-400">No experience added yet</p>
             )}
-          </div>
+          </section>
 
           {/* Preferences */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <Settings className="h-5 w-5 text-primary-600" />
-              <h2 className="text-lg font-semibold text-neutral-800">
-                Preferences
-              </h2>
-            </div>
+          <section className="bg-white rounded-xl border border-neutral-200 p-5">
+            <header className="flex items-center gap-2 mb-4">
+              <Settings className="h-4 w-4 text-neutral-600" />
+              <h2 className="text-sm font-semibold text-neutral-900">Preferences</h2>
+            </header>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-neutral-600">
-                  Writing Tone
-                </label>
-                <p className="text-neutral-800 mt-1 capitalize">
-                  {profile.writing_tone || <span className="text-neutral-400">Not specified</span>}
-                </p>
-              </div>
-              {profile.ai_preferences && profile.ai_preferences.speed_vs_quality && (
-                <div>
-                  <label className="text-sm font-medium text-neutral-600">
-                    AI Speed vs Quality
-                  </label>
-                  <p className="text-neutral-800 mt-1 capitalize">
-                    {profile.ai_preferences.speed_vs_quality}
-                  </p>
-                </div>
+              <InfoField
+                label="Writing tone"
+                value={profile.writing_tone}
+                capitalize
+              />
+              {profile.ai_preferences?.speed_vs_quality && (
+                <InfoField
+                  label="AI speed vs quality"
+                  value={profile.ai_preferences.speed_vs_quality}
+                  capitalize
+                />
               )}
             </div>
-          </div>
+          </section>
         </div>
       </DashboardLayout>
     </ProtectedRoute>
+  )
+}
+
+function InfoField({
+  label,
+  value,
+  capitalize = false,
+}: {
+  label: string
+  value: string | null | undefined
+  capitalize?: boolean
+}) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+        {label}
+      </label>
+      <p
+        className={`text-sm mt-1 ${
+          value ? 'text-neutral-900' : 'text-neutral-400'
+        } ${capitalize ? 'capitalize' : ''}`}
+      >
+        {value || 'Not specified'}
+      </p>
+    </div>
   )
 }

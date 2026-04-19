@@ -76,18 +76,9 @@ a {
     animation: gradient 15s ease infinite;
   }
 
-  /* Button Premium Hover */
+  /* Subtle primary button hover — used on landing and marketing CTAs only */
   .btn-premium {
-    @apply relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl active:translate-y-0;
-  }
-
-  .btn-premium::after {
-    content: '';
-    @apply absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300;
-  }
-
-  .btn-premium:hover::after {
-    @apply translate-y-0;
+    @apply transition-shadow duration-200 hover:shadow-md;
   }
 }
 
