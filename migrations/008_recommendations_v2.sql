@@ -105,7 +105,7 @@ COMMENT ON COLUMN job_recommendations.title_alignment   IS 'Title overlap score 
 COMMENT ON COLUMN job_recommendations.skill_overlap     IS 'Fraction of user top-15 skills found in job text, 0..1.';
 COMMENT ON COLUMN job_recommendations.freshness         IS 'Age-based decay on posted_date, 0..1.';
 COMMENT ON COLUMN job_recommendations.channel_bonus     IS 'Source quality bonus (recruiter > scraped > external), 0..1.';
-COMMENT ON COLUMN job_recommendations.interest_affinity IS 'Cosine to the centroid of the user\'s recent saved/applied jobs, 0..1 or NULL.';
+COMMENT ON COLUMN job_recommendations.interest_affinity IS 'Cosine to the centroid of the user''s recent saved/applied jobs, 0..1 or NULL.';
 COMMENT ON COLUMN job_recommendations.llm_rerank_score  IS 'Reranker score (0..100). NULL if this row was not reranked.';
 
 -- Re-read indexes for the new access pattern: "give me Tier 1 for user X".
