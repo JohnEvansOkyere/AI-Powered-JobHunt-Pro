@@ -45,10 +45,10 @@ celery_app.conf.beat_schedule = {
         "task": "scheduler.scrape_recent_jobs",
         "schedule": crontab(minute=0, hour=6, day_of_month="*/3"),
     },
-    # Generate recommendations for all eligible users every 2 days at 07:00 UTC
-    "generate-recommendations-every-2-days": {
+    # Generate recommendations for all eligible users every 12 hours
+    "generate-recommendations-every-12-hours": {
         "task": "scheduler.generate_recommendations_for_all",
-        "schedule": crontab(minute=0, hour=7, day_of_month="*/2"),
+        "schedule": crontab(minute=0, hour="*/12"),
     },
     # Hourly backfill for users with zero recommendations (catches new signups
     # without waiting for the 2-day generation pass)

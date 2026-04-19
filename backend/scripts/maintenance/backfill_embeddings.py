@@ -28,7 +28,7 @@ Usage
 Provider wiring
 ---------------
 Respects ``AI_EMBEDDING_PROVIDER`` / ``AI_EMBEDDING_MODEL`` from
-``.env``. The defaults are Gemini + ``text-embedding-004`` (768 dim).
+``.env``. The defaults are Gemini + ``gemini-embedding-001`` (768 dim).
 If you flip providers later you MUST re-run with ``--force`` because the
 existing rows will have a different ``model`` tag and be ignored at read
 time. See ``docs/RECOMMENDATIONS_V2_PLAN.md`` §3.1.

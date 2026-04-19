@@ -3,7 +3,7 @@
 Mirrors the ``job_embeddings`` and ``user_embeddings`` tables created in
 ``migrations/008_recommendations_v2.sql`` (see ``docs/RECOMMENDATIONS_V2_PLAN.md`` §5.1).
 
-Dimension is fixed at 768 (Gemini ``text-embedding-004``). Every row is
+Dimension is fixed at 768 (Gemini ``gemini-embedding-001``). Every row is
 model-tagged; queries against these tables MUST filter on ``model`` so a
 mid-migration dataset with mixed providers doesn't silently mix dims.
 """
@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - import-time fallback
         return Column(ARRAY(Float), nullable=False)
 
 
-EMBEDDING_DIM = 768  # Gemini text-embedding-004
+EMBEDDING_DIM = 768  # Gemini gemini-embedding-001 with outputDimensionality
 
 
 class JobEmbedding(Base):
@@ -46,7 +46,7 @@ class JobEmbedding(Base):
         primary_key=True,
     )
     embedding = _vector_column(EMBEDDING_DIM)
-    model = Column(Text, nullable=False, default="text-embedding-004")
+    model = Column(Text, nullable=False, default="gemini-embedding-001")
     source_hash = Column(Text, nullable=False)
     embedded_at = Column(
         TIMESTAMP(timezone=True),
@@ -66,7 +66,7 @@ class UserEmbedding(Base):
 
     user_id = Column(UUID(as_uuid=True), primary_key=True)
     embedding = _vector_column(EMBEDDING_DIM)
-    model = Column(Text, nullable=False, default="text-embedding-004")
+    model = Column(Text, nullable=False, default="gemini-embedding-001")
     source_hash = Column(Text, nullable=False)
     embedded_at = Column(
         TIMESTAMP(timezone=True),

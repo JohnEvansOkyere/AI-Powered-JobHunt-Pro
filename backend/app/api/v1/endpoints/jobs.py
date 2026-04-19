@@ -6,52 +6,24 @@ Handles job listing, searching, filtering, and scraping operations.
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, desc
+from sqlalchemy import and_, or_, desc
 from typing import List, Optional
 from datetime import datetime, timedelta
-import asyncio
 import uuid
 
-from app.core.database import get_db, SessionLocal
+from app.core.database import get_db
 from app.core.config import settings
 from app.api.v1.dependencies import get_current_user
 from app.core.logging import get_logger
 from app.models.job import Job
 from app.models.scraping_job import ScrapingJob
-from app.models.job_match import JobMatch
-from app.models.job_recommendation import JobRecommendation
 from app.services.job_scraper_service import JobScraperService
-from app.services.job_matching_service import JobMatchingService
-from app.services.job_matching_service_optimized import get_optimized_matching_service
-from app.services.ai_job_matcher import get_ai_job_matcher
-from app.services.recommendation_generator import RecommendationGenerator
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, Field, field_serializer
 
 router = APIRouter()
 logger = get_logger(__name__)
 scraper_service = JobScraperService()
-matching_service = JobMatchingService()
-optimized_matching_service = get_optimized_matching_service()
-ai_matcher = get_ai_job_matcher()  # AI-powered semantic matching
-
-
-async def _background_generate_recommendations_for_user(user_id_str: str) -> None:
-    """
-    Run recommendation generation for a user in the background (own DB session).
-    Used when GET /recommendations returns 0 for an eligible user so new users
-    get recommendations without waiting for the 2-day scheduler.
-    """
-    db = SessionLocal()
-    try:
-        generator = RecommendationGenerator(db)
-        count = await generator.generate_recommendations_for_user(user_id_str)
-        if count > 0:
-            logger.info(f"Background: generated {count} recommendations for user {user_id_str}")
-    except Exception as e:
-        logger.error(f"Background recommendation generation failed for {user_id_str}: {e}", exc_info=True)
-    finally:
-        db.close()
 
 
 # Pydantic models
@@ -159,7 +131,7 @@ async def search_jobs(
     job_type: Optional[str] = Query(None, description="Filter by job type"),
     remote_type: Optional[str] = Query(None, description="Filter by remote type"),
     min_posted_days: Optional[int] = Query(None, description="Minimum days since posted"),
-    matched: bool = Query(False, description="Return only matched jobs with scores"),
+    matched: bool = Query(False, description="Deprecated. Use /api/v1/recommendations."),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     current_user: dict = Depends(get_current_user),
@@ -168,7 +140,7 @@ async def search_jobs(
     """
     Search and filter jobs.
     
-    If matched=True, returns jobs matched to the user with relevance scores.
+    Recommendation-specific matching now lives on /api/v1/recommendations.
     Otherwise returns all jobs matching the criteria.
     """
     query = db.query(Job)
@@ -217,77 +189,12 @@ async def search_jobs(
     # Filter out archived jobs
     query = query.filter(Job.processing_status != "archived")
     
-    # If matched=True, get matched jobs with scores
     if matched:
-        user_id = current_user["id"]
-        if isinstance(user_id, str):
-            import uuid
-            user_id = uuid.UUID(user_id)
-
-        # Use AI-POWERED matching service (60%+ quality matches only)
-        matches = await ai_matcher.get_cached_matches(
-            user_id=str(user_id),
-            db=db,
-            limit=page_size * 2  # Get more for pagination
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="matched=true was removed. Use /api/v1/recommendations?tier=tier2 instead.",
         )
-        
-        # Extract job IDs from matches
-        matched_job_ids = [match["job"].id for match in matches]
-        
-        if matched_job_ids:
-            # Filter query to only matched jobs
-            query = query.filter(Job.id.in_(matched_job_ids))
-            
-            # Sort by relevance score (get from job_matches table)
-            job_matches = db.query(JobMatch).filter(
-                and_(
-                    JobMatch.user_id == user_id,
-                    JobMatch.job_id.in_(matched_job_ids)
-                )
-            ).all()
-            
-            # Create a map of job_id -> relevance_score
-            score_map = {match.job_id: match.relevance_score for match in job_matches}
-            
-            # Get total count
-            total = len(matched_job_ids)
-            
-            # Sort matches by relevance score
-            matches.sort(key=lambda x: x["relevance_score"], reverse=True)
-            
-            # Paginate
-            offset = (page - 1) * page_size
-            paginated_matches = matches[offset:offset + page_size]
-            
-            # Convert to JobResponse with match scores
-            jobs_with_scores = []
-            for match in paginated_matches:
-                job = match["job"]
-                job_dict = JobResponse.from_orm(job).dict()
-                job_dict["match_score"] = match["relevance_score"]
-                job_dict["match_reasons"] = match.get("match_reasons", [])
-                jobs_with_scores.append(job_dict)
-            
-            total_pages = (total + page_size - 1) // page_size
-            
-            return JobSearchResponse(
-                jobs=jobs_with_scores,
-                total=total,
-                page=page,
-                page_size=page_size,
-                total_pages=total_pages
-            )
-        else:
-            # No matches found
-            return JobSearchResponse(
-                jobs=[],
-                total=0,
-                page=page,
-                page_size=page_size,
-                total_pages=0
-            )
     
-    # Regular search (not matched)
     # Get total count
     total = query.count()
     
@@ -627,4 +534,3 @@ def delete_job(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete job: {str(e)}"
         )
-

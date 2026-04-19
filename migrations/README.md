@@ -49,7 +49,7 @@ in the same order.
 ## After 008
 
 Migration 008 sizes all vector columns for **768 dimensions** (Gemini
-`text-embedding-004`). If you flip `AI_EMBEDDING_PROVIDER` from Gemini to
+`gemini-embedding-001`). If you flip `AI_EMBEDDING_PROVIDER` from Gemini to
 OpenAI later, you must re-embed — see §3.1 of
 `docs/RECOMMENDATIONS_V2_PLAN.md`. Rows stamped with a different `model` stay
 in place but are ignored at read time because queries filter by `model`.

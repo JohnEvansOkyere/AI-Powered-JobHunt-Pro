@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    ForeignKey,
     Index,
     Text,
 )
@@ -33,7 +34,11 @@ class NotificationPreferences(Base):
 
     __tablename__ = "notification_preferences"
 
-    user_id = Column(UUID(as_uuid=True), primary_key=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
 
     # WhatsApp consent state. `whatsapp_opted_in` is the single source of
     # truth for "may we send this user a marketing template"; the dispatcher
@@ -87,7 +92,11 @@ class WhatsappMessage(Base):
     __tablename__ = "whatsapp_messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     template_name = Column(Text, nullable=False)
     template_language = Column(Text, nullable=False, default="en")
     phone_e164 = Column(Text, nullable=False)
@@ -131,7 +140,11 @@ class WhatsappIncomingEvent(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     phone_e164 = Column(Text, nullable=False)
-    user_id = Column(UUID(as_uuid=True), nullable=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     event_type = Column(Text, nullable=False)
     body = Column(Text, nullable=True)
     raw = Column(JSONB, nullable=False)

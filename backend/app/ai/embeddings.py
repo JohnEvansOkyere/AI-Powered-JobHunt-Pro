@@ -1,4 +1,4 @@
-"""Embedding service — Gemini primary, OpenAI fallback.
+"""Embedding service - Gemini primary, OpenAI fallback.
 
 This module is the single entry point for every vector the recommender
 produces. Callers never talk to provider SDKs directly.
@@ -10,9 +10,10 @@ Design goals
     ``job_embeddings.model`` / ``user_embeddings.model``. The read path
     filters on that column to keep job/user dims consistent even across a
     provider switch.
-2.  **Free-tier first.** Gemini ``text-embedding-004`` (768 dims) is the
-    default; OpenAI ``text-embedding-3-small`` (1536 dims) is only used if
-    Gemini fails AND ``AI_PROVIDER_FALLBACK_ENABLED`` is ``True``.
+2.  **Free-tier first.** Gemini ``gemini-embedding-001`` at 768 dims is the
+    default; OpenAI ``text-embedding-3-small`` is only used if Gemini fails
+    AND ``AI_PROVIDER_FALLBACK_ENABLED`` is ``True``. OpenAI v3 embeddings
+    are requested at 768 dims so fallback rows fit the same pgvector column.
 3.  **Bounded failure.** Every provider call has a hard timeout and is
     retried at most once. There is no infinite retry loop.
 4.  **Deterministic batching.** Input order is preserved. Duplicate inputs
@@ -31,6 +32,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
+import requests
+
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -43,11 +46,23 @@ logger = get_logger(__name__)
 # to do (embed a list of strings), which keeps them tiny and testable.
 
 try:
-    import google.generativeai as _genai  # type: ignore
-    _GEMINI_SDK_AVAILABLE = True
+    import google.generativeai as _legacy_genai  # type: ignore
+
+    _GEMINI_SDK_FLAVOR = "google-generativeai"
 except ImportError:  # pragma: no cover - optional dep
+    _legacy_genai = None  # type: ignore
+    try:
+        from google import genai as _genai  # type: ignore
+        from google.genai import types as _genai_types  # type: ignore
+
+        _GEMINI_SDK_FLAVOR = "google-genai"
+    except ImportError:  # pragma: no cover - optional dep
+        _genai = None  # type: ignore
+        _genai_types = None  # type: ignore
+        _GEMINI_SDK_FLAVOR = ""
+else:
     _genai = None  # type: ignore
-    _GEMINI_SDK_AVAILABLE = False
+    _genai_types = None  # type: ignore
 
 try:
     from openai import AsyncOpenAI as _AsyncOpenAI  # type: ignore
@@ -89,16 +104,31 @@ class EmbeddingUnavailableError(RuntimeError):
 # --- Module-level clients (lazy singletons) ------------------------------
 
 _openai_client: Optional["_AsyncOpenAI"] = None  # type: ignore[name-defined]
+_gemini_client: Optional[object] = None
 _gemini_configured: bool = False
+GEMINI_OUTPUT_DIMENSIONS = 768
 
 
 def _gemini_ready() -> bool:
-    """Prepare the google.generativeai SDK. Idempotent."""
-    global _gemini_configured
-    if not _GEMINI_SDK_AVAILABLE or not settings.GEMINI_API_KEY:
+    """Prepare the configured Gemini SDK. Idempotent."""
+    global _gemini_client, _gemini_configured
+    if not settings.GEMINI_API_KEY:
         return False
+    if (settings.AI_EMBEDDING_MODEL or "") in {
+        "gemini-embedding-001",
+        "models/gemini-embedding-001",
+        "gemini-embedding-2-preview",
+        "models/gemini-embedding-2-preview",
+    }:
+        return True
+    if not _GEMINI_SDK_FLAVOR:
+        return False
+    if _GEMINI_SDK_FLAVOR == "google-genai":
+        if _gemini_client is None:
+            _gemini_client = _genai.Client(api_key=settings.GEMINI_API_KEY)  # type: ignore[union-attr]
+        return True
     if not _gemini_configured:
-        _genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore[union-attr]
+        _legacy_genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore[union-attr]
         _gemini_configured = True
     return True
 
@@ -152,17 +182,77 @@ def _dedupe(texts: Sequence[str]) -> tuple[List[str], List[int]]:
 async def _embed_with_gemini(texts: Sequence[str], model: str) -> List[List[float]]:
     """Embed a batch via Gemini. Returns one vector per input in the same order."""
     if not _gemini_ready():
-        raise EmbeddingUnavailableError("Gemini SDK missing or GEMINI_API_KEY empty.")
+        raise EmbeddingUnavailableError(
+            "Gemini SDK missing/unusable or GEMINI_API_KEY empty."
+        )
 
     # The sync Gemini call is cheap (HTTP) but we still run it in a thread
-    # so the event loop stays responsive. Older versions of
-    # google-generativeai don't expose an async embed_content; this keeps
-    # us compatible with all of them.
+    # so the event loop stays responsive. The current google-genai SDK and
+    # legacy google-generativeai SDK both expose synchronous embedding calls.
     def _sync_call() -> List[List[float]]:
-        # The SDK accepts a list of strings directly and returns one
-        # embedding per input under ``embedding``. See
-        # https://ai.google.dev/api/embeddings.
-        resp = _genai.embed_content(  # type: ignore[union-attr]
+        model_path = model if model.startswith("models/") else f"models/{model}"
+        if model_path in {
+            "models/gemini-embedding-001",
+            "models/gemini-embedding-2-preview",
+        }:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/"
+                f"{model_path}:batchEmbedContents"
+            )
+            payload = {
+                "requests": [
+                    {
+                        "model": model_path,
+                        "content": {"parts": [{"text": text}]},
+                        "taskType": "RETRIEVAL_DOCUMENT",
+                        "outputDimensionality": GEMINI_OUTPUT_DIMENSIONS,
+                    }
+                    for text in texts
+                ]
+            }
+            resp = requests.post(
+                url,
+                headers={
+                    "x-goog-api-key": settings.GEMINI_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=max(1.0, float(settings.AI_EMBEDDING_TIMEOUT_SECONDS)),
+            )
+            if resp.status_code >= 400:
+                raise EmbeddingUnavailableError(
+                    f"Gemini HTTP {resp.status_code}: {resp.text[:500]}"
+                )
+            data = resp.json()
+            embeddings = data.get("embeddings")
+            if embeddings is None:
+                raise EmbeddingUnavailableError(
+                    "Gemini response missing 'embeddings' field."
+                )
+            return [[float(x) for x in item.get("values", [])] for item in embeddings]
+
+        if _GEMINI_SDK_FLAVOR == "google-genai":
+            client = _gemini_client
+            if client is None:
+                raise EmbeddingUnavailableError("Gemini client not initialized.")
+            config_kwargs = {"task_type": "RETRIEVAL_DOCUMENT"}
+            if model == "gemini-embedding-001":
+                config_kwargs["output_dimensionality"] = GEMINI_OUTPUT_DIMENSIONS
+            config = _genai_types.EmbedContentConfig(**config_kwargs)  # type: ignore[union-attr]
+            resp = client.models.embed_content(  # type: ignore[attr-defined]
+                model=model,
+                contents=list(texts),
+                config=config,
+            )
+            embeddings = getattr(resp, "embeddings", None)
+            if embeddings is None:
+                raise EmbeddingUnavailableError(
+                    "Gemini response missing 'embeddings' field."
+                )
+            return [[float(x) for x in emb.values] for emb in embeddings]
+
+        # Legacy SDK fallback for older environments.
+        resp = _legacy_genai.embed_content(  # type: ignore[union-attr]
             model=f"models/{model}" if not model.startswith("models/") else model,
             content=list(texts),
             task_type="retrieval_document",
@@ -170,8 +260,6 @@ async def _embed_with_gemini(texts: Sequence[str], model: str) -> List[List[floa
         raw = resp.get("embedding") if isinstance(resp, dict) else getattr(resp, "embedding", None)
         if raw is None:
             raise EmbeddingUnavailableError("Gemini response missing 'embedding' field.")
-        # Single-input calls return a flat list; batched calls return a
-        # list-of-lists. Normalize both to list-of-lists.
         if raw and isinstance(raw[0], (float, int)):
             return [[float(x) for x in raw]]
         return [[float(x) for x in row] for row in raw]
@@ -184,7 +272,13 @@ async def _embed_with_openai(texts: Sequence[str], model: str) -> List[List[floa
     client = _openai()
     if client is None:
         raise EmbeddingUnavailableError("OpenAI SDK missing or OPENAI_API_KEY empty.")
-    resp = await client.embeddings.create(model=model, input=list(texts))
+    kwargs = {"model": model, "input": list(texts)}
+    # The DB schema is vector(768). OpenAI's v3 embedding models support
+    # dimensionality reduction, which keeps Gemini-primary fallback writes
+    # compatible with the same pgvector column.
+    if model.startswith("text-embedding-3-"):
+        kwargs["dimensions"] = 768
+    resp = await client.embeddings.create(**kwargs)
     # OpenAI returns results in the same order as the input batch.
     return [list(item.embedding) for item in resp.data]
 
@@ -224,14 +318,14 @@ async def embed_texts(
     unique, inverse = _dedupe(texts)
 
     primary = (settings.AI_EMBEDDING_PROVIDER or "gemini").lower()
-    primary_model = settings.AI_EMBEDDING_MODEL or "text-embedding-004"
+    primary_model = settings.AI_EMBEDDING_MODEL or "gemini-embedding-001"
     fallback_enabled = bool(settings.AI_PROVIDER_FALLBACK_ENABLED)
     timeout = max(1.0, float(settings.AI_EMBEDDING_TIMEOUT_SECONDS))
 
     order = [
         (primary, primary_model),
         *(
-            [("openai", "text-embedding-3-small") if primary != "openai" else ("gemini", "text-embedding-004")]
+            [("openai", "text-embedding-3-small") if primary != "openai" else ("gemini", "gemini-embedding-001")]
             if fallback_enabled
             else []
         ),

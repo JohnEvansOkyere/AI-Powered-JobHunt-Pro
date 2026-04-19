@@ -138,7 +138,7 @@ class Settings(BaseSettings):
         description="Provider for embeddings: 'gemini' (default, free), 'openai'.",
     )
     AI_EMBEDDING_MODEL: str = Field(
-        default="text-embedding-004",
+        default="gemini-embedding-001",
         description="Embedding model name. Must match job_embeddings.model at match time.",
     )
     AI_RERANK_PROVIDER: str = Field(
@@ -146,7 +146,7 @@ class Settings(BaseSettings):
         description="Provider for top-K LLM reranker: 'gemini' (default, free), 'groq', 'openai'.",
     )
     AI_RERANK_MODEL: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-2.5-flash",
         description="Rerank model name.",
     )
     AI_PROVIDER_FALLBACK_ENABLED: bool = Field(
@@ -158,7 +158,7 @@ class Settings(BaseSettings):
         description="Hard timeout for a single embedding request before fallback kicks in.",
     )
     AI_RERANK_TIMEOUT_SECONDS: float = Field(
-        default=15.0,
+        default=45.0,
         description="Hard timeout for a single rerank request before fallback kicks in.",
     )
 

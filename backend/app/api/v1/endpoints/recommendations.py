@@ -12,12 +12,13 @@ See docs/RECOMMENDATIONS_V2_PLAN.md §5.7.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_current_user
@@ -71,6 +72,10 @@ class RecommendationItem(BaseModel):
     llm_rerank_score: Optional[float] = None
     expires_at: datetime
     job: Optional[JobSnippet] = None
+    catalog_only: bool = Field(
+        default=False,
+        description="True when this row is a Tier-3 browse listing, not a scored recommendation row.",
+    )
 
 
 class RecommendationsResponse(BaseModel):
@@ -82,20 +87,122 @@ class RecommendationsResponse(BaseModel):
     tier: Optional[str] = None
 
 
+# ---- Tier-3 catalogue (recent jobs, excluding tier1/tier2 picks) -------
+
+
+def _job_to_snippet(job: Job) -> JobSnippet:
+    return JobSnippet(
+        id=str(job.id),
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        remote_type=job.remote_type,
+        job_type=job.job_type,
+        source=job.source,
+        job_link=job.job_link,
+        source_url=job.source_url,
+        posted_date=job.posted_date,
+        scraped_at=job.scraped_at,
+    )
+
+
+def _tier3_catalog_response(
+    db: Session,
+    user_id: str,
+    now: datetime,
+    page: int,
+    page_size: int,
+    background_tasks: BackgroundTasks,
+) -> RecommendationsResponse:
+    """Tier 3 lists all visible non-archived jobs, including top picks."""
+    from app.services.recommendation_engine_v2 import (
+        RECENT_JOB_WINDOW_DAYS,
+        RECOMMENDATION_TTL_HOURS,
+    )
+
+    cutoff = now - timedelta(days=RECENT_JOB_WINDOW_DAYS)
+    try:
+        user_uuid: Optional[uuid.UUID] = uuid.UUID(str(user_id))
+    except ValueError:
+        user_uuid = None
+
+    non_external_recent = and_(
+        Job.source != "external",
+        or_(Job.scraped_at > cutoff, Job.posted_date > cutoff),
+    )
+    if user_uuid is not None:
+        own_external = and_(Job.source == "external", Job.added_by_user_id == user_uuid)
+        visibility = or_(non_external_recent, own_external)
+    else:
+        visibility = non_external_recent
+
+    q = db.query(Job).filter(
+        Job.processing_status != "archived",
+        visibility,
+    )
+
+    total = q.count()
+    if total == 0:
+        background_tasks.add_task(_bg_run, user_id)
+
+    offset = (page - 1) * page_size
+    jobs = (
+        q.order_by(desc(Job.scraped_at), desc(Job.posted_date))
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    expires_at = now + timedelta(hours=RECOMMENDATION_TTL_HOURS)
+    items: List[RecommendationItem] = []
+    for job in jobs:
+        items.append(
+            RecommendationItem(
+                id=f"catalog-{job.id}",
+                job_id=str(job.id),
+                tier="tier3",
+                match_score=0.0,
+                match_reason=None,
+                semantic_fit=None,
+                title_alignment=None,
+                skill_overlap=None,
+                freshness=None,
+                llm_rerank_score=None,
+                expires_at=expires_at,
+                job=_job_to_snippet(job),
+                catalog_only=True,
+            )
+        )
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return RecommendationsResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        tier="tier3",
+    )
+
+
 # ---- Endpoints ---------------------------------------------------------
 
 
 @router.get("", response_model=RecommendationsResponse)
 async def get_recommendations(
+    background_tasks: BackgroundTasks,
     tier: Optional[str] = Query(
         None,
-        description="Filter by tier: 'tier1', 'tier2', or 'tier3'. Omit for all tiers.",
+        description=(
+            "Filter by tier: 'tier1' or 'tier2' from stored recommendations; "
+            "'tier3' returns a paginated catalogue of all visible jobs. "
+            "Omit for all stored tiers."
+        ),
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Return pre-computed tiered recommendations for the authenticated user."""
     if tier and tier not in VALID_TIERS:
@@ -106,6 +213,9 @@ async def get_recommendations(
 
     user_id = current_user["id"]
     now = datetime.now(timezone.utc)
+
+    if tier == "tier3":
+        return _tier3_catalog_response(db, user_id, now, page, page_size, background_tasks)
 
     q = db.query(JobRecommendation).filter(
         JobRecommendation.user_id == user_id,
@@ -134,19 +244,7 @@ async def get_recommendations(
         job = job_map.get(str(rec.job_id))
         snippet: Optional[JobSnippet] = None
         if job:
-            snippet = JobSnippet(
-                id=str(job.id),
-                title=job.title,
-                company=job.company,
-                location=job.location,
-                remote_type=job.remote_type,
-                job_type=job.job_type,
-                source=job.source,
-                job_link=job.job_link,
-                source_url=job.source_url,
-                posted_date=job.posted_date,
-                scraped_at=job.scraped_at,
-            )
+            snippet = _job_to_snippet(job)
         items.append(
             RecommendationItem(
                 id=str(rec.id),
@@ -161,6 +259,7 @@ async def get_recommendations(
                 llm_rerank_score=rec.llm_rerank_score,
                 expires_at=rec.expires_at,
                 job=snippet,
+                catalog_only=False,
             )
         )
 
@@ -177,9 +276,9 @@ async def get_recommendations(
 
 @router.post("/regenerate", status_code=status.HTTP_202_ACCEPTED)
 async def regenerate_recommendations(
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Trigger an on-demand recommendation run for the current user.
 
@@ -190,8 +289,6 @@ async def regenerate_recommendations(
     user_id = current_user["id"]
     # Check if we have fresh enough results to skip early.
     # "Fresh" = at least one non-expired recommendation from the last hour.
-    from datetime import timedelta
-
     recent_cutoff = datetime.now(timezone.utc) - timedelta(seconds=REGENERATE_COOLDOWN_SECONDS)
     exists = (
         db.query(JobRecommendation)

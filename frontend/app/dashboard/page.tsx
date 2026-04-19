@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import { Briefcase, FileText, User, ArrowRight, Target, Star } from 'lucide-react'
 import { getApplicationsStats } from '@/lib/api/applications'
-import { getRecommendations } from '@/lib/api/jobs'
+import { fetchRecommendations } from '@/lib/api/recommendations'
 
 interface Stats {
   applicationsTotal: number
@@ -37,7 +37,7 @@ export default function DashboardPage() {
       try {
         const [appStats, recs] = await Promise.all([
           getApplicationsStats(),
-          getRecommendations(1, 1),
+          fetchRecommendations(undefined, 1, 1),
         ])
         setStats({
           applicationsTotal: appStats.applications_total,

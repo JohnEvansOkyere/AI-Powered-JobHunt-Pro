@@ -28,20 +28,23 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-# Hard limits from the plan.
-MAX_CANDIDATES = 50
-DESCRIPTION_CHAR_BUDGET = 400
+# Hard limits for a single rerank call. Keep this prompt compact enough that
+# Gemini returns complete JSON instead of a truncated array.
+MAX_CANDIDATES = 30
+MAX_RERANK_RESULTS = 15
+DESCRIPTION_CHAR_BUDGET = 240
 REASON_WORD_BUDGET = 20
 SCORE_MIN, SCORE_MAX = 0, 100
-MIN_ITEMS_FOR_VALID_RESPONSE = 30  # below this we reject and fall back
+MIN_ITEMS_FOR_VALID_RESPONSE = 1  # below this we reject and fall back
 
 
 SYSTEM_PROMPT = (
     "You are scoring job fit for a candidate. You will receive the "
-    "candidate's target titles, top skills, and up to 50 candidate jobs "
-    "(title + short description + company). Return a STRICT JSON array of "
-    '{"job_id": "...", "score": 0-100, "reason": "..."} ordered by score '
-    "desc. Use 85+ only for roles that clearly match the candidate's "
+    "candidate's target titles, top skills, and up to 30 candidate jobs "
+    "(title + short description + company). Return a STRICT JSON array for "
+    f"the best {MAX_RERANK_RESULTS} jobs only, ordered by score desc. Each "
+    'item must be {"job_id": "...", "score": 0-100, "reason": "..."}. '
+    "Omit poor matches. Use 85+ only for roles that clearly match the candidate's "
     "target title AND use at least one of their top skills. Use 60-84 for "
     "adjacent roles. Use <60 for everything else. Never invent facts. "
     f"Each reason MUST be <= {REASON_WORD_BUDGET} words. Output ONLY the "
@@ -111,11 +114,49 @@ def _build_prompt(
     lines.extend(
         [
             "",
-            "Respond with STRICT JSON only:",
+            f"Respond with STRICT JSON only for the best {MAX_RERANK_RESULTS} jobs:",
             '[{"job_id":"...","score":0-100,"reason":"..."}]',
         ]
     )
     return "\n".join(lines)
+
+
+def _extract_complete_json_objects(text: str) -> list:
+    """Recover complete JSON objects from a possibly truncated array."""
+    objects: list = []
+    start: Optional[int] = None
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for idx, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = idx
+            depth += 1
+        elif ch == "}":
+            if depth == 0:
+                continue
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    objects.append(json.loads(text[start : idx + 1]))
+                except json.JSONDecodeError:
+                    pass
+                start = None
+
+    return objects
 
 
 def _extract_json_array(raw: str) -> Optional[list]:
@@ -133,17 +174,19 @@ def _extract_json_array(raw: str) -> Optional[list]:
     fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.DOTALL | re.IGNORECASE)
     if fence:
         text = fence.group(1).strip()
-    # Find the first '[' through the last ']' — safest way to ignore
-    # stray "Sure, here you go:" preambles if the model emitted any.
+    # Find the first '[' through the last ']'. If the model returns a
+    # truncated array, recover complete leading objects below.
     start = text.find("[")
     end = text.rfind("]")
-    if start == -1 or end == -1 or end <= start:
+    if start == -1:
         return None
-    blob = text[start : end + 1]
+    blob = text[start : end + 1] if end > start else text[start:]
     try:
         parsed = json.loads(blob)
     except json.JSONDecodeError:
-        return None
+        parsed = _extract_complete_json_objects(blob)
+        if not parsed:
+            return None
     if not isinstance(parsed, list):
         return None
     return parsed
@@ -230,7 +273,7 @@ async def rerank_candidates(
                 user_id=user_id,
                 # Deterministic scoring beats creative scoring here.
                 temperature=0.2,
-                max_tokens=4096,
+                max_tokens=2048,
             ),
             timeout=timeout,
         )

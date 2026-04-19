@@ -84,7 +84,8 @@ const TIER_CONFIG: {
     icon: List,
     iconColor: 'text-neutral-500',
     dotColor: 'bg-neutral-400',
-    description: 'Everything in your target area, sorted by freshness.',
+    description:
+      'All visible roles in your current pool, including your top picks.',
   },
 ]
 
@@ -147,7 +148,7 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 mb-2">
-            <MatchBadge score={item.match_score} tier={tier} />
+            {!item.catalog_only && <MatchBadge score={item.match_score} tier={tier} />}
             {job?.source === 'recruiter' && (
               <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-1.5 py-0.5 font-medium">
                 <BadgeCheck className="w-3 h-3" />
@@ -267,16 +268,19 @@ function EmptyTier1() {
 
 function EmptyGeneric({ tier }: { tier: Tier }) {
   const cfg = TIER_CONFIG.find((t) => t.id === tier)!
+  const isTier3 = tier === 'tier3'
   return (
     <div className="bg-white rounded-xl border border-dashed border-neutral-200 py-10 px-4 text-center">
       <div className="w-10 h-10 bg-neutral-50 rounded-lg flex items-center justify-center mx-auto mb-3">
         <cfg.icon className="w-5 h-5 text-neutral-400" />
       </div>
       <h3 className="text-sm font-semibold text-neutral-900 mb-1">
-        No {cfg.label.toLowerCase()} yet
+        {isTier3 ? 'No visible roles yet' : `No ${cfg.label.toLowerCase()} yet`}
       </h3>
       <p className="text-xs text-neutral-500 max-w-xs mx-auto leading-relaxed">
-        Matching runs every 12 hours. Come back later or tap Refresh.
+        {isTier3
+          ? 'This column shows all currently visible roles in your pool. Try Browse jobs or add/import more roles.'
+          : 'Matching runs every 12 hours. Come back later or tap Refresh.'}
       </p>
     </div>
   )

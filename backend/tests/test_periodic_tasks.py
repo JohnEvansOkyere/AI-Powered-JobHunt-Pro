@@ -15,7 +15,7 @@ from app.tasks.celery_app import celery_app
 
 EXPECTED_BEAT_ENTRIES = {
     "scrape-recent-jobs-every-3-days": "scheduler.scrape_recent_jobs",
-    "generate-recommendations-every-2-days": "scheduler.generate_recommendations_for_all",
+    "generate-recommendations-every-12-hours": "scheduler.generate_recommendations_for_all",
     "backfill-empty-users-hourly": "scheduler.generate_recommendations_for_empty_users",
     "cleanup-expired-saved-jobs-daily": "scheduler.cleanup_expired_saved_jobs",
     "cleanup-expired-recommendations-daily": "scheduler.cleanup_expired_recommendations",

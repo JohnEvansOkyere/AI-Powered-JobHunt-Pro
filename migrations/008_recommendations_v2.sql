@@ -7,7 +7,7 @@
 --   3. Extends `job_recommendations` with tiering + sub-score columns + user_id FK.
 --
 -- Dimension note:
---   Vectors are sized for Gemini `text-embedding-004` (768 dims). If you flip
+--   Vectors are sized for Gemini `gemini-embedding-001` with outputDimensionality=768. If you flip
 --   AI_EMBEDDING_PROVIDER=openai you MUST re-embed; see §3.1 of the plan. Rows
 --   produced by a different model stay in-place but are ignored at read time
 --   because queries join on `model`.
@@ -42,13 +42,14 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS job_embeddings (
     job_id       UUID        PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
     embedding    vector(768) NOT NULL,
-    model        TEXT        NOT NULL DEFAULT 'text-embedding-004',
+    model        TEXT        NOT NULL DEFAULT 'gemini-embedding-001',
     source_hash  TEXT        NOT NULL,
     embedded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE job_embeddings ALTER COLUMN model SET DEFAULT 'gemini-embedding-001';
 
 COMMENT ON TABLE  job_embeddings             IS 'Cached job embeddings. Queries MUST filter by `model` (see RECOMMENDATIONS_V2_PLAN §3.1).';
-COMMENT ON COLUMN job_embeddings.embedding   IS 'Vector. Dim = 768 for Gemini text-embedding-004.';
+COMMENT ON COLUMN job_embeddings.embedding   IS 'Vector. Dim = 768 for Gemini gemini-embedding-001 with outputDimensionality.';
 COMMENT ON COLUMN job_embeddings.model       IS 'Producing model, source of truth for vector dimensionality/provider.';
 COMMENT ON COLUMN job_embeddings.source_hash IS 'Stable hash of the text we embedded; short-circuits re-embedding when unchanged.';
 
@@ -71,10 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_job_embeddings_model
 CREATE TABLE IF NOT EXISTS user_embeddings (
     user_id      UUID        PRIMARY KEY,
     embedding    vector(768) NOT NULL,
-    model        TEXT        NOT NULL DEFAULT 'text-embedding-004',
+    model        TEXT        NOT NULL DEFAULT 'gemini-embedding-001',
     source_hash  TEXT        NOT NULL,
     embedded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE user_embeddings ALTER COLUMN model SET DEFAULT 'gemini-embedding-001';
 
 COMMENT ON TABLE  user_embeddings           IS 'Cached user-intent embeddings. Refreshed on profile/CV change.';
 COMMENT ON COLUMN user_embeddings.model     IS 'Must match job_embeddings.model at match time.';
@@ -154,14 +156,14 @@ COMMIT;
 -- CREATE TABLE IF NOT EXISTS job_embeddings (
 --     job_id       UUID        PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
 --     embedding    DOUBLE PRECISION[] NOT NULL,
---     model        TEXT        NOT NULL DEFAULT 'text-embedding-004',
+--     model        TEXT        NOT NULL DEFAULT 'gemini-embedding-001',
 --     source_hash  TEXT        NOT NULL,
 --     embedded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 -- );
 -- CREATE TABLE IF NOT EXISTS user_embeddings (
 --     user_id      UUID        PRIMARY KEY,
 --     embedding    DOUBLE PRECISION[] NOT NULL,
---     model        TEXT        NOT NULL DEFAULT 'text-embedding-004',
+--     model        TEXT        NOT NULL DEFAULT 'gemini-embedding-001',
 --     source_hash  TEXT        NOT NULL,
 --     embedded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 -- );

@@ -86,7 +86,7 @@ class TestAssignTier:
     def test_tier1_requires_title_or_skill(self):
         from app.services.recommendation_engine_v2 import assign_tier
 
-        # Neither title_alignment ≥ 0.6 nor skill_overlap ≥ 0.3 → not tier1
+        # Neither strong rule evidence nor weak reranked title evidence → not tier1
         tier = assign_tier(
             semantic_fit=0.80,
             title_alignment=0.40,
@@ -95,6 +95,30 @@ class TestAssignTier:
             llm_rerank_score=90.0,
         )
         assert tier != "tier1"
+
+    def test_tier1_allows_high_rerank_with_semantic_title_signal(self):
+        from app.services.recommendation_engine_v2 import assign_tier
+
+        tier = assign_tier(
+            semantic_fit=0.76,
+            title_alignment=0.45,
+            skill_overlap=0.07,
+            freshness=0.90,
+            llm_rerank_score=95.0,
+        )
+        assert tier == "tier1"
+
+    def test_tier1_allows_strong_semantic_title_without_rerank(self):
+        from app.services.recommendation_engine_v2 import assign_tier
+
+        tier = assign_tier(
+            semantic_fit=0.76,
+            title_alignment=0.85,
+            skill_overlap=0.07,
+            freshness=0.90,
+            llm_rerank_score=None,
+        )
+        assert tier == "tier1"
 
     def test_tier1_skill_overlap_saves_it(self):
         from app.services.recommendation_engine_v2 import assign_tier
@@ -204,8 +228,32 @@ class TestFreshnessScore:
         )
         assert freshness_score(job) == 1.0
 
+    def test_own_external_job_is_active_intent(self):
+        from app.services.recommendation_engine_v2 import freshness_score
+
+        user_id = "d1be0de9-4491-485c-b898-85fef80a348f"
+        job = make_job(
+            source="external",
+            scraped_at=datetime.now(timezone.utc) - timedelta(days=90),
+        )
+        job.added_by_user_id = user_id
+        assert freshness_score(job, user_id=user_id) == 1.0
+
 
 class TestTitleAlignment:
+    def test_split_pipe_delimited_target_titles(self):
+        from app.services.recommendation_engine_v2 import split_target_titles
+
+        titles = split_target_titles(
+            "Data Scientist | AI/ML Engineer | Machine Learning Engineer | AI Engineer"
+        )
+        assert titles == [
+            "Data Scientist",
+            "AI/ML Engineer",
+            "Machine Learning Engineer",
+            "AI Engineer",
+        ]
+
     def test_exact_match(self):
         from app.services.recommendation_engine_v2 import title_alignment_score
 
@@ -236,6 +284,48 @@ class TestTitleAlignment:
             primary="Data Scientist",
         )
         assert score >= 0.6
+
+    def test_ml_scientist_matches_ml_engineer_family(self):
+        from app.services.recommendation_engine_v2 import title_alignment_score
+
+        job = make_job(
+            title="Machine Learning Scientist",
+            normalized_title="Machine Learning Scientist",
+        )
+        score = title_alignment_score(
+            job,
+            ["Data Scientist", "AI/ML Engineer", "Machine Learning Engineer"],
+            primary="Data Scientist",
+        )
+        assert score >= 0.8
+
+    @pytest.mark.parametrize(
+        ("target", "job_title"),
+        [
+            ("DevOps Engineer", "Cloud Platform Engineer"),
+            ("Frontend Developer", "React UI Engineer"),
+            ("Backend Engineer", "Python API Engineer"),
+            ("Data Engineer", "Analytics Engineer"),
+            ("Security Engineer", "Application Security Engineer"),
+            ("Mobile Developer", "iOS Engineer"),
+            ("QA Automation Engineer", "SDET"),
+            ("Product Manager", "Technical Product Manager"),
+            ("UX Designer", "Product Designer"),
+        ],
+    )
+    def test_common_role_families_match(self, target, job_title):
+        from app.services.recommendation_engine_v2 import title_alignment_score
+
+        job = make_job(title=job_title, normalized_title=job_title)
+        score = title_alignment_score(job, [target], primary=target)
+        assert score >= 0.6
+
+    def test_unrelated_role_families_do_not_match_on_generic_engineer(self):
+        from app.services.recommendation_engine_v2 import title_alignment_score
+
+        job = make_job(title="Security Engineer", normalized_title="Security Engineer")
+        score = title_alignment_score(job, ["Machine Learning Engineer"], primary="Machine Learning Engineer")
+        assert score < 0.6
 
 
 class TestSkillOverlap:
@@ -448,6 +538,15 @@ def test_channel_bonus_external():
 
     job = make_job(source="external")
     assert channel_bonus_score(job) == 0.0
+
+
+def test_channel_bonus_own_external():
+    from app.services.recommendation_engine_v2 import channel_bonus_score
+
+    user_id = "d1be0de9-4491-485c-b898-85fef80a348f"
+    job = make_job(source="external")
+    job.added_by_user_id = user_id
+    assert channel_bonus_score(job, user_id=user_id) == 0.6
 
 
 def test_channel_bonus_scraped():

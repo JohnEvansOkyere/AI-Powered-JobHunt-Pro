@@ -1,9 +1,9 @@
 """
 Application Model
 
-Tracks a candidate's relationship with a job: saved, applied (externally),
-interviewing, offer, dismissed, hidden. CV tailoring / cover letter
-generation were removed in v2 (see docs/RECOMMENDATIONS_V2_PLAN.md).
+ Tracks a candidate's relationship with a job: saved, applied externally,
+interviewing, offer, dismissed, hidden. CV tailoring was removed in v2
+(see docs/RECOMMENDATIONS_V2_PLAN.md).
 """
 
 import uuid

@@ -35,7 +35,7 @@ Defined in `backend/app/tasks/celery_app.py` as `celery_app.conf.beat_schedule`:
 | Name | Task | Cron (UTC) |
 |---|---|---|
 | `scrape-recent-jobs-every-3-days` | `scheduler.scrape_recent_jobs` | Every 3rd day at 06:00 |
-| `generate-recommendations-every-2-days` | `scheduler.generate_recommendations_for_all` | Every 2nd day at 07:00 |
+| `generate-recommendations-every-12-hours` | `scheduler.generate_recommendations_for_all` | Every 12 hours |
 | `backfill-empty-users-hourly` | `scheduler.generate_recommendations_for_empty_users` | Every hour at :15 |
 | `cleanup-expired-saved-jobs-daily` | `scheduler.cleanup_expired_saved_jobs` | 00:00 |
 | `cleanup-expired-recommendations-daily` | `scheduler.cleanup_expired_recommendations` | 00:05 |

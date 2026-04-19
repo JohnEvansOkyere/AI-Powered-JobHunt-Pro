@@ -100,7 +100,7 @@ class ModelRouter:
             try:
                 self.providers["gemini"] = GeminiProvider(
                     api_key=settings.GEMINI_API_KEY,
-                    model_name="gemini-pro"
+                    model_name=settings.AI_RERANK_MODEL
                 )
                 logger.info("Gemini provider initialized")
             except Exception as e:
@@ -412,4 +412,3 @@ def get_model_router() -> ModelRouter:
 
 # For backward compatibility
 model_router = get_model_router()
-

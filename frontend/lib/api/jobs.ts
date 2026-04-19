@@ -156,7 +156,7 @@ export async function listScrapingJobs(status?: string): Promise<ScrapingJob[]> 
 /**
  * Get pre-computed job recommendations for the current user
  *
- * Returns recommendations generated daily by background scheduler.
+ * Deprecated compatibility client. Prefer frontend/lib/api/recommendations.ts.
  * Much faster than on-demand matching.
  */
 export async function getRecommendations(
@@ -178,4 +178,3 @@ export async function getRecommendations(
 export async function deleteJob(jobId: string): Promise<void> {
   return apiClient.delete(`/api/v1/jobs/${jobId}`) as Promise<void>
 }
-

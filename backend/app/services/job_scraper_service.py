@@ -24,6 +24,20 @@ from app.core.config import settings
 logger = get_logger(__name__)
 
 
+def _queue_job_embedding_refresh(job_id: str) -> None:
+    """Best-effort refresh of the Recommendations V2 job embedding."""
+    try:
+        from app.tasks.embeddings import embed_job_task
+
+        embed_job_task.delay(str(job_id))
+    except Exception as exc:  # pragma: no cover - queue availability varies by env
+        logger.warning(
+            "Failed to queue job embedding refresh",
+            job_id=str(job_id),
+            error=str(exc),
+        )
+
+
 class JobScraperService:
     """
     Service for scraping and managing jobs from multiple sources.
@@ -317,6 +331,7 @@ class JobScraperService:
             int: Number of jobs stored
         """
         stored_count = 0
+        stored_jobs: List[Job] = []
         
         for idx, job_listing in enumerate(jobs):
             try:
@@ -343,6 +358,7 @@ class JobScraperService:
                 )
                 
                 db.add(job)
+                stored_jobs.append(job)
                 stored_count += 1
                 
                 # Commit in batches for performance
@@ -359,6 +375,10 @@ class JobScraperService:
         
         # Final commit
         db.commit()
+
+        for job in stored_jobs:
+            if job.id:
+                _queue_job_embedding_refresh(str(job.id))
         
         return stored_count
     
@@ -370,4 +390,3 @@ class JobScraperService:
             List[str]: List of source names
         """
         return list(self.scrapers.keys())
-

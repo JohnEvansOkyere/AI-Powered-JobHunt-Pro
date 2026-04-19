@@ -27,6 +27,20 @@ router = APIRouter()
 cv_parser = CVParser()
 
 
+def _queue_user_embedding_refresh(user_id: uuid.UUID) -> None:
+    """Best-effort refresh of the Recommendations V2 user embedding."""
+    try:
+        from app.tasks.embeddings import embed_user_task
+
+        embed_user_task.delay(str(user_id))
+    except Exception as exc:  # pragma: no cover - queue availability varies by env
+        logger.warning(
+            "Failed to queue user embedding refresh",
+            user_id=str(user_id),
+            error=str(exc),
+        )
+
+
 # Pydantic models for request/response
 class CVResponse(BaseModel):
     """CV response model."""
@@ -247,6 +261,7 @@ async def upload_cv(
             db.refresh(cv)
             
             logger.info(f"CV parsing completed for CV {cv.id}")
+            _queue_user_embedding_refresh(user_id)
         except Exception as parse_error:
             logger.error(f"CV parsing failed for CV {cv.id}: {parse_error}")
             cv.parsing_status = "failed"
@@ -357,6 +372,7 @@ def activate_cv(
     cv.is_active = True
     db.commit()
     db.refresh(cv)
+    _queue_user_embedding_refresh(user_id)
     
     return CVResponse.from_orm(cv)
 
@@ -394,6 +410,7 @@ def delete_cv(
     # Delete from database
     db.delete(cv)
     db.commit()
+    _queue_user_embedding_refresh(user_id)
     
     return None
 
@@ -462,4 +479,3 @@ def get_download_url(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate download URL: {str(e)}"
         )
-

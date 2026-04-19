@@ -58,7 +58,7 @@ def create_application() -> FastAPI:
     """
     app = FastAPI(
         title="AI Job Application Platform API",
-        description="Production-ready API for AI-powered job matching and application generation",
+        description="Production-ready API for AI-powered job recommendations and tracking",
         version="1.0.0",
         docs_url="/api/docs" if settings.DEBUG else None,
         redoc_url="/api/redoc" if settings.DEBUG else None,
@@ -130,4 +130,3 @@ def create_application() -> FastAPI:
 
 # Create application instance
 app = create_application()
-

@@ -23,6 +23,7 @@ pydantic-settings>=2.3.0
 # AI Models (Core)
 openai>=1.3.0
 google-generativeai>=0.3.0
+setuptools>=70.0.0  # Provides distutils shim needed by google-generativeai on Python 3.12+
 groq>=0.3.0
 tiktoken>=0.7.0
 numpy>=1.24.0

@@ -68,23 +68,24 @@ Task-to-provider mapping (primary → fallback):
 
 | Task | Primary (free) | Fallback (paid) | Notes |
 |---|---|---|---|
-| Embedding (jobs, users, interest centroids) | **Gemini `text-embedding-004`** — 768-dim, 1,500 RPM free | OpenAI `text-embedding-3-small` | One provider per corpus at a time (rows are model-tagged in `job_embeddings.model`); switching providers = re-embed. |
-| LLM reranker (top-50 per user) | **Gemini 1.5 Flash** (free tier generous) or **Groq Llama 3.1 70B** | OpenAI `gpt-4o-mini` | Strict JSON schema; malformed output falls back to `semantic_fit` ordering. |
+| Embedding (jobs, users, interest centroids) | **Gemini `gemini-embedding-001`** — 768-dim output | OpenAI `text-embedding-3-small` | One provider per corpus at a time (rows are model-tagged in `job_embeddings.model`); switching providers = re-embed. |
+| LLM reranker (top-50 per user) | **Gemini 2.5 Flash** (free tier generous) or **Groq Llama 3.1 70B** | OpenAI `gpt-4o-mini` | Strict JSON schema; malformed output falls back to `semantic_fit` ordering. |
 | External job URL parse / text extraction (existing) | **Gemini 1.5 Flash** | OpenAI `gpt-4o-mini` | Already routed; no change required beyond defaults. |
 
 Environment flags (add to `.env.example`):
 
 ```
 AI_EMBEDDING_PROVIDER=gemini          # gemini | openai
-AI_EMBEDDING_MODEL=text-embedding-004 # gemini default
+AI_EMBEDDING_MODEL=gemini-embedding-001 # gemini default
 AI_RERANK_PROVIDER=gemini             # gemini | groq | openai
-AI_RERANK_MODEL=gemini-1.5-flash
+AI_RERANK_MODEL=gemini-2.5-flash
 AI_PROVIDER_FALLBACK_ENABLED=true
+AI_RERANK_TIMEOUT_SECONDS=45.0
 ```
 
 Router behavior:
 
-- Primary provider is called with a hard timeout (embedding: 5s; rerank: 15s).
+- Primary provider is called with a hard timeout (embedding: 5s; rerank: 45s).
 - On timeout, 429, 5xx, or quota-exceeded error: fall back once to the paid provider if `AI_PROVIDER_FALLBACK_ENABLED=true`.
 - Per-task counter logged (`cache_hit`, `primary_success`, `fallback_success`, `both_failed`). After two weeks we can decide whether to retire the paid fallback entirely.
 
@@ -145,8 +146,8 @@ Additive migration `migrations/008_recommendations_v2.sql`:
 
 - New table `job_embeddings`:
   - `job_id` UUID PK FK → jobs(id) ON DELETE CASCADE.
-  - `embedding` `vector(768)` (pgvector, sized for Gemini `text-embedding-004`) or `float8[]` fallback. Widen to `vector(1536)` if you flip the primary provider to OpenAI.
-  - `model` TEXT NOT NULL (default `text-embedding-004`; see §3.1). Queries MUST filter by `model`.
+  - `embedding` `vector(768)` (pgvector, sized for Gemini `gemini-embedding-001` with output dimensionality set to 768) or `float8[]` fallback. Widen to `vector(1536)` if you flip the primary provider to OpenAI without dimensionality reduction.
+  - `model` TEXT NOT NULL (default `gemini-embedding-001`; see §3.1). Queries MUST filter by `model`.
   - `source_hash` TEXT NOT NULL (hash of the text we embedded; allows cheap "did this change" checks).
   - `embedded_at` TIMESTAMPTZ NOT NULL DEFAULT NOW().
   - Index: `CREATE INDEX ON job_embeddings USING hnsw (embedding vector_cosine_ops)` if pgvector is enabled.
@@ -179,7 +180,7 @@ All scores 0.0–1.0 unless noted.
   - older: 0.1
 - `channel_bonus` — 1.0 for `source='recruiter'` approved and verified, 0.8 other scraped sources, 0.0 expired or `external`.
 - `interest_affinity` — cosine to centroid of the user's last 10 saved/applied jobs' embeddings. If the user has <3 interest signals, set to NULL and ignore.
-- `llm_rerank_score` — 0–100, from a single `gemini-1.5-flash` call (primary; see §3.1) over the top 50 candidates, with `gpt-4o-mini` as fallback (see §5.4).
+- `llm_rerank_score` — 0–100, from a single `gemini-2.5-flash` call (primary; see §3.1) over the top 50 candidates, with `gpt-4o-mini` as fallback (see §5.4).
 
 Composite only for ordering within Tier 2 and Tier 3; **tiering itself is rule-based, not a single weighted score** (see §5.3).
 

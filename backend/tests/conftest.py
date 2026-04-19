@@ -267,8 +267,6 @@ def mock_ai_router(mock_ai_response, monkeypatch):
             """Return mock AI response based on task type."""
             if "cv_parsing" in task_type.value.lower() or "parse" in prompt.lower():
                 return json.dumps(mock_ai_response)
-            elif "cover_letter" in task_type.value.lower():
-                return "Dear Hiring Manager,\n\nMock cover letter content..."
             elif "email" in task_type.value.lower():
                 return "Subject: Application for Position\n\nMock email content..."
             else:

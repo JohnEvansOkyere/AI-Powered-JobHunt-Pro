@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from sqlalchemy import and_, delete, text
+from sqlalchemy import and_, delete, or_, text
 from sqlalchemy.orm import Session
 
 from app.ai.embeddings import EmbeddingUnavailableError
@@ -53,16 +53,21 @@ logger = get_logger(__name__)
 # ---- Constants -----------------------------------------------------------
 
 CANDIDATE_POOL_SIZE = 200
-RERANK_TOP_K = 50
+RERANK_TOP_K = 30
 TIER1_CAP = 10
 TIER2_CAP = 30
 RECOMMENDATION_TTL_HOURS = 72  # 3 days
+RECENT_JOB_WINDOW_DAYS = 14
 
 # Tier thresholds (plan §5.3)
 TIER1_RERANK_FLOOR = 85.0
 TIER1_FRESHNESS_FLOOR = 0.8
 TIER1_TITLE_FLOOR = 0.6
 TIER1_SKILL_FLOOR = 0.3
+TIER1_SEMANTIC_TITLE_FLOOR = 0.74
+TIER1_STRONG_TITLE_FLOOR = 0.8
+TIER1_RERANK_SEMANTIC_FLOOR = 0.70
+TIER1_RERANK_WEAK_TITLE_FLOOR = 0.45
 TIER2_RERANK_FLOOR = 60.0
 TIER2_SEMANTIC_FLOOR = 0.55
 
@@ -70,8 +75,23 @@ TIER2_SEMANTIC_FLOOR = 0.55
 # ---- Score helpers -------------------------------------------------------
 
 
-def freshness_score(job: Job) -> float:
+def _same_uuid(left: Any, right: Any) -> bool:
+    if left is None or right is None:
+        return False
+    try:
+        return uuid.UUID(str(left)) == uuid.UUID(str(right))
+    except (TypeError, ValueError):
+        return False
+
+
+def freshness_score(job: Job, *, user_id: Optional[str] = None) -> float:
     """Piecewise freshness decay on posted_date (fallback: scraped_at)."""
+    if (job.source or "").lower() == "external" and _same_uuid(
+        getattr(job, "added_by_user_id", None), user_id
+    ):
+        # Candidate-added jobs are active intent signals. Their scraped_at is
+        # import time, not a reliable proxy for whether the role is still open.
+        return 1.0
     ref: Optional[datetime] = job.posted_date or job.scraped_at
     if ref is None:
         return 0.1
@@ -89,14 +109,226 @@ def freshness_score(job: Job) -> float:
     return 0.1
 
 
-def channel_bonus_score(job: Job) -> float:
+def channel_bonus_score(job: Job, *, user_id: Optional[str] = None) -> float:
     """Source-channel quality bonus."""
     source = (job.source or "").lower()
     if source == "recruiter":
         return 1.0
     if source == "external":
+        if _same_uuid(getattr(job, "added_by_user_id", None), user_id):
+            return 0.6
         return 0.0
     return 0.8
+
+
+_TITLE_DELIMITER_RE = re.compile(r"\s*(?:\||,|;|\bor\b)\s*", re.IGNORECASE)
+_TITLE_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_GENERIC_TITLE_TOKENS = {
+    "senior",
+    "junior",
+    "jr",
+    "sr",
+    "lead",
+    "principal",
+    "staff",
+    "manager",
+    "engineer",
+    "developer",
+    "specialist",
+    "consultant",
+    "associate",
+}
+_ROLE_FAMILY_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "ai_ml": (
+        "ai engineer",
+        "artificial intelligence",
+        "machine learning",
+        "ml engineer",
+        "ml scientist",
+        "deep learning",
+        "nlp",
+        "llm",
+        "computer vision",
+        "prompt engineer",
+    ),
+    "data_science": (
+        "data scientist",
+        "data science",
+        "research scientist",
+        "statistician",
+        "statistical",
+        "quantitative analyst",
+        "analytics scientist",
+    ),
+    "data_engineering": (
+        "data engineer",
+        "etl",
+        "elt",
+        "data pipeline",
+        "data platform",
+        "analytics engineer",
+        "warehouse",
+        "spark",
+        "dbt",
+    ),
+    "analytics_bi": (
+        "data analyst",
+        "business analyst",
+        "business intelligence",
+        "bi analyst",
+        "analytics",
+        "tableau",
+        "power bi",
+        "reporting",
+    ),
+    "backend": (
+        "backend",
+        "back end",
+        "api engineer",
+        "server side",
+        "django",
+        "fastapi",
+        "node",
+        "java engineer",
+        "python engineer",
+        "software engineer",
+    ),
+    "frontend": (
+        "frontend",
+        "front end",
+        "react",
+        "next.js",
+        "web developer",
+        "ui engineer",
+        "javascript developer",
+        "typescript developer",
+    ),
+    "fullstack": (
+        "full stack",
+        "fullstack",
+        "software engineer",
+        "web engineer",
+    ),
+    "devops_cloud": (
+        "devops",
+        "sre",
+        "site reliability",
+        "cloud engineer",
+        "platform engineer",
+        "infrastructure",
+        "kubernetes",
+        "terraform",
+        "aws",
+        "azure",
+        "gcp",
+    ),
+    "security": (
+        "security engineer",
+        "cybersecurity",
+        "application security",
+        "appsec",
+        "infosec",
+        "security analyst",
+        "penetration",
+    ),
+    "mobile": (
+        "mobile",
+        "android",
+        "ios",
+        "swift",
+        "kotlin",
+        "react native",
+        "flutter",
+    ),
+    "qa": (
+        "qa",
+        "quality assurance",
+        "test engineer",
+        "automation tester",
+        "sdet",
+        "software testing",
+    ),
+    "product": (
+        "product manager",
+        "product owner",
+        "growth product",
+        "technical product",
+        "program manager",
+    ),
+    "design": (
+        "product designer",
+        "ux",
+        "ui designer",
+        "user experience",
+        "visual designer",
+    ),
+}
+_ROLE_FAMILY_RELATEDNESS: Dict[Tuple[str, str], float] = {
+    ("ai_ml", "data_science"): 0.78,
+    ("ai_ml", "data_engineering"): 0.55,
+    ("ai_ml", "backend"): 0.50,
+    ("data_science", "analytics_bi"): 0.68,
+    ("data_science", "data_engineering"): 0.58,
+    ("data_engineering", "analytics_bi"): 0.62,
+    ("backend", "fullstack"): 0.78,
+    ("frontend", "fullstack"): 0.78,
+    ("backend", "devops_cloud"): 0.55,
+    ("devops_cloud", "security"): 0.45,
+    ("frontend", "design"): 0.45,
+    ("mobile", "frontend"): 0.42,
+    ("qa", "backend"): 0.35,
+}
+
+
+def _title_tokens(value: str) -> set[str]:
+    return set(_TITLE_TOKEN_RE.findall(value.lower()))
+
+
+def _normalize_title_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.lower().replace("/", " ").replace("-", " ")).strip()
+
+
+def role_families(value: str) -> set[str]:
+    """Return broad role families detected from a title-like string."""
+    text = _normalize_title_text(value)
+    tokens = _title_tokens(text)
+    families: set[str] = set()
+    for family, aliases in _ROLE_FAMILY_ALIASES.items():
+        for alias in aliases:
+            alias_norm = _normalize_title_text(alias)
+            alias_tokens = _title_tokens(alias_norm)
+            if alias_norm in text or (alias_tokens and alias_tokens.issubset(tokens)):
+                families.add(family)
+                break
+    return families
+
+
+def _related_role_family_score(target_families: set[str], job_families: set[str]) -> float:
+    if not target_families or not job_families:
+        return 0.0
+    if target_families & job_families:
+        return 0.85
+    best = 0.0
+    for left in target_families:
+        for right in job_families:
+            best = max(
+                best,
+                _ROLE_FAMILY_RELATEDNESS.get((left, right), 0.0),
+                _ROLE_FAMILY_RELATEDNESS.get((right, left), 0.0),
+            )
+    return best
+
+
+def split_target_titles(raw: Optional[str]) -> List[str]:
+    """Split user-entered target title strings into individual titles.
+
+    Users commonly paste titles as "Data Scientist | AI/ML Engineer".
+    Keep slash-delimited phrases intact so "AI/ML Engineer" does not become
+    two weaker titles.
+    """
+    if not raw:
+        return []
+    return [part.strip() for part in _TITLE_DELIMITER_RE.split(raw) if part.strip()]
 
 
 def title_alignment_score(
@@ -117,13 +349,16 @@ def title_alignment_score(
         if t == job_title_lower:
             return 1.0
         if t in job_title_lower or job_title_lower in t:
-            best = max(best, 0.6)
-        words_t = set(t.split())
-        words_j = set(job_title_lower.split())
+            best = max(best, 0.75)
+        words_t = _title_tokens(t)
+        words_j = _title_tokens(job_title_lower)
         common = words_t & words_j
-        if common:
-            ratio = len(common) / max(len(words_t), 1)
-            best = max(best, 0.3 * min(1.0, ratio))
+        best = max(best, _related_role_family_score(role_families(t), role_families(job_title_lower)))
+        meaningful_t = words_t - _GENERIC_TITLE_TOKENS
+        meaningful_common = common - _GENERIC_TITLE_TOKENS
+        if meaningful_common:
+            ratio = len(meaningful_common) / max(len(meaningful_t), 1)
+            best = max(best, 0.45 * min(1.0, ratio))
     return best
 
 
@@ -156,24 +391,19 @@ def composite_score(
     llm_rerank_score: Optional[float],
 ) -> float:
     """Weighted composite used for ordering within a tier (not for tiering)."""
-    w = {
-        "semantic_fit": 0.35,
-        "title_alignment": 0.20,
-        "skill_overlap": 0.15,
-        "freshness": 0.10,
-        "channel_bonus": 0.05,
-        "interest_affinity": 0.10,
-        "rerank": 0.05,
-    }
-    total = (
-        w["semantic_fit"] * semantic_fit
-        + w["title_alignment"] * title_alignment
-        + w["skill_overlap"] * skill_overlap
-        + w["freshness"] * freshness
-        + w["channel_bonus"] * channel_bonus
-        + w["interest_affinity"] * (interest_affinity or 0.0)
-        + w["rerank"] * ((llm_rerank_score or 0.0) / 100.0)
+    deterministic = (
+        0.40 * semantic_fit
+        + 0.25 * title_alignment
+        + 0.15 * skill_overlap
+        + 0.10 * freshness
+        + 0.05 * channel_bonus
+        + 0.05 * (interest_affinity or 0.0)
     )
+    if llm_rerank_score is None:
+        return min(1.0, max(0.0, deterministic))
+
+    rerank = max(0.0, min(1.0, llm_rerank_score / 100.0))
+    total = 0.80 * rerank + 0.20 * deterministic
     return min(1.0, max(0.0, total))
 
 
@@ -193,11 +423,29 @@ def assign_tier(
         title_alignment >= TIER1_TITLE_FLOOR or skill_overlap >= TIER1_SKILL_FLOOR
     )
     rerank = llm_rerank_score if llm_rerank_score is not None else 0.0
-    if rerank >= TIER1_RERANK_FLOOR and is_fresh_enough and has_title_or_skill:
+    has_strong_semantic_title = (
+        semantic_fit >= TIER1_SEMANTIC_TITLE_FLOOR
+        and title_alignment >= TIER1_STRONG_TITLE_FLOOR
+    )
+    has_reranked_semantic_title = (
+        semantic_fit >= TIER1_RERANK_SEMANTIC_FLOOR
+        and title_alignment >= TIER1_RERANK_WEAK_TITLE_FLOOR
+    )
+    if is_fresh_enough and (
+        (rerank >= TIER1_RERANK_FLOOR and (has_title_or_skill or has_reranked_semantic_title))
+        or has_strong_semantic_title
+    ):
         return "tier1"
     if rerank >= TIER2_RERANK_FLOOR or semantic_fit >= TIER2_SEMANTIC_FLOOR:
         return "tier2"
     return "tier3"
+
+
+def _coerce_uuid(value: str) -> Optional[uuid.UUID]:
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 # ---- Main service --------------------------------------------------------
@@ -296,11 +544,12 @@ class RecommendationEngineV2:
         # 4. Compute sub-scores.
         interest_vecs = self._interest_centroid(user_id, model)
         scored = self._score_candidates(
-            candidates, user_vec, target_titles, top_skills, interest_vecs
+            candidates, user_vec, target_titles, top_skills, interest_vecs, user_id
         )
 
-        # 5. LLM rerank top-50.
-        top_50 = scored[:RERANK_TOP_K]
+        # 5. LLM rerank the top-50 by raw semantic fit, per the V2 retrieval
+        # contract. Composite ordering is recomputed after rerank scores land.
+        top_50 = sorted(scored, key=lambda x: x.semantic_fit, reverse=True)[:RERANK_TOP_K]
         rerank_map = await self._rerank(top_50, target_titles, top_skills, user_id)
         stats.reranked = bool(rerank_map)
         stats.rerank_fallback = not stats.reranked
@@ -312,6 +561,18 @@ class RecommendationEngineV2:
                 sc.llm_rerank_score = rv.score
                 if rv.reason:
                     sc.match_reason = rv.reason
+
+        for sc in scored:
+            sc.match_score = composite_score(
+                sc.semantic_fit,
+                sc.title_alignment,
+                sc.skill_overlap,
+                sc.freshness,
+                sc.channel_bonus,
+                sc.interest_affinity,
+                sc.llm_rerank_score,
+            )
+        scored.sort(key=lambda x: x.match_score, reverse=True)
 
         # 6. Assign tiers and cap.
         self._classify_tiers(scored)
@@ -360,7 +621,8 @@ class RecommendationEngineV2:
         user_id: str,
     ) -> List["_CandidateScore"]:
         """Use pgvector ``<=>`` operator (cosine distance = 1 - cosine)."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_JOB_WINDOW_DAYS)
+        user_uuid = _coerce_uuid(user_id)
         raw = self.db.execute(
             text(
                 """
@@ -369,8 +631,16 @@ class RecommendationEngineV2:
                 FROM jobs j
                 JOIN job_embeddings e ON e.job_id = j.id
                 WHERE e.model = :model
-                  AND (j.scraped_at > :cutoff OR j.posted_date > :cutoff)
-                  AND j.source != 'external'
+                  AND (
+                    (
+                      j.source != 'external'
+                      AND (j.scraped_at > :cutoff OR j.posted_date > :cutoff)
+                    )
+                    OR (
+                      j.source = 'external'
+                      AND j.added_by_user_id = :user_uuid
+                    )
+                  )
                 ORDER BY e.embedding <=> :uvec
                 LIMIT :limit
                 """
@@ -379,6 +649,7 @@ class RecommendationEngineV2:
                 "uvec": f"[{','.join(str(x) for x in user_vec)}]",
                 "model": model,
                 "cutoff": cutoff,
+                "user_uuid": user_uuid,
                 "limit": CANDIDATE_POOL_SIZE,
             },
         ).fetchall()
@@ -408,16 +679,22 @@ class RecommendationEngineV2:
         user_id: str,
     ) -> List["_CandidateScore"]:
         """Fallback: load all embedded recent jobs and rank in Python."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_JOB_WINDOW_DAYS)
+        user_uuid = _coerce_uuid(user_id)
+        non_external_recent = and_(
+            Job.source != "external",
+            or_(Job.scraped_at > cutoff, Job.posted_date > cutoff),
+        )
+        own_external = and_(
+            Job.source == "external",
+            Job.added_by_user_id == user_uuid,
+        )
         rows = (
             self.db.query(Job, JobEmbedding.embedding)
             .join(JobEmbedding, JobEmbedding.job_id == Job.id)
             .filter(
                 JobEmbedding.model == model,
-                Job.source != "external",
-            )
-            .filter(
-                (Job.scraped_at > cutoff) | (Job.posted_date > cutoff)
+                or_(non_external_recent, own_external),
             )
             .all()
         )
@@ -439,13 +716,14 @@ class RecommendationEngineV2:
         target_titles: List[str],
         top_skills: List[str],
         interest_vecs: Optional[List[float]],
+        user_id: str,
     ) -> List["_CandidateScore"]:
         primary = target_titles[0] if target_titles else None
         for c in candidates:
             c.title_alignment = title_alignment_score(c.job, target_titles, primary=primary)
             c.skill_overlap = skill_overlap_score(c.job, top_skills)
-            c.freshness = freshness_score(c.job)
-            c.channel_bonus = channel_bonus_score(c.job)
+            c.freshness = freshness_score(c.job, user_id=user_id)
+            c.channel_bonus = channel_bonus_score(c.job, user_id=user_id)
             if interest_vecs:
                 c.interest_affinity = _cosine(user_vec, interest_vecs)
         for c in candidates:
@@ -542,9 +820,10 @@ class RecommendationEngineV2:
             return []
         out = []
         if profile.primary_job_title:
-            out.append(profile.primary_job_title)
+            out.extend(split_target_titles(profile.primary_job_title))
         if profile.secondary_job_titles:
-            out.extend(t for t in profile.secondary_job_titles if t)
+            for title in profile.secondary_job_titles:
+                out.extend(split_target_titles(title))
         return out
 
     def _top_skills(self, profile: Optional[UserProfile], n: int = 15) -> List[str]:

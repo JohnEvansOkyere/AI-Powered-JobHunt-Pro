@@ -22,6 +22,20 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _queue_user_embedding_refresh(user_id: uuid.UUID) -> None:
+    """Best-effort refresh of the Recommendations V2 user embedding."""
+    try:
+        from app.tasks.embeddings import embed_user_task
+
+        embed_user_task.delay(str(user_id))
+    except Exception as exc:  # pragma: no cover - queue availability varies by env
+        logger.warning(
+            "Failed to queue user embedding refresh",
+            user_id=str(user_id),
+            error=str(exc),
+        )
+
+
 # Pydantic models for request/response
 class TechnicalSkill(BaseModel):
     """Technical skill with experience and confidence."""
@@ -42,8 +56,6 @@ class ExperienceItem(BaseModel):
 class AIPreferences(BaseModel):
     """AI model preferences per task."""
     job_matching: Optional[str] = "gemini"
-    cv_tailoring: Optional[str] = "openai"
-    cover_letter: Optional[str] = "openai"
     email: Optional[str] = "grok"
     speed_vs_quality: Optional[str] = "balanced"  # "speed", "quality", "balanced"
 
@@ -304,6 +316,7 @@ async def create_profile(
     db.refresh(profile)
     
     logger.info(f"Created profile for user {user_id}")
+    _queue_user_embedding_refresh(user_id)
     
     return profile_to_response(profile)
 
@@ -376,6 +389,7 @@ async def update_profile(
     db.refresh(profile)
     
     logger.info(f"Updated profile for user {user_id}")
+    _queue_user_embedding_refresh(user_id)
     
     return profile_to_response(profile)
 
@@ -418,6 +432,6 @@ async def delete_profile(
     db.commit()
     
     logger.info(f"Deleted profile for user {user_id}")
+    _queue_user_embedding_refresh(user_id)
     
     return None
-

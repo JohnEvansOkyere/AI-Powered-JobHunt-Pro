@@ -36,6 +36,8 @@ export interface RecommendationItem {
   llm_rerank_score: number | null
   expires_at: string
   job: RecommendedJob | null
+  /** Tier-3 catalogue rows: recent jobs list, not a scored recommendation. */
+  catalog_only?: boolean
 }
 
 export interface RecommendationsResponse {

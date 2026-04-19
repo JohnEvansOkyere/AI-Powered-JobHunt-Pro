@@ -200,7 +200,7 @@ export default function HomePage() {
               {
                 icon: Rocket,
                 title: "One-Click Apply",
-                desc: "Integrated application tracking and cover letter generation to 10x your output.",
+                desc: "Integrated application tracking and job-fit ranking to focus your search.",
                 color: "brand-turquoise"
               }
             ].map((feature, idx) => (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
@@ -61,7 +61,7 @@ function recToCardJob(rec: RecommendationItem): JobCardJob {
     workType: j?.remote_type ?? j?.job_type ?? '',
     postedDate: j?.posted_date ?? j?.scraped_at ?? new Date().toISOString(),
     description: rec.match_reason ?? '',
-    matchScore: Math.round(rec.match_score * 100),
+    matchScore: rec.catalog_only ? undefined : Math.round(rec.match_score * 100),
     url: j?.job_link ?? j?.source_url ?? '',
   }
 }
@@ -81,6 +81,26 @@ function jobToCardJob(job: Job): JobCardJob {
 }
 
 export default function JobsPage() {
+  return (
+    <Suspense fallback={<JobsPageFallback />}>
+      <JobsPageContent />
+    </Suspense>
+  )
+}
+
+function JobsPageFallback() {
+  return (
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader className="h-6 w-6 text-neutral-300 animate-spin" />
+        </div>
+      </DashboardLayout>
+    </ProtectedRoute>
+  )
+}
+
+function JobsPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tierParam = searchParams.get('tier')

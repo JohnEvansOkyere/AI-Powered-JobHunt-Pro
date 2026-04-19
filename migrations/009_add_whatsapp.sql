@@ -47,6 +47,14 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
         CHECK (whatsapp_digest_time_local ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
 );
 
+ALTER TABLE notification_preferences
+    DROP CONSTRAINT IF EXISTS fk_notification_preferences_user_id;
+ALTER TABLE notification_preferences
+    ADD CONSTRAINT fk_notification_preferences_user_id
+    FOREIGN KEY (user_id)
+    REFERENCES public.users(id)
+    ON DELETE CASCADE;
+
 COMMENT ON TABLE  notification_preferences                       IS 'Per-user notification channel preferences. WhatsApp is the first channel.';
 COMMENT ON COLUMN notification_preferences.whatsapp_phone_e164   IS 'E.164 phone, digits-only with leading + (e.g. +233241234567).';
 COMMENT ON COLUMN notification_preferences.whatsapp_timezone     IS 'IANA timezone name used with whatsapp_digest_time_local (e.g. Africa/Accra).';
@@ -91,6 +99,14 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
         )
 );
 
+ALTER TABLE whatsapp_messages
+    DROP CONSTRAINT IF EXISTS fk_whatsapp_messages_user_id;
+ALTER TABLE whatsapp_messages
+    ADD CONSTRAINT fk_whatsapp_messages_user_id
+    FOREIGN KEY (user_id)
+    REFERENCES public.users(id)
+    ON DELETE SET NULL;
+
 COMMENT ON TABLE  whatsapp_messages                       IS 'Append-only audit of every outbound WhatsApp send attempt.';
 COMMENT ON COLUMN whatsapp_messages.user_id               IS 'Nullable so records survive account deletion for the retention window.';
 COMMENT ON COLUMN whatsapp_messages.payload_hash          IS 'SHA-256 of the rendered template + variables, for dedup.';
@@ -122,6 +138,14 @@ CREATE TABLE IF NOT EXISTS whatsapp_incoming_events (
     CONSTRAINT whatsapp_incoming_events_type_check
         CHECK (event_type IN ('text', 'status_update', 'button', 'interactive', 'other'))
 );
+
+ALTER TABLE whatsapp_incoming_events
+    DROP CONSTRAINT IF EXISTS fk_whatsapp_incoming_events_user_id;
+ALTER TABLE whatsapp_incoming_events
+    ADD CONSTRAINT fk_whatsapp_incoming_events_user_id
+    FOREIGN KEY (user_id)
+    REFERENCES public.users(id)
+    ON DELETE SET NULL;
 
 COMMENT ON TABLE  whatsapp_incoming_events            IS 'Raw audit of inbound webhook events. Used to evidence consent + STOP keyword handling.';
 COMMENT ON COLUMN whatsapp_incoming_events.raw        IS 'Full webhook payload for this event. Redact in response logs.';
