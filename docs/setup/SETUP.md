@@ -184,5 +184,5 @@ Frontend will be available at `http://localhost:3000`
 
 ## Production Deployment
 
-See `docs/DEPLOYMENT.md` for deployment instructions to Render (backend) and Vercel (frontend).
+See `docs/deployment/DEPLOYMENT.md` for deployment instructions to Render (backend) and Vercel (frontend).
 

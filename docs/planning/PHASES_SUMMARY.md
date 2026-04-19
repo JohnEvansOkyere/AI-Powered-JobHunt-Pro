@@ -193,7 +193,7 @@ This document provides an overview of all completed phases in the AI-Powered Job
 - [Setup Guide](./SETUP.md)
 - [Deployment Guide](./DEPLOYMENT.md)
 - [Database Schema](./SUPABASE_SCHEMA.sql)
-- [Project Plan](../PROJECT_PLAN.md)
+- [Project Plan](PROJECT_PLAN.md)
 - [Phase 1: Foundation](./PHASE1_FOUNDATION.md)
 - [Phase 2: Authentication](./PHASE2_AUTH.md)
 - [Phase 3: Profile System](./PHASE3_PROFILE.md)

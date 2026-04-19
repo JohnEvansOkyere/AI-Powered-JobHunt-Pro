@@ -103,27 +103,27 @@ POST /api/v1/applications/generate-cover-letter-custom
 
 **Created:**
 ```
-📚 docs/AI_CV_GENERATOR_USER_GUIDE.md        (1000+ lines)
+📚 docs/features/ai-cv/AI_CV_GENERATOR_USER_GUIDE.md        (1000+ lines)
    - Complete user guide
    - Step-by-step instructions
    - Troubleshooting
    - FAQ
    - Best practices
 
-📚 docs/AI_CV_GENERATOR_TECHNICAL_DOCS.md    (800+ lines)
+📚 docs/features/ai-cv/AI_CV_GENERATOR_TECHNICAL_DOCS.md    (800+ lines)
    - Architecture details
    - API documentation
    - Code examples
    - Testing guidelines
    - Development workflow
 
-📚 docs/AI_CV_GENERATOR_README.md            (400+ lines)
+📚 docs/features/ai-cv/AI_CV_GENERATOR_README.md            (400+ lines)
    - Quick reference
    - Feature overview
    - Usage examples
    - Visual diagrams
 
-📚 docs/CUSTOM_CV_GENERATION.md              (Updated)
+📚 docs/features/ai-cv/CUSTOM_CV_GENERATION.md              (Updated)
    - Quick reference guide
    - Version history
    - Links to other docs

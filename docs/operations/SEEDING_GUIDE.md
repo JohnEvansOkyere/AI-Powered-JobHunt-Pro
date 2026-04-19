@@ -217,7 +217,7 @@ curl 'https://remotive.io/api/remote-jobs?search=python' | jq '.jobs | length'
 
 4. **Set Up Periodic Scraping** (Optional):
    - Configure Celery Beat for daily scraping
-   - See `docs/JOB_SCRAPING_ISSUE_RESOLUTION.md` for details
+   - See `docs/fixes/JOB_SCRAPING_ISSUE_RESOLUTION.md` for details
 
 ---
 

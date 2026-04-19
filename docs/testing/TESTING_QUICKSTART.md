@@ -117,7 +117,7 @@ Before deploying to production:
 
 For detailed information, see:
 - [tests/README.md](tests/README.md) - Full testing guide
-- [TESTING_SETUP_SUMMARY.md](../TESTING_SETUP_SUMMARY.md) - Complete setup docs
+- [TESTING_SETUP_SUMMARY.md](TESTING_SETUP_SUMMARY.md) - Complete setup docs
 
 ---
 

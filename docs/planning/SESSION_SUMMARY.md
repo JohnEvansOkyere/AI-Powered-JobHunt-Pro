@@ -108,7 +108,7 @@ Successfully implemented a production-ready pre-computed job recommendations sys
 - `GET_FRESH_JOBS_THEN_RECOMMENDATIONS.md` - Workflow guide
 - `QUICK_START_RECOMMENDATIONS.md` - Quick reference
 - `NEXT_STEPS.md` - User guidance
-- `docs/AUTO_JOB_DELETION.md` - Auto-deletion documentation
+- `docs/features/jobs/AUTO_JOB_DELETION.md` - Auto-deletion documentation
 - `RENDER_DEPLOYMENT.md` - Deployment guide
 - `SESSION_SUMMARY.md` - This file
 

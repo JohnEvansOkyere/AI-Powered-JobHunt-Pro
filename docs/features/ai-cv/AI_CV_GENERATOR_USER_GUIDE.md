@@ -586,8 +586,8 @@ Click "▶ Advanced Options" to customize:
 
 **Documentation:**
 - Read this full guide
-- Check [ERROR_HANDLING_GUIDE.md](ERROR_HANDLING_GUIDE.md)
-- Review [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- Check [ERROR_HANDLING_GUIDE.md](../../troubleshooting/ERROR_HANDLING_GUIDE.md)
+- Review [TROUBLESHOOTING.md](../../troubleshooting/TROUBLESHOOTING.md)
 
 **Support Channels:**
 - Check browser console for detailed errors

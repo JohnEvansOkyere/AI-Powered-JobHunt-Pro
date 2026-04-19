@@ -146,10 +146,10 @@ This gives you:
 
 ## Documentation
 
-- [GET_FRESH_JOBS_THEN_RECOMMENDATIONS.md](GET_FRESH_JOBS_THEN_RECOMMENDATIONS.md) - Detailed guide
-- [docs/AUTO_JOB_DELETION.md](docs/AUTO_JOB_DELETION.md) - Auto-deletion system
-- [GENERATE_INITIAL_RECOMMENDATIONS.md](GENERATE_INITIAL_RECOMMENDATIONS.md) - All generation options
-- [PRE_COMPUTED_RECOMMENDATIONS_IMPLEMENTATION.md](PRE_COMPUTED_RECOMMENDATIONS_IMPLEMENTATION.md) - Full implementation
+- [GET_FRESH_JOBS_THEN_RECOMMENDATIONS.md](../features/recommendations/GET_FRESH_JOBS_THEN_RECOMMENDATIONS.md) - Detailed guide
+- [docs/features/jobs/AUTO_JOB_DELETION.md](../features/jobs/AUTO_JOB_DELETION.md) - Auto-deletion system
+- [GENERATE_INITIAL_RECOMMENDATIONS.md](../features/recommendations/GENERATE_INITIAL_RECOMMENDATIONS.md) - All generation options
+- [PRE_COMPUTED_RECOMMENDATIONS_IMPLEMENTATION.md](../features/recommendations/PRE_COMPUTED_RECOMMENDATIONS_IMPLEMENTATION.md) - Full implementation
 
 ---
 

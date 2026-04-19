@@ -58,8 +58,8 @@ if sensitive_found:
 
 ### 4. Documentation Created
 **Files**:
-- `docs/SECURITY_SANITIZATION.md` - Comprehensive security guide
-- `docs/SANITIZATION_IMPLEMENTATION_SUMMARY.md` - This file
+- `docs/security/SECURITY_SANITIZATION.md` - Comprehensive security guide
+- `docs/security/SANITIZATION_IMPLEMENTATION_SUMMARY.md` - This file
 
 ## Security Features Implemented
 
@@ -225,7 +225,7 @@ Example output:
 1. **Created**: `backend/app/utils/sanitizer.py` - Comprehensive sanitization module
 2. **Integrated**: In `backend/app/services/cv_generator.py` - All data sanitized before AI
 3. **Tested**: `backend/tests/test_sanitizer.py` - 8/12 tests passing
-4. **Documented**: `docs/SECURITY_SANITIZATION.md` - Full security guide
+4. **Documented**: `docs/security/SECURITY_SANITIZATION.md` - Full security guide
 
 **What's sanitized**:
 - ✅ CV data (personal info, experience, skills, education, projects)

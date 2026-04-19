@@ -101,7 +101,7 @@ AI-Powered-JobHunt-Pro/
 
 ### 📝 Important Notes
 
-1. **Environment Variables**: You'll need to create `.env` files for both backend and frontend (see `docs/SETUP.md`)
+1. **Environment Variables**: You'll need to create `.env` files for both backend and frontend (see `docs/setup/SETUP.md`)
 
 2. **Supabase Setup**: Run the SQL schema in `docs/SUPABASE_SCHEMA.sql` in your Supabase project
 

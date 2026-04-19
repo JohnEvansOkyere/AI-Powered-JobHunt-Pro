@@ -144,8 +144,8 @@ But for now, **free sources work great!**
 
 ## Documentation
 
-- Quick Start: [QUICK_START_SCHEDULER.md](QUICK_START_SCHEDULER.md)
-- Full Documentation: [docs/AUTOMATED_JOB_SCRAPING.md](docs/AUTOMATED_JOB_SCRAPING.md)
+- Scheduler guide: [JOB_SCHEDULER_SETUP.md](../features/jobs/JOB_SCHEDULER_SETUP.md)
+- Job scraping guide: [JOB_SCRAPING_GUIDE.md](../features/jobs/JOB_SCRAPING_GUIDE.md)
 
 ## Next Steps
 

@@ -81,19 +81,19 @@ AI-Powered-JobHunt-Pro/
 
 ### For New Users
 1. **README.md** - Start here for overview and quick start
-2. **docs/SETUP.md** - Detailed setup instructions
+2. **docs/setup/SETUP.md** - Detailed setup instructions
 3. **docs/SUPABASE_SETUP_COMPLETE.sql** - Database setup (single file)
 
 ### For Developers
-1. **docs/PROJECT_PLAN.md** - Development roadmap and architecture
-2. **docs/JOB_SCHEDULER_SETUP.md** - Understanding the scheduler
-3. **docs/TECH_JOB_SCRAPING_COMPLETE.md** - Job scraping implementation
-4. **docs/SCHEDULER_MIGRATION_COMPLETE.md** - Why APScheduler vs Celery
+1. **docs/planning/PROJECT_PLAN.md** - Development roadmap and architecture
+2. **docs/features/jobs/JOB_SCHEDULER_SETUP.md** - Understanding the scheduler
+3. **docs/features/jobs/TECH_JOB_SCRAPING_COMPLETE.md** - Job scraping implementation
+4. **docs/operations/SCHEDULER_MIGRATION_COMPLETE.md** - Why APScheduler vs Celery
 
 ### For Troubleshooting
-1. **docs/ERRORS_AND_SOLUTIONS.md** - Error catalog
-2. **docs/TROUBLESHOOTING.md** - Common issues
-3. **docs/CV_UPLOAD_TROUBLESHOOTING.md** - CV-specific issues
+1. **docs/troubleshooting/ERRORS_AND_SOLUTIONS.md** - Error catalog
+2. **docs/troubleshooting/TROUBLESHOOTING.md** - Common issues
+3. **docs/troubleshooting/CV_UPLOAD_TROUBLESHOOTING.md** - CV-specific issues
 
 ## Benefits of Cleanup
 
@@ -129,7 +129,7 @@ If you had bookmarked or referenced old files:
 
 **Scheduler Documentation**:
 - Old: `QUICK_START_SCHEDULER.md`, `README_SCHEDULER.md`, `AUTOMATED_JOB_SCRAPING.md`
-- New: `docs/JOB_SCHEDULER_SETUP.md` (comprehensive guide)
+- New: `docs/features/jobs/JOB_SCHEDULER_SETUP.md` (comprehensive guide)
 
 **Project Documentation**:
 - Old: Various files in root directory
@@ -147,7 +147,7 @@ If you had bookmarked or referenced old files:
 1. **Bookmark these key files**:
    - `README.md` - Main entry point
    - `docs/SUPABASE_SETUP_COMPLETE.sql` - Database setup
-   - `docs/JOB_SCHEDULER_SETUP.md` - Scheduler guide
+   - `docs/features/jobs/JOB_SCHEDULER_SETUP.md` - Scheduler guide
 
 2. **Delete any old bookmarks** to removed files
 
