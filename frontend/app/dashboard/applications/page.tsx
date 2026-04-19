@@ -1,464 +1,294 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Download, Eye, Clock, CheckCircle, XCircle, Bookmark, Trash2, ExternalLink } from 'lucide-react'
-import { getSavedJobs, unsaveJob, Application as SavedApplication } from '@/lib/api/savedJobs'
-import { listApplications, getCVDownloadUrl, type ApplicationWithJob, type ApplicationStatus } from '@/lib/api/applications'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import {
+  Bookmark,
+  CheckCircle,
+  Clock,
+  ExternalLink,
+  Inbox,
+  Trash2,
+} from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
-const IN_PROGRESS_STATUSES: ApplicationStatus[] = ['draft', 'reviewed', 'finalized']
-const SUBMITTED_STATUSES: ApplicationStatus[] = ['sent', 'submitted', 'interviewing', 'offer']
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import {
+  listApplications,
+  markJobApplied,
+  type ApplicationStatus,
+  type ApplicationWithJob,
+} from '@/lib/api/applications'
+import { Application as SavedApplication, getSavedJobs, unsaveJob } from '@/lib/api/savedJobs'
 
-function isInProgress(status: ApplicationStatus) {
-  return IN_PROGRESS_STATUSES.includes(status)
-}
-function isSubmitted(status: ApplicationStatus) {
-  return SUBMITTED_STATUSES.includes(status)
+type TabType = 'saved' | 'applied' | 'archive'
+
+const APPLIED_STATUSES: ApplicationStatus[] = ['applied', 'interviewing', 'offer']
+const ARCHIVE_STATUSES: ApplicationStatus[] = ['dismissed', 'hidden', 'rejected']
+
+const STATUS_STYLES: Record<ApplicationStatus, string> = {
+  saved: 'bg-neutral-100 text-neutral-700',
+  applied: 'bg-brand-turquoise-50 text-brand-turquoise-700',
+  interviewing: 'bg-indigo-50 text-indigo-700',
+  offer: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-rose-50 text-rose-700',
+  dismissed: 'bg-neutral-100 text-neutral-500',
+  hidden: 'bg-neutral-100 text-neutral-500',
 }
 
-type TabType = 'saved' | 'draft' | 'submitted'
+const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  saved: 'Saved',
+  applied: 'Applied',
+  interviewing: 'Interviewing',
+  offer: 'Offer',
+  rejected: 'Rejected',
+  dismissed: 'Dismissed',
+  hidden: 'Hidden',
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function daysUntil(expires?: string | null) {
+  if (!expires) return null
+  const diff = new Date(expires).getTime() - Date.now()
+  return Math.max(0, Math.ceil(diff / 86_400_000))
+}
 
 export default function ApplicationsPage() {
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('saved')
   const [applications, setApplications] = useState<ApplicationWithJob[]>([])
-  const [loadingApplications, setLoadingApplications] = useState(false)
   const [savedJobs, setSavedJobs] = useState<SavedApplication[]>([])
-  const [loadingSaved, setLoadingSaved] = useState(false)
+  const [loadingApps, setLoadingApps] = useState(true)
+  const [loadingSaved, setLoadingSaved] = useState(true)
 
   useEffect(() => {
-    if (activeTab === 'saved') {
-      loadSavedJobs()
-    }
-  }, [activeTab])
-
-  useEffect(() => {
-    loadApplications()
+    ;(async () => {
+      try {
+        setLoadingApps(true)
+        setApplications(await listApplications())
+      } catch (e) {
+        console.error(e)
+        toast.error('Failed to load applications')
+      } finally {
+        setLoadingApps(false)
+      }
+    })()
   }, [])
 
-  const loadApplications = async () => {
-    try {
-      setLoadingApplications(true)
-      const list = await listApplications()
-      setApplications(list)
-    } catch (error) {
-      console.error('Error loading applications:', error)
-      toast.error('Failed to load applications')
-    } finally {
-      setLoadingApplications(false)
-    }
-  }
+  useEffect(() => {
+    if (activeTab !== 'saved') return
+    ;(async () => {
+      try {
+        setLoadingSaved(true)
+        setSavedJobs(await getSavedJobs())
+      } catch (e) {
+        console.error(e)
+        toast.error('Failed to load saved jobs')
+      } finally {
+        setLoadingSaved(false)
+      }
+    })()
+  }, [activeTab])
 
-  const loadSavedJobs = async () => {
-    try {
-      setLoadingSaved(true)
-      const jobs = await getSavedJobs()
-      setSavedJobs(jobs)
-    } catch (error) {
-      console.error('Error loading saved jobs:', error)
-      toast.error('Failed to load saved jobs')
-    } finally {
-      setLoadingSaved(false)
-    }
-  }
+  const applied = useMemo(
+    () => applications.filter((a) => APPLIED_STATUSES.includes(a.status)),
+    [applications],
+  )
+  const archived = useMemo(
+    () => applications.filter((a) => ARCHIVE_STATUSES.includes(a.status)),
+    [applications],
+  )
 
   const handleUnsave = async (jobId: string) => {
     try {
       await unsaveJob(jobId)
-      setSavedJobs(prev => prev.filter(app => app.job_id !== jobId))
-      toast.success('Job removed from saved')
-    } catch (error) {
-      console.error('Error removing saved job:', error)
-      toast.error('Failed to remove job')
+      setSavedJobs((prev) => prev.filter((a) => a.job_id !== jobId))
+      toast.success('Removed from saved')
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to remove')
     }
   }
 
-  const handleGenerateCV = (jobId: string) => {
-    router.push(`/dashboard/applications/generate/${jobId}`)
-  }
-
-  const getDaysUntilExpiry = (expiresAt: string) => {
-    const now = new Date()
-    const expiry = new Date(expiresAt)
-    const diffTime = expiry.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
-  const getStatusBadge = (status: ApplicationStatus) => {
-    const styles: Record<string, string> = {
-      draft: 'bg-yellow-100 text-yellow-800',
-      reviewed: 'bg-blue-100 text-blue-800',
-      finalized: 'bg-blue-100 text-blue-800',
-      sent: 'bg-green-100 text-green-800',
-      submitted: 'bg-green-100 text-green-800',
-      interviewing: 'bg-green-100 text-green-800',
-      offer: 'bg-green-100 text-green-800',
-      saved: 'bg-neutral-100 text-neutral-700',
-      rejected: 'bg-red-100 text-red-800',
-    }
-    const labels: Record<string, string> = {
-      draft: 'Draft',
-      reviewed: 'Ready',
-      finalized: 'Ready',
-      sent: 'Sent',
-      submitted: 'Submitted',
-      interviewing: 'Interviewing',
-      offer: 'Offer',
-      saved: 'Saved',
-      rejected: 'Rejected',
-    }
-    return (
-      <span
-        className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] ?? 'bg-neutral-100 text-neutral-700'}`}
-      >
-        {labels[status] ?? status}
-      </span>
-    )
-  }
-
-  const handleViewApplication = (jobId: string) => {
-    router.push(`/dashboard/applications/generate/${jobId}`)
-  }
-
-  const handleDownloadCV = async (application: ApplicationWithJob) => {
-    if (!application.tailored_cv_path) {
-      toast.error('No CV generated yet for this application')
-      return
-    }
+  const handleMarkApplied = async (app: SavedApplication) => {
     try {
-      const { download_url } = await getCVDownloadUrl(application.id)
-      window.open(download_url, '_blank')
-    } catch (error) {
-      console.error('Error getting download URL:', error)
-      toast.error('Failed to get download link')
+      const updated = await markJobApplied(app.job_id)
+      setSavedJobs((prev) => prev.filter((a) => a.job_id !== app.job_id))
+      setApplications((prev) => [
+        {
+          ...updated,
+          job: app.job ?? null,
+        } as ApplicationWithJob,
+        ...prev.filter((a) => a.job_id !== app.job_id),
+      ])
+      toast.success(`Marked "${app.job?.title ?? 'job'}" as applied`)
+    } catch (e) {
+      console.error(e)
+      toast.error('Could not update status')
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
+  const tabs: { id: TabType; label: string; count: number; icon: typeof Bookmark }[] = [
+    { id: 'saved', label: 'Saved', count: savedJobs.length, icon: Bookmark },
+    { id: 'applied', label: 'Applied', count: applied.length, icon: CheckCircle },
+    { id: 'archive', label: 'Archive', count: archived.length, icon: Inbox },
+  ]
 
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-neutral-800 mb-2">
-              My Applications
+        <div className="max-w-6xl mx-auto space-y-6">
+          <header className="space-y-1">
+            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+              Applications
             </h1>
-            <p className="text-neutral-600">
-              Manage your job applications and generated materials
+            <p className="text-sm text-neutral-500 max-w-2xl">
+              Save interesting roles, mark the ones you applied to, and archive the rest.
             </p>
-          </div>
+          </header>
 
-          {/* Tabs */}
-          <div className="mb-6">
-            <div className="border-b border-neutral-200">
-              <nav className="flex space-x-8">
+          <nav className="inline-flex bg-neutral-100 rounded-lg p-1 gap-1">
+            {tabs.map(({ id, label, count, icon: Icon }) => {
+              const active = activeTab === id
+              return (
                 <button
-                  onClick={() => setActiveTab('saved')}
-                  className={`
-                    py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                    ${activeTab === 'saved'
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
-                    }
-                  `}
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-500 hover:text-neutral-700'
+                  }`}
                 >
-                  <div className="flex items-center space-x-2">
-                    <Bookmark className="h-4 w-4" />
-                    <span>Saved Jobs ({savedJobs.length})</span>
-                  </div>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{label}</span>
+                  <span
+                    className={`text-xs rounded-full px-1.5 py-0 tabular-nums ${
+                      active ? 'bg-neutral-100 text-neutral-700' : 'bg-white text-neutral-500'
+                    }`}
+                  >
+                    {count}
+                  </span>
                 </button>
-                <button
-                  onClick={() => setActiveTab('draft')}
-                  className={`
-                    py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                    ${activeTab === 'draft'
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
-                    }
-                  `}
-                >
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4" />
-                    <span>In Progress ({applications.filter(a => isInProgress(a.status)).length})</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('submitted')}
-                  className={`
-                    py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                    ${activeTab === 'submitted'
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
-                    }
-                  `}
-                >
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4" />
-                    <span>Submitted ({applications.filter(a => isSubmitted(a.status)).length})</span>
-                  </div>
-                </button>
-              </nav>
-            </div>
-          </div>
+              )
+            })}
+          </nav>
 
-          {/* Saved Jobs Tab */}
           {activeTab === 'saved' && (
-            <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
+            <section>
               {loadingSaved ? (
-                <div className="p-12 text-center">
-                  <Clock className="h-12 w-12 text-primary-600 mx-auto mb-4 animate-spin" />
-                  <p className="text-neutral-600">Loading saved jobs...</p>
-                </div>
+                <LoadingCard label="Loading saved jobs…" />
               ) : savedJobs.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Bookmark className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-                  <p className="text-neutral-600 mb-2">No saved jobs yet</p>
-                  <p className="text-sm text-neutral-500">
-                    Browse jobs and click the bookmark icon to save them for later
-                  </p>
-                </div>
+                <EmptyCard
+                  icon={Bookmark}
+                  title="No saved jobs yet"
+                  description="When you find a role that interests you, tap the bookmark to keep it here."
+                  action={
+                    <Link
+                      href="/dashboard/recommendations"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-medium text-sm transition-colors"
+                    >
+                      Browse recommendations
+                    </Link>
+                  }
+                />
               ) : (
-                <div className="divide-y divide-neutral-200">
-                  {savedJobs.map((app) => {
-                    const daysLeft = getDaysUntilExpiry(app.expires_at!)
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                  {savedJobs.map((app, i) => {
+                    const daysLeft = daysUntil(app.expires_at ?? null)
                     const job = app.job
                     return (
-                      <div
+                      <motion.li
                         key={app.id}
-                        className="p-6 hover:bg-neutral-50 transition-colors"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="group bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 p-5 transition-colors flex flex-col"
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="text-lg font-semibold text-neutral-800">
-                                {job?.title || 'Saved Job'}
-                              </h3>
-                              {job?.remote_type && (
-                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full font-medium capitalize">
-                                  {job.remote_type}
-                                </span>
-                              )}
-                              {daysLeft <= 3 && (
-                                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full font-medium">
-                                  Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
-                                </span>
-                              )}
-                            </div>
-                            {job && (
-                              <div className="mb-3">
-                                <p className="text-neutral-600 font-medium">{job.company}</p>
-                                <div className="flex items-center space-x-4 text-sm text-neutral-500 mt-1">
-                                  {job.location && <span>{job.location}</span>}
-                                  {job.salary_range && <span>{job.salary_range}</span>}
-                                  {job.job_type && <span className="capitalize">{job.job_type}</span>}
-                                </div>
-                              </div>
-                            )}
-                            <p className="text-sm text-neutral-500 mb-4">
-                              Saved on {new Date(app.saved_at!).toLocaleDateString()}
-                              {job?.source && <span className="ml-2">from {job.source}</span>}
+                        <header className="flex items-start justify-between gap-3 mb-3">
+                          <div className="min-w-0">
+                            <h3 className="text-base font-semibold text-neutral-900 truncate">
+                              {job?.title ?? 'Saved job'}
+                            </h3>
+                            <p className="text-sm text-neutral-500 truncate">
+                              {job?.company ?? '—'}
                             </p>
-
-                            <div className="flex items-center space-x-3">
-                              <button
-                                onClick={() => handleGenerateCV(app.job_id)}
-                                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm"
-                              >
-                                Generate Tailored CV
-                              </button>
-                              {job?.job_link && (
-                                <a
-                                  href={job.job_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium text-sm flex items-center space-x-2"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                  <span>View Job</span>
-                                </a>
-                              )}
-                              <button
-                                onClick={() => handleUnsave(app.job_id)}
-                                className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium text-sm flex items-center space-x-2"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                <span>Remove</span>
-                              </button>
-                            </div>
                           </div>
+                          <span className="shrink-0 text-xs font-medium rounded-md bg-neutral-50 text-neutral-600 border border-neutral-200 px-1.5 py-0.5">
+                            Saved
+                          </span>
+                        </header>
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-xs text-neutral-500">
+                          {job?.location && <span>{job.location}</span>}
+                          {job?.remote_type && <span className="capitalize">{job.remote_type}</span>}
+                          {job?.job_type && <span className="capitalize">{job.job_type}</span>}
+                          {daysLeft !== null && daysLeft <= 3 && (
+                            <span className="text-brand-orange-700 font-medium">
+                              Expires in {daysLeft}d
+                            </span>
+                          )}
                         </div>
-                      </div>
+
+                        <div className="mt-auto flex flex-wrap items-center gap-2">
+                          {job?.job_link && (
+                            <a
+                              href={job.job_link}
+                              target="_blank"
+                              rel="noopener noreferrer nofollow"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-medium text-xs transition-colors"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Apply
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleMarkApplied(app)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-xs transition-colors"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Mark applied
+                          </button>
+                          <button
+                            onClick={() => handleUnsave(app.job_id)}
+                            className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-medium transition-colors ml-auto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Remove
+                          </button>
+                        </div>
+                      </motion.li>
                     )
                   })}
-                </div>
+                </ul>
               )}
-            </div>
+            </section>
           )}
 
-          {/* In Progress Tab */}
-          {activeTab === 'draft' && (
-            <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
-              {loadingApplications ? (
-                <div className="p-12 text-center">
-                  <Clock className="h-12 w-12 text-primary-600 mx-auto mb-4 animate-spin" />
-                  <p className="text-neutral-600">Loading applications...</p>
-                </div>
-              ) : applications.filter(a => isInProgress(a.status)).length === 0 ? (
-                <div className="p-12 text-center">
-                  <Clock className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-                  <p className="text-neutral-600 mb-2">No applications in progress</p>
-                  <p className="text-sm text-neutral-500">
-                    Start by saving jobs and generating application materials
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-neutral-200">
-                  {applications.filter(a => isInProgress(a.status)).map((application) => (
-                    <div
-                      key={application.id}
-                      className="p-6 hover:bg-neutral-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-neutral-800">
-                              {application.job?.title ?? 'Application'}
-                            </h3>
-                            {getStatusBadge(application.status)}
-                          </div>
-                          <p className="text-neutral-600 mb-4">{application.job?.company ?? '—'}</p>
-
-                          <div className="flex items-center space-x-4 mb-4">
-                            <div className="flex items-center space-x-2">
-                              {application.tailored_cv_path ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-neutral-400" />
-                              )}
-                              <span className="text-sm text-neutral-600">CV</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {application.cover_letter ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-neutral-400" />
-                              )}
-                              <span className="text-sm text-neutral-600">Cover Letter</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {application.application_email ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-neutral-400" />
-                              )}
-                              <span className="text-sm text-neutral-600">Email</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-4 text-xs text-neutral-500">
-                            <span>Created: {formatDate(application.created_at)}</span>
-                            <span>Updated: {formatDate(application.updated_at)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2 ml-4">
-                          <button
-                            onClick={() => handleViewApplication(application.job_id)}
-                            className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="View / Edit application"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDownloadCV(application)}
-                            className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Download CV"
-                          >
-                            <Download className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {activeTab === 'applied' && (
+            <ApplicationList
+              loading={loadingApps}
+              items={applied}
+              emptyTitle="Nothing applied to yet"
+              emptyDescription="Once you click Apply on a recommended role and mark it as applied, it shows up here."
+            />
           )}
 
-          {/* Submitted Tab */}
-          {activeTab === 'submitted' && (
-            <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
-              {loadingApplications ? (
-                <div className="p-12 text-center">
-                  <Clock className="h-12 w-12 text-primary-600 mx-auto mb-4 animate-spin" />
-                  <p className="text-neutral-600">Loading applications...</p>
-                </div>
-              ) : applications.filter(a => isSubmitted(a.status)).length === 0 ? (
-                <div className="p-12 text-center">
-                  <CheckCircle className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-                  <p className="text-neutral-600 mb-2">No submitted applications yet</p>
-                  <p className="text-sm text-neutral-500">
-                    Applications you mark as sent will appear here
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-neutral-200">
-                  {applications.filter(a => isSubmitted(a.status)).map((application) => (
-                    <div
-                      key={application.id}
-                      className="p-6 hover:bg-neutral-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-neutral-800">
-                              {application.job?.title ?? 'Application'}
-                            </h3>
-                            {getStatusBadge(application.status)}
-                          </div>
-                          <p className="text-neutral-600 mb-4">{application.job?.company ?? '—'}</p>
-
-                          <div className="flex items-center space-x-4 text-xs text-neutral-500">
-                            <span>Created: {formatDate(application.created_at)}</span>
-                            <span>Submitted: {formatDate(application.updated_at)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2 ml-4">
-                          <button
-                            onClick={() => handleViewApplication(application.job_id)}
-                            className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="View application"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDownloadCV(application)}
-                            className="p-2 text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
-                            title="Download CV"
-                          >
-                            <Download className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {activeTab === 'archive' && (
+            <ApplicationList
+              loading={loadingApps}
+              items={archived}
+              emptyTitle="Archive is empty"
+              emptyDescription="Dismissed, hidden and rejected roles end up here so your main view stays focused."
+            />
           )}
         </div>
       </DashboardLayout>
@@ -466,3 +296,95 @@ export default function ApplicationsPage() {
   )
 }
 
+function ApplicationList({
+  loading,
+  items,
+  emptyTitle,
+  emptyDescription,
+}: {
+  loading: boolean
+  items: ApplicationWithJob[]
+  emptyTitle: string
+  emptyDescription: string
+}) {
+  if (loading) return <LoadingCard label="Loading applications…" />
+  if (items.length === 0) {
+    return <EmptyCard icon={Inbox} title={emptyTitle} description={emptyDescription} />
+  }
+  return (
+    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+      {items.map((app, i) => (
+        <motion.li
+          key={app.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.03 }}
+          className="bg-white rounded-xl border border-neutral-200 p-5"
+        >
+          <header className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-neutral-900 truncate">
+                {app.job?.title ?? 'Application'}
+              </h3>
+              <p className="text-sm text-neutral-500 truncate">{app.job?.company ?? '—'}</p>
+            </div>
+            <span
+              className={`shrink-0 text-xs font-medium rounded-md px-1.5 py-0.5 ${STATUS_STYLES[app.status]}`}
+            >
+              {STATUS_LABELS[app.status]}
+            </span>
+          </header>
+          <div className="text-xs text-neutral-500 flex flex-wrap gap-x-3 gap-y-1 mb-3">
+            <span>Created {formatDate(app.created_at)}</span>
+            <span>Updated {formatDate(app.updated_at)}</span>
+          </div>
+          <div className="flex gap-2">
+            {app.job?.job_link && (
+              <a
+                href={app.job.job_link}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-xs transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                View listing
+              </a>
+            )}
+          </div>
+        </motion.li>
+      ))}
+    </ul>
+  )
+}
+
+function LoadingCard({ label }: { label: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 p-10 text-center">
+      <Clock className="h-6 w-6 text-neutral-300 mx-auto mb-3 animate-spin" />
+      <p className="text-sm text-neutral-500">{label}</p>
+    </div>
+  )
+}
+
+function EmptyCard({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: typeof Bookmark
+  title: string
+  description: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center">
+      <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-neutral-50 flex items-center justify-center">
+        <Icon className="h-4 w-4 text-neutral-400" />
+      </div>
+      <h3 className="text-base font-semibold text-neutral-900 mb-1">{title}</h3>
+      <p className="text-sm text-neutral-500 max-w-sm mx-auto mb-4 leading-relaxed">{description}</p>
+      {action}
+    </div>
+  )
+}

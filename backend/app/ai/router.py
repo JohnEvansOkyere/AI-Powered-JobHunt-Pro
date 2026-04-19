@@ -53,15 +53,16 @@ class ModelRouter:
     Routes AI requests to appropriate providers with fallback support.
     """
 
-    # Default model mapping by task type
+    # Default model mapping by task type.
+    # Defaults favor free-tier providers per docs/RECOMMENDATIONS_V2_PLAN.md §3.1.
     DEFAULT_MODELS: Dict[TaskType, str] = {
-        TaskType.JOB_ANALYSIS: "gemini",  # Gemini for analysis
-        TaskType.CV_TAILORING: "openai",  # OpenAI for CV tailoring
-        TaskType.COVER_LETTER: "openai",  # OpenAI for cover letters
-        TaskType.EMAIL_DRAFTING: "grok",  # Grok for emails
-        TaskType.FAST_SUMMARY: "groq",  # Groq for fast summaries
-        TaskType.JOB_MATCHING: "gemini",  # Gemini for matching
-        TaskType.CV_PARSING: "openai",  # OpenAI for CV parsing (structured extraction)
+        TaskType.JOB_ANALYSIS: "gemini",
+        TaskType.EMAIL_DRAFTING: "gemini",
+        TaskType.FAST_SUMMARY: "groq",
+        TaskType.JOB_MATCHING: "gemini",
+        TaskType.CV_PARSING: "openai",  # structured extraction still favors OpenAI
+        TaskType.EMBEDDING: "gemini",
+        TaskType.RERANK: "gemini",
     }
 
     def __init__(self):

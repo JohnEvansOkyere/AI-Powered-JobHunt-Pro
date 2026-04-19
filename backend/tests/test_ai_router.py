@@ -51,7 +51,7 @@ class TestProviderSelection:
         # Test default task type mapping
         task_types = [
             TaskType.CV_PARSING,
-            TaskType.COVER_LETTER,
+            TaskType.JOB_ANALYSIS,
             TaskType.JOB_MATCHING,
         ]
 

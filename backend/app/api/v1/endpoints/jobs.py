@@ -306,83 +306,21 @@ async def search_jobs(
     )
 
 
-@router.get("/recommendations", response_model=JobSearchResponse)
-async def get_recommendations(
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+@router.get("/recommendations")
+async def get_recommendations_legacy(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
+    """Deprecated. Redirects to /api/v1/recommendations?tier=tier2.
+
+    307 so clients transparently follow the redirect and existing code keeps
+    working. Will be removed in a future release.
     """
-    Get pre-computed job recommendations for the current user.
+    from fastapi.responses import RedirectResponse
 
-    Returns recommendations sorted by match score (highest first).
-    When the user has zero recommendations but is eligible (has profile/CV),
-    generation is triggered in the background so new users get recommendations
-    without waiting for the 2-day scheduler. Refresh the page after a short wait.
-    """
-    user_id = current_user["id"]
-    if isinstance(user_id, str):
-        user_id = uuid.UUID(user_id)
-
-    # Get active recommendations (not expired)
-    now = datetime.utcnow()
-    query = db.query(JobRecommendation).filter(
-        and_(
-            JobRecommendation.user_id == user_id,
-            JobRecommendation.expires_at > now
-        )
-    ).order_by(desc(JobRecommendation.match_score))
-
-    # Get total count
-    total = query.count()
-
-    # Paginate
-    offset = (page - 1) * page_size
-    recommendations = query.offset(offset).limit(page_size).all()
-
-    if not recommendations:
-        # No recommendations: if user is eligible (profile/CV/interest), trigger background generation
-        # so new users get recommendations without waiting for the 2-day scheduler.
-        generator = RecommendationGenerator(db)
-        if generator.user_eligible_for_recommendations(str(user_id)):
-            logger.info(f"User {user_id} has 0 recommendations but is eligible - triggering background generation")
-            asyncio.create_task(_background_generate_recommendations_for_user(str(user_id)))
-        return JobSearchResponse(
-            jobs=[],
-            total=0,
-            page=page,
-            page_size=page_size,
-            total_pages=0
-        )
-
-    # Fetch job details for recommendations
-    job_ids = [rec.job_id for rec in recommendations]
-    jobs = db.query(Job).filter(Job.id.in_(job_ids)).all()
-
-    # Create job map for quick lookup
-    job_map = {job.id: job for job in jobs}
-
-    # Build response with match scores
-    jobs_with_scores = []
-    for rec in recommendations:
-        job = job_map.get(rec.job_id)
-        if job:
-            job_dict = JobResponse.from_orm(job).dict()
-            # Convert match_score from 0.0-1.0 to 0-100 for frontend
-            job_dict["match_score"] = round(rec.match_score * 100, 1)
-            job_dict["match_reasons"] = [rec.match_reason] if rec.match_reason else []
-            jobs_with_scores.append(job_dict)
-
-    total_pages = (total + page_size - 1) // page_size
-
-    return JobSearchResponse(
-        jobs=jobs_with_scores,
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages
-    )
+    url = f"/api/v1/recommendations?tier=tier2&page={page}&page_size={page_size}"
+    return RedirectResponse(url=url, status_code=307)
 
 
 @router.get("/{job_id}", response_model=JobResponse)

@@ -1,64 +1,20 @@
 /**
  * Applications API Client
- * 
- * Handles API calls for application generation and management.
+ *
+ * Minimal tracker for the candidate's relationship to a job:
+ *   saved, applied, dismissed, hidden, interviewing, rejected, offer.
+ *
+ * CV tailoring and cover-letter generation were removed in v2
+ * (see docs/RECOMMENDATIONS_V2_PLAN.md §4).
  */
 
 import { apiClient } from './client'
 
-export interface GenerateCVRequest {
-  tone?: 'professional' | 'confident' | 'friendly'
-  highlight_skills?: boolean
-  emphasize_relevant_experience?: boolean
-}
-
-export interface GenerateCustomCVRequest {
-  job_title?: string
-  company_name?: string
-  job_description?: string
-  job_link?: string
-  location?: string
-  job_type?: string
-  remote_type?: string
-  tone?: 'professional' | 'confident' | 'friendly' | 'enthusiastic'
-  highlight_skills?: boolean
-  emphasize_relevant_experience?: boolean
-}
-
-export interface GenerateCoverLetterRequest {
-  job_title?: string
-  company_name?: string
-  job_description?: string
-  job_link?: string
-  location?: string
-  job_type?: string
-  remote_type?: string
-  tone?: 'professional' | 'confident' | 'friendly' | 'enthusiastic'
-  length?: 'short' | 'medium' | 'long'
-}
-
-export interface GenerateCoverLetterResponse {
-  application_id: string
-  cover_letter: string
-  status: string
-  created_at?: string
-}
-
-export interface GenerateCVResponse {
-  application_id: string
-  cv_path: string
-  public_url?: string
-  status: string
-  created_at?: string
-}
-
 export type ApplicationStatus =
   | 'saved'
-  | 'draft'
-  | 'reviewed'
-  | 'finalized'
-  | 'sent'
-  | 'submitted'
+  | 'applied'
+  | 'dismissed'
+  | 'hidden'
   | 'interviewing'
   | 'rejected'
   | 'offer'
@@ -67,11 +23,10 @@ export interface Application {
   id: string
   user_id: string
   job_id: string
-  cv_id?: string
-  tailored_cv_path?: string
-  cover_letter?: string
-  application_email?: string
+  cv_id?: string | null
   status: ApplicationStatus
+  saved_at?: string | null
+  expires_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -80,76 +35,17 @@ export interface JobDetails {
   id: string
   title: string
   company: string
-  location?: string
-  job_link?: string
+  location?: string | null
+  job_link?: string | null
   source?: string
-  posted_date?: string
-  salary_range?: string
-  job_type?: string
-  remote_type?: string
+  posted_date?: string | null
+  salary_range?: string | null
+  job_type?: string | null
+  remote_type?: string | null
 }
 
 export interface ApplicationWithJob extends Application {
   job?: JobDetails | null
-}
-
-/**
- * Generate a tailored CV for a specific job
- */
-export async function generateTailoredCV(
-  jobId: string,
-  request: GenerateCVRequest = {}
-): Promise<GenerateCVResponse> {
-  return apiClient.post<GenerateCVResponse>(
-    `/api/v1/applications/generate-cv/${jobId}`,
-    request
-  )
-}
-
-/**
- * Generate a tailored CV from a custom job description
- */
-export async function generateCustomTailoredCV(
-  request: GenerateCustomCVRequest
-): Promise<GenerateCVResponse> {
-  return apiClient.post<GenerateCVResponse>(
-    `/api/v1/applications/generate-cv-custom`,
-    request
-  )
-}
-
-/**
- * Generate a cover letter from a custom job description
- */
-export async function generateCustomCoverLetter(
-  request: GenerateCoverLetterRequest
-): Promise<GenerateCoverLetterResponse> {
-  return apiClient.post<GenerateCoverLetterResponse>(
-    `/api/v1/applications/generate-cover-letter-custom`,
-    request
-  )
-}
-
-/**
- * Get a specific application by ID
- */
-export async function getApplication(applicationId: string): Promise<Application> {
-  return apiClient.get<Application>(`/api/v1/applications/${applicationId}`)
-}
-
-/**
- * Get application for a specific job
- */
-export async function getApplicationForJob(jobId: string): Promise<Application | null> {
-  return apiClient.get<Application | null>(`/api/v1/applications/job/${jobId}`)
-}
-
-/**
- * List all applications for the current user (with job details)
- */
-export async function listApplications(status?: string): Promise<ApplicationWithJob[]> {
-  const params = status ? `?status_filter=${status}` : ''
-  return apiClient.get<ApplicationWithJob[]>(`/api/v1/applications/${params}`)
 }
 
 export interface DashboardApplicationsStats {
@@ -157,18 +53,43 @@ export interface DashboardApplicationsStats {
   submitted_count: number
 }
 
-/**
- * Get dashboard stats: total applications and submitted count
- */
+export async function getApplication(applicationId: string): Promise<Application> {
+  return apiClient.get<Application>(`/api/v1/applications/${applicationId}`)
+}
+
+export async function getApplicationForJob(jobId: string): Promise<Application | null> {
+  return apiClient.get<Application | null>(`/api/v1/applications/job/${jobId}`)
+}
+
+export async function listApplications(
+  status?: ApplicationStatus
+): Promise<ApplicationWithJob[]> {
+  const params = status ? `?status_filter=${status}` : ''
+  return apiClient.get<ApplicationWithJob[]>(`/api/v1/applications/${params}`)
+}
+
 export async function getApplicationsStats(): Promise<DashboardApplicationsStats> {
   return apiClient.get<DashboardApplicationsStats>('/api/v1/applications/stats')
 }
 
-/**
- * Get download URL for tailored CV
- */
-export async function getCVDownloadUrl(applicationId: string): Promise<{ download_url: string }> {
-  return apiClient.get<{ download_url: string }>(`/api/v1/applications/${applicationId}/download-url`)
+export async function updateApplicationStatus(
+  jobId: string,
+  status: ApplicationStatus
+): Promise<Application> {
+  return apiClient.patch<Application>(
+    `/api/v1/applications/update-status/${jobId}`,
+    { status }
+  )
 }
 
+export async function markJobApplied(jobId: string): Promise<Application> {
+  return apiClient.post<Application>(`/api/v1/applications/mark-applied/${jobId}`, {})
+}
 
+export async function saveJob(jobId: string): Promise<Application> {
+  return apiClient.post<Application>(`/api/v1/applications/save-job/${jobId}`, {})
+}
+
+export async function unsaveJob(jobId: string): Promise<void> {
+  return apiClient.delete<void>(`/api/v1/applications/unsave-job/${jobId}`)
+}

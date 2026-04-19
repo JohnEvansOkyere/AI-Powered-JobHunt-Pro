@@ -10,14 +10,19 @@ from enum import Enum
 
 
 class TaskType(Enum):
-    """Types of AI tasks."""
+    """Types of AI tasks.
+
+    CV_TAILORING and COVER_LETTER were removed in v2
+    (see docs/RECOMMENDATIONS_V2_PLAN.md §4).
+    """
+
     JOB_MATCHING = "job_matching"
-    CV_TAILORING = "cv_tailoring"
-    COVER_LETTER = "cover_letter"
     EMAIL_DRAFTING = "email_drafting"
     JOB_ANALYSIS = "job_analysis"
     FAST_SUMMARY = "fast_summary"
-    CV_PARSING = "cv_parsing"  # CV/resume parsing and extraction
+    CV_PARSING = "cv_parsing"
+    EMBEDDING = "embedding"
+    RERANK = "rerank"
 
 
 class AIProvider(ABC):
