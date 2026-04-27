@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser, getCurrentSession, signOut } from '@/lib/auth'
+import { getCurrentSession, signOut } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/client'
 import type { User, Session } from '@supabase/supabase-js'
 
@@ -17,6 +17,12 @@ export function useAuth() {
   const router = useRouter()
 
   useEffect(() => {
+    const applySession = (nextSession: Session | null) => {
+      setSession(nextSession)
+      setUser(nextSession?.user ?? null)
+      setLoading(false)
+    }
+
     // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false)
@@ -24,10 +30,8 @@ export function useAuth() {
 
     // Get initial session
     getCurrentSession()
-      .then((session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        setLoading(false)
+      .then((nextSession) => {
+        applySession(nextSession)
         clearTimeout(timeout)
       })
       .catch((error) => {
@@ -40,10 +44,8 @@ export function useAuth() {
     const supabase = createClient()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      applySession(nextSession)
     })
 
     return () => {
@@ -67,4 +69,3 @@ export function useAuth() {
     logout,
   }
 }
-

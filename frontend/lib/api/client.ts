@@ -4,7 +4,7 @@
  * Handles HTTP requests to the FastAPI backend.
  */
 
-import { getCurrentSession } from '../auth'
+import { getCurrentSession, signOut } from '../auth'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
@@ -21,6 +21,24 @@ export class ApiClient {
       return session?.access_token || null
     } catch {
       return null
+    }
+  }
+
+  private async handleAuthFailure(response: Response, message: string) {
+    if (response.status !== 401 && response.status !== 403) {
+      return
+    }
+
+    if (
+      message === 'Email verification required' ||
+      message === 'Invalid authentication credentials' ||
+      message === 'Could not validate credentials'
+    ) {
+      try {
+        await signOut()
+      } catch {
+        // Ignore sign-out cleanup failures here; the original auth error still matters most.
+      }
     }
   }
 
@@ -54,6 +72,7 @@ export class ApiClient {
         detail: response.statusText,
       }))
       const errorMessage = error.detail || error.message || response.statusText || 'Request failed'
+      await this.handleAuthFailure(response, errorMessage)
       const errorWithStatus = new Error(errorMessage)
       ;(errorWithStatus as any).status = response.status
       throw errorWithStatus
@@ -120,4 +139,3 @@ export class ApiClient {
 
 // Export singleton instance
 export const apiClient = new ApiClient()
-

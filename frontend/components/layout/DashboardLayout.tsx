@@ -78,6 +78,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 height={28}
                 priority
                 className="object-contain"
+                style={{ width: 'auto', height: 'auto' }}
               />
               <span className="text-base font-semibold tracking-tight text-neutral-900">
                 Veloxa<span className="text-brand-turquoise-700">Hire</span>

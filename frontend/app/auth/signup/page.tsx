@@ -29,8 +29,8 @@ export default function SignUpPage() {
           full_name: fullName,
         },
       })
-      toast.success('Account created! Please check your email to verify your account.')
-      router.push('/auth/verify-email')
+      toast.success('Account created! You can sign in now.')
+      router.push('/auth/login')
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account')
     } finally {
@@ -54,6 +54,7 @@ export default function SignUpPage() {
               height={36}
               priority
               className="object-contain transition-transform group-hover:scale-105"
+              style={{ width: 'auto', height: 'auto' }}
             />
             <span className="text-2xl font-semibold tracking-tight text-neutral-900">
               Veloxa<span className="text-brand-turquoise-700">Hire</span>
@@ -63,7 +64,7 @@ export default function SignUpPage() {
             Create your account
           </h2>
           <p className="mt-2 text-neutral-500">
-            Get your first ranked matches in minutes.
+            Create your VeloxaHire account and get started.
           </p>
         </div>
 
@@ -143,7 +144,6 @@ export default function SignUpPage() {
                 <p className="mt-2 text-[10px] text-neutral-400 font-bold uppercase tracking-wider ml-1">Min. 6 characters for security</p>
               </div>
             </div>
-
             <button
               type="submit"
               disabled={loading}

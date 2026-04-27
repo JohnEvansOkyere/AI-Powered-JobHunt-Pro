@@ -15,6 +15,7 @@ import { toast } from 'react-hot-toast'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { useAuth } from '@/hooks/useAuth'
 import {
   listApplications,
   markJobApplied,
@@ -63,6 +64,7 @@ function daysUntil(expires?: string | null) {
 }
 
 export default function ApplicationsPage() {
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('saved')
   const [applications, setApplications] = useState<ApplicationWithJob[]>([])
   const [savedJobs, setSavedJobs] = useState<SavedApplication[]>([])
@@ -70,6 +72,11 @@ export default function ApplicationsPage() {
   const [loadingSaved, setLoadingSaved] = useState(true)
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      setLoadingApps(false)
+      return
+    }
+
     ;(async () => {
       try {
         setLoadingApps(true)
@@ -81,10 +88,10 @@ export default function ApplicationsPage() {
         setLoadingApps(false)
       }
     })()
-  }, [])
+  }, [authLoading, isAuthenticated])
 
   useEffect(() => {
-    if (activeTab !== 'saved') return
+    if (authLoading || !isAuthenticated || activeTab !== 'saved') return
     ;(async () => {
       try {
         setLoadingSaved(true)
@@ -96,7 +103,7 @@ export default function ApplicationsPage() {
         setLoadingSaved(false)
       }
     })()
-  }, [activeTab])
+  }, [activeTab, authLoading, isAuthenticated])
 
   const applied = useMemo(
     () => applications.filter((a) => APPLIED_STATUSES.includes(a.status)),

@@ -15,10 +15,13 @@ export default function VerifyEmailPage() {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-neutral-800">
-            Check your email
+            Sign in to continue
           </h2>
           <p className="mt-2 text-sm text-neutral-600">
-            We've sent a verification link to your email address. Please click the link to verify your account.
+            Email verification is currently disabled. If you already created an account, go back to login and sign in with your email and password.
+          </p>
+          <p className="mt-2 text-sm text-neutral-600">
+            If you need a new account, go back to registration and create one.
           </p>
         </div>
         <div className="space-y-4">
@@ -33,4 +36,3 @@ export default function VerifyEmailPage() {
     </div>
   )
 }
-

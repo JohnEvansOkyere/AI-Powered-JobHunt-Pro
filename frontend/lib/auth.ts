@@ -4,7 +4,7 @@
  * Helper functions for authentication using Supabase Auth.
  */
 
-import { createClient } from './supabase/client'
+import { createClient, setRememberSession } from './supabase/client'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
 
 export interface SignUpData {
@@ -19,6 +19,7 @@ export interface SignUpData {
 export interface SignInData {
   email: string
   password: string
+  remember?: boolean
 }
 
 /**
@@ -42,6 +43,7 @@ export async function signUp(data: SignUpData) {
  * Sign in an existing user
  */
 export async function signIn(data: SignInData) {
+  setRememberSession(Boolean(data.remember))
   const supabase = createClient()
   const { data: authData, error } = await supabase.auth.signInWithPassword({
     email: data.email,
@@ -124,4 +126,3 @@ export async function updatePassword(newPassword: string) {
   if (error) throw error
   return data
 }
-

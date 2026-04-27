@@ -29,6 +29,7 @@ import {
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/hooks/useAuth'
 
 // ---- Types ---------------------------------------------------------------
 
@@ -289,6 +290,7 @@ function EmptyGeneric({ tier }: { tier: Tier }) {
 // ---- Main page -----------------------------------------------------------
 
 export default function RecommendationsPage() {
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [tierStates, setTierStates] = useState<Record<Tier, TierState>>({
     tier1: { ...INITIAL_TIER_STATE },
     tier2: { ...INITIAL_TIER_STATE },
@@ -325,9 +327,13 @@ export default function RecommendationsPage() {
   // Load every tier on mount. Previously only tier1 ran — tier2/tier3 stayed at
   // loading: true forever, so desktop columns 2–3 showed skeletons indefinitely.
   useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      return
+    }
+
     const tiers: Tier[] = ['tier1', 'tier2', 'tier3']
     void Promise.all(tiers.map((t) => loadTier(t)))
-  }, [loadTier])
+  }, [authLoading, isAuthenticated, loadTier])
 
   const handleTabChange = (tier: TabId) => {
     setActiveTab(tier)

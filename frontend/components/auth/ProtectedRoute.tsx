@@ -20,7 +20,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) {
+      return
+    }
+
+    if (!user) {
       router.push('/auth/login')
     }
   }, [user, loading, router])
@@ -39,4 +43,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   return <>{children}</>
 }
-

@@ -17,6 +17,7 @@ import { saveJob, unsaveJob, getSavedJobs } from '@/lib/api/savedJobs'
 import { markJobApplied } from '@/lib/api/applications'
 import { Search, Loader, X, ArrowLeft } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { useAuth } from '@/hooks/useAuth'
 
 const TIER_META: Record<Tier, { label: string; description: string; dot: string }> = {
   tier1: {
@@ -101,6 +102,7 @@ function JobsPageFallback() {
 }
 
 function JobsPageContent() {
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
   const tierParam = searchParams.get('tier')
@@ -126,13 +128,19 @@ function JobsPageContent() {
 
   // Load data whenever the inputs change.
   useEffect(() => {
-    loadJobs()
+    if (!authLoading && isAuthenticated) {
+      void loadJobs()
+    } else if (!authLoading) {
+      setLoading(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTier, page, appliedSearchQuery, filters])
+  }, [activeTier, page, appliedSearchQuery, filters, authLoading, isAuthenticated])
 
   useEffect(() => {
-    loadSavedJobs()
-  }, [])
+    if (!authLoading && isAuthenticated) {
+      void loadSavedJobs()
+    }
+  }, [authLoading, isAuthenticated])
 
   const loadJobs = async () => {
     try {

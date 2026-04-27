@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { getMyProfile, createProfile, updateProfile } from '@/lib/api/profiles'
+import { useAuth } from '@/hooks/useAuth'
 import type { UserProfile, UserProfileFormData } from '@/types/profile'
 import { toast } from 'react-hot-toast'
 
@@ -13,10 +14,21 @@ export function useProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { isAuthenticated, loading: authLoading } = useAuth()
 
   useEffect(() => {
-    loadProfile()
-  }, [])
+    if (authLoading) {
+      return
+    }
+
+    if (!isAuthenticated) {
+      setProfile(null)
+      setLoading(false)
+      return
+    }
+
+    void loadProfile()
+  }, [authLoading, isAuthenticated])
 
   const loadProfile = async () => {
     try {
@@ -24,7 +36,14 @@ export function useProfile() {
       const data = await getMyProfile()
       setProfile(data)
     } catch (error: any) {
-      console.error('Error loading profile:', error)
+      const isAuthFailure =
+        error?.message === 'Email verification required' ||
+        error?.status === 401 ||
+        error?.status === 403
+
+      if (!isAuthFailure) {
+        console.error('Error loading profile:', error)
+      }
       
       // Don't show error toast for 404 - profile will be created
       // Only show error for actual connection/server errors
@@ -35,6 +54,9 @@ export function useProfile() {
       } else if (error.message?.includes('Database') || error.message?.includes('connection')) {
         // Database connection error - show error but don't redirect
         toast.error('Database connection error. Please check your configuration.')
+        setProfile(null)
+      } else if (isAuthFailure) {
+        // Auth redirect will handle this path; avoid repeated toasts while the session clears.
         setProfile(null)
       } else {
         // Other errors
@@ -80,4 +102,3 @@ export function useProfile() {
     saveProfile,
   }
 }
-

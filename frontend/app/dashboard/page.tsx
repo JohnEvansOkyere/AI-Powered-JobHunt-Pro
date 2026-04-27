@@ -19,18 +19,22 @@ interface Stats {
 
 export default function DashboardPage() {
   const { profile, loading: profileLoading } = useProfile()
-  const { user } = useAuth()
+  const { user, isAuthenticated, loading: authLoading } = useAuth()
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      return
+    }
+
     if (!profileLoading && !profile) {
       const timer = setTimeout(() => {
         if (!profile) router.push('/profile/setup')
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [profile, profileLoading, router])
+  }, [authLoading, isAuthenticated, profile, profileLoading, router])
 
   useEffect(() => {
     async function loadStats() {
@@ -48,10 +52,13 @@ export default function DashboardPage() {
         setStats({ applicationsTotal: 0, submittedCount: 0, recommendationsTotal: 0 })
       }
     }
-    loadStats()
-  }, [])
 
-  if (profileLoading) {
+    if (!authLoading && isAuthenticated) {
+      void loadStats()
+    }
+  }, [authLoading, isAuthenticated])
+
+  if (authLoading || profileLoading) {
     return (
       <ProtectedRoute>
         <DashboardLayout>
