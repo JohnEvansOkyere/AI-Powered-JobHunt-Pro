@@ -35,6 +35,15 @@ class Job(Base):
     scraped_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     added_by_user_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # User who added external job
 
+    # Upstream origin (for recruiter jobs mirrored from the ATS)
+    origin_system = Column(String(50), nullable=True, index=True)
+    origin_job_id = Column(Text, nullable=True, index=True)
+    origin_updated_at = Column(TIMESTAMP(timezone=True), nullable=True, index=True)
+    ats_organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    organization_name = Column(Text, nullable=True)
+    organization_logo_url = Column(Text, nullable=True)
+    publication_status = Column(String(20), nullable=True, index=True)
+
     # Normalized Data
     normalized_title = Column(Text, nullable=True)
     normalized_location = Column(Text, nullable=True)
@@ -67,5 +76,6 @@ class Job(Base):
     # Composite index for search
     __table_args__ = (
         Index("idx_jobs_title_company", "title", "company"),
+        Index("uq_jobs_origin_system_job_id", "origin_system", "origin_job_id", unique=True),
     )
 

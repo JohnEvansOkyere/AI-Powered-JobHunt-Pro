@@ -22,6 +22,7 @@ export interface Job {
   description: string
   matchScore?: number
   url: string
+  source?: string
 }
 
 interface JobCardProps {
@@ -55,6 +56,11 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
             {job.matchScore !== undefined && (
               <span className="inline-flex items-center text-[11px] font-medium bg-brand-turquoise-50 text-brand-turquoise-700 border border-brand-turquoise-100 rounded-md px-1.5 py-0.5">
                 {job.matchScore}% match
+              </span>
+            )}
+            {job.source === 'recruiter' && (
+              <span className="inline-flex items-center text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md px-1.5 py-0.5">
+                Direct role
               </span>
             )}
           </div>

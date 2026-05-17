@@ -64,6 +64,7 @@ function recToCardJob(rec: RecommendationItem): JobCardJob {
     description: rec.match_reason ?? '',
     matchScore: rec.catalog_only ? undefined : Math.round(rec.match_score * 100),
     url: j?.job_link ?? j?.source_url ?? '',
+    source: j?.source ?? undefined,
   }
 }
 
@@ -78,6 +79,7 @@ function jobToCardJob(job: Job): JobCardJob {
     postedDate: job.posted_date ?? job.scraped_at ?? new Date().toISOString(),
     description: (job as any).description ?? '',
     url: job.job_link ?? job.source_url ?? '',
+    source: job.source,
   }
 }
 
@@ -107,6 +109,8 @@ function JobsPageContent() {
   const router = useRouter()
   const tierParam = searchParams.get('tier')
   const activeTier: Tier | null = isValidTier(tierParam) ? tierParam : null
+  const activeView = searchParams.get('view')
+  const isJobBoard = !activeTier && activeView === 'board'
 
   const [cardJobs, setCardJobs] = useState<JobCardJob[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -124,7 +128,7 @@ function JobsPageContent() {
   // Reset paging when tier, query, or filters change.
   useEffect(() => {
     setPage(1)
-  }, [activeTier, appliedSearchQuery, filters])
+  }, [activeTier, isJobBoard, appliedSearchQuery, filters])
 
   // Load data whenever the inputs change.
   useEffect(() => {
@@ -134,7 +138,7 @@ function JobsPageContent() {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTier, page, appliedSearchQuery, filters, authLoading, isAuthenticated])
+  }, [activeTier, isJobBoard, page, appliedSearchQuery, filters, authLoading, isAuthenticated])
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -162,6 +166,7 @@ function JobsPageContent() {
       } else {
         // Search mode: server-side filtering.
         const params: JobSearchParams = { page, page_size: PAGE_SIZE }
+        if (isJobBoard) params.source = 'recruiter'
         if (filters.jobTitle) params.q = filters.jobTitle
         else if (appliedSearchQuery) params.q = appliedSearchQuery
         if (filters.location) params.location = filters.location
@@ -256,10 +261,12 @@ function JobsPageContent() {
     router.push('/dashboard/jobs')
   }
 
-  const pageTitle = activeTier ? TIER_META[activeTier].label : 'Jobs'
+  const pageTitle = activeTier ? TIER_META[activeTier].label : isJobBoard ? 'Job Board' : 'All Jobs'
   const pageDescription = activeTier
     ? TIER_META[activeTier].description
-    : 'Browse your matches or search the full index.'
+    : isJobBoard
+      ? 'Direct roles posted by recruiters in our ecosystem.'
+      : 'Browse the full index, including scraped opportunities.'
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -312,6 +319,30 @@ function JobsPageContent() {
                 </div>
                 <p className="text-sm text-neutral-500 mt-0.5">{pageDescription}</p>
               </div>
+              {!activeTier && (
+                <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-1 text-sm">
+                  <Link
+                    href="/dashboard/jobs?view=board"
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      isJobBoard
+                        ? 'bg-neutral-900 text-white'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Job Board
+                  </Link>
+                  <Link
+                    href="/dashboard/jobs"
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      !isJobBoard
+                        ? 'bg-neutral-900 text-white'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    All Jobs
+                  </Link>
+                </div>
+              )}
             </div>
           </header>
 

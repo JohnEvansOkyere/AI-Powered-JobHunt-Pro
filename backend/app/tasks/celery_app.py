@@ -45,6 +45,11 @@ celery_app.conf.beat_schedule = {
         "task": "scheduler.scrape_recent_jobs",
         "schedule": crontab(minute=0, hour=6, day_of_month="*/3"),
     },
+    # Mirror recruiter-created ATS jobs every 10 minutes
+    "sync-ats-jobs-every-10-minutes": {
+        "task": "scheduler.sync_ats_jobs",
+        "schedule": crontab(minute="*/10"),
+    },
     # Generate recommendations for all eligible users every 12 hours
     "generate-recommendations-every-12-hours": {
         "task": "scheduler.generate_recommendations_for_all",

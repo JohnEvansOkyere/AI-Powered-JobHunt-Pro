@@ -126,15 +126,19 @@ def _tier3_catalog_response(
     except ValueError:
         user_uuid = None
 
-    non_external_recent = and_(
-        Job.source != "external",
+    recent_non_recruiter = and_(
+        Job.source.notin_(("external", "recruiter")),
         or_(Job.scraped_at > cutoff, Job.posted_date > cutoff),
+    )
+    published_recruiter = and_(
+        Job.source == "recruiter",
+        Job.publication_status == "published",
     )
     if user_uuid is not None:
         own_external = and_(Job.source == "external", Job.added_by_user_id == user_uuid)
-        visibility = or_(non_external_recent, own_external)
+        visibility = or_(recent_non_recruiter, published_recruiter, own_external)
     else:
-        visibility = non_external_recent
+        visibility = or_(recent_non_recruiter, published_recruiter)
 
     q = db.query(Job).filter(
         Job.processing_status != "archived",

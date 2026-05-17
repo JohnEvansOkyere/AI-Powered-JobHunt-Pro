@@ -180,6 +180,15 @@ CREATE TABLE IF NOT EXISTS jobs (
     scraped_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     added_by_user_id UUID,
 
+    -- Upstream origin (for recruiter jobs mirrored from ATS)
+    origin_system TEXT,
+    origin_job_id TEXT,
+    origin_updated_at TIMESTAMP WITH TIME ZONE,
+    ats_organization_id UUID,
+    organization_name TEXT,
+    organization_logo_url TEXT,
+    publication_status TEXT,
+
     -- Normalized Data
     normalized_title TEXT,
     normalized_location TEXT,
@@ -217,6 +226,13 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_level VARCHAR(20);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS requirements TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS responsibilities TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS skills TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS origin_system TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS origin_job_id TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS origin_updated_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ats_organization_id UUID;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_name TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_logo_url TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS publication_status TEXT;
 
 -- Indexes for jobs
 CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);
@@ -230,6 +246,13 @@ CREATE INDEX IF NOT EXISTS idx_jobs_job_link ON jobs(job_link);
 CREATE INDEX IF NOT EXISTS idx_jobs_added_by_user_id ON jobs(added_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_source_url ON jobs(source_url);
 CREATE INDEX IF NOT EXISTS idx_jobs_experience_level ON jobs(experience_level);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_origin_system_job_id
+    ON jobs(origin_system, origin_job_id)
+    WHERE origin_system IS NOT NULL AND origin_job_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_jobs_origin_system ON jobs(origin_system);
+CREATE INDEX IF NOT EXISTS idx_jobs_origin_updated_at ON jobs(origin_updated_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_ats_organization_id ON jobs(ats_organization_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_publication_status ON jobs(publication_status);
 
 -- =====================================================
 -- PART 6: JOB MATCHES TABLE

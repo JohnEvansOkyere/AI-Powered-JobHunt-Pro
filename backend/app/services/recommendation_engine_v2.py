@@ -633,8 +633,12 @@ class RecommendationEngineV2:
                 WHERE e.model = :model
                   AND (
                     (
-                      j.source != 'external'
+                      j.source NOT IN ('external', 'recruiter')
                       AND (j.scraped_at > :cutoff OR j.posted_date > :cutoff)
+                    )
+                    OR (
+                      j.source = 'recruiter'
+                      AND j.publication_status = 'published'
                     )
                     OR (
                       j.source = 'external'
@@ -681,9 +685,13 @@ class RecommendationEngineV2:
         """Fallback: load all embedded recent jobs and rank in Python."""
         cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_JOB_WINDOW_DAYS)
         user_uuid = _coerce_uuid(user_id)
-        non_external_recent = and_(
-            Job.source != "external",
+        recent_non_recruiter = and_(
+            Job.source.notin_(("external", "recruiter")),
             or_(Job.scraped_at > cutoff, Job.posted_date > cutoff),
+        )
+        published_recruiter = and_(
+            Job.source == "recruiter",
+            Job.publication_status == "published",
         )
         own_external = and_(
             Job.source == "external",
@@ -694,7 +702,7 @@ class RecommendationEngineV2:
             .join(JobEmbedding, JobEmbedding.job_id == Job.id)
             .filter(
                 JobEmbedding.model == model,
-                or_(non_external_recent, own_external),
+                or_(recent_non_recruiter, published_recruiter, own_external),
             )
             .all()
         )

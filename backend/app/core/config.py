@@ -113,6 +113,24 @@ class Settings(BaseSettings):
         description="Secret for cron endpoints (X-Cron-Secret header). If set, required to trigger cleanup.",
     )
 
+    # ATS job mirroring (private ecosystem integration)
+    ATS_SYNC_ENABLED: bool = Field(
+        default=False,
+        description="If True, mirror published recruiter jobs from the ATS into this candidate platform.",
+    )
+    ATS_PUBLISHED_JOBS_URL: str = Field(
+        default="",
+        description="Full ATS published-jobs integration endpoint URL.",
+    )
+    ATS_SYNC_TOKEN: str = Field(
+        default="",
+        description="Service token sent as X-Candidate-Sync-Token when pulling ATS jobs.",
+    )
+    ATS_SYNC_TIMEOUT_SECONDS: float = Field(
+        default=15.0,
+        description="HTTP timeout for ATS job sync calls.",
+    )
+
     # Job Scraping
     SCRAPING_USER_AGENT: str = Field(
         default="Mozilla/5.0 (compatible; JobHuntBot/1.0)",

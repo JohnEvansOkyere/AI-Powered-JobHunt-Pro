@@ -117,6 +117,34 @@ def scrape_recent_jobs() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Task: mirror recruiter jobs from ATS
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="scheduler.sync_ats_jobs", ignore_result=False)
+def sync_ats_jobs() -> Dict[str, Any]:
+    """Mirror published recruiter jobs from the ATS into the candidate DB."""
+    from app.core.config import settings
+    from app.services.ats_job_sync_service import ATSJobSyncService
+
+    if not settings.ATS_SYNC_ENABLED:
+        logger.info("scheduled.sync_ats_jobs.disabled")
+        return {"status": "disabled"}
+
+    logger.info("scheduled.sync_ats_jobs.start")
+    db: Session = SessionLocal()
+    try:
+        stats = ATSJobSyncService(db).sync()
+        return {"status": "success", **stats.as_dict()}
+    except Exception as exc:
+        logger.error("scheduled.sync_ats_jobs.failed", error=str(exc), exc_info=True)
+        db.rollback()
+        return {"status": "failed", "error": str(exc)}
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Task: generate recommendations for all eligible users
 # ---------------------------------------------------------------------------
 
@@ -309,7 +337,7 @@ def cleanup_old_jobs() -> int:
             db.query(Job)
             .filter(
                 Job.scraped_at < cutoff_date,
-                Job.source != "external",
+                Job.source.notin_(("external", "recruiter")),
             )
             .all()
         )
