@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: Union[str, List[str]] = Field(
         default=["*"], description="Allowed hosts for TrustedHost middleware"
     )
+    APP_PUBLIC_URL: str = Field(
+        default="http://localhost:3000",
+        description="Public frontend URL used in outbound notification CTAs.",
+    )
 
     # Sentry
     SENTRY_DSN: str = Field(default="", description="Sentry DSN for error tracking")
@@ -246,6 +250,10 @@ class Settings(BaseSettings):
     WHATSAPP_PROVIDER_RPS: int = Field(
         default=5,
         description="Client-side rate limit (requests/sec) against the Cloud API.",
+    )
+    WHATSAPP_DIGEST_MAX_JOBS: int = Field(
+        default=5,
+        description="Maximum Tier-1 jobs included in one WhatsApp digest.",
     )
     WHATSAPP_OTP_TTL_SECONDS: int = Field(
         default=600,

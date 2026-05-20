@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.tasks.ai_processing",
         "app.tasks.periodic_tasks",
         "app.tasks.embeddings",
+        "app.tasks.whatsapp_digest",
     ],
 )
 
@@ -60,6 +61,11 @@ celery_app.conf.beat_schedule = {
     "backfill-empty-users-hourly": {
         "task": "scheduler.generate_recommendations_for_empty_users",
         "schedule": crontab(minute=15),
+    },
+    # Send Tier-1 recommendation digests to verified WhatsApp subscribers.
+    "dispatch-whatsapp-digests-hourly": {
+        "task": "notifications.dispatch_whatsapp_digests",
+        "schedule": crontab(minute=0),
     },
     # Daily cleanups — staggered so they don't all hit SessionLocal at once
     "cleanup-expired-saved-jobs-daily": {

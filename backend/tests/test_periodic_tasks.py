@@ -18,6 +18,7 @@ EXPECTED_BEAT_ENTRIES = {
     "sync-ats-jobs-every-10-minutes": "scheduler.sync_ats_jobs",
     "generate-recommendations-every-12-hours": "scheduler.generate_recommendations_for_all",
     "backfill-empty-users-hourly": "scheduler.generate_recommendations_for_empty_users",
+    "dispatch-whatsapp-digests-hourly": "notifications.dispatch_whatsapp_digests",
     "cleanup-expired-saved-jobs-daily": "scheduler.cleanup_expired_saved_jobs",
     "cleanup-expired-recommendations-daily": "scheduler.cleanup_expired_recommendations",
     "cleanup-old-jobs-daily": "scheduler.cleanup_old_jobs",
@@ -44,6 +45,7 @@ def test_beat_entry_points_at_registered_task(entry_name: str, task_name: str):
 def test_all_scheduled_tasks_are_registered():
     # Importing the module registers the tasks via @celery_app.task decorators.
     from app.tasks import periodic_tasks  # noqa: F401
+    from app.tasks import whatsapp_digest  # noqa: F401
 
     registered = set(celery_app.tasks.keys())
     for task_name in EXPECTED_BEAT_ENTRIES.values():
@@ -59,3 +61,4 @@ def test_apscheduler_package_is_gone():
 def test_celery_include_covers_periodic_tasks():
     include = celery_module.celery_app.conf.include or []
     assert "app.tasks.periodic_tasks" in include
+    assert "app.tasks.whatsapp_digest" in include

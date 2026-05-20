@@ -477,13 +477,13 @@ Each phase is a self-contained PR and can be reviewed independently. Phases can 
 - [x] Webhook: `GET|POST /api/v1/webhooks/whatsapp` — Meta verify handshake; POST verifies `X-Hub-Signature-256` when `WHATSAPP_APP_SECRET` is set; persists inbound events; updates `whatsapp_messages` by `provider_message_id`; STOP keywords flip `notification_preferences.whatsapp_opted_in` off.
 - [x] `backend/scripts/ops/submit_whatsapp_templates.py` — template JSON + optional `--execute` submission.
 - [x] Tests: `tests/test_whatsapp_phase4b.py` (HMAC, dry-run client, webhook verify, webhook POST).
-- [ ] Frontend: profile settings panel for WhatsApp — phone input, verify code box, digest time, timezone picker, opt-out toggle.
+- [x] Frontend: settings panel for WhatsApp — phone input, verify code box, digest time, timezone picker, opt-out toggle.
 
 ### Phase 5 — WhatsApp digest dispatcher (2 days)
 
-- [ ] Celery Beat hourly task `dispatch_whatsapp_digests`.
-- [ ] Celery worker task `send_whatsapp_template` with idempotency, backoff, budget circuit breaker.
-- [ ] Signed-link generator for the CTA URL (short-lived JWT or Supabase magic link).
+- [x] Celery Beat hourly task `dispatch_whatsapp_digests`.
+- [x] Celery worker task `send_whatsapp_digest` with idempotency, backoff, budget circuit breaker.
+- [x] CTA URL generator via `APP_PUBLIC_URL` to `/dashboard/recommendations` (not auth-magic; users still authenticate normally).
 - [ ] Admin endpoint `GET /admin/whatsapp/stats` — daily sends, delivery rate, opt-out rate.
 - [ ] End-to-end test: opt-in user with one Tier-1 rec receives the template; STOP reply flips opt-in; next day's dispatcher skips them.
 

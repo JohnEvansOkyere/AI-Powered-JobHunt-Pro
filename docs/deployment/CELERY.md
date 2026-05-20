@@ -37,12 +37,33 @@ Defined in `backend/app/tasks/celery_app.py` as `celery_app.conf.beat_schedule`:
 | `scrape-recent-jobs-every-3-days` | `scheduler.scrape_recent_jobs` | Every 3rd day at 06:00 |
 | `generate-recommendations-every-12-hours` | `scheduler.generate_recommendations_for_all` | Every 12 hours |
 | `backfill-empty-users-hourly` | `scheduler.generate_recommendations_for_empty_users` | Every hour at :15 |
+| `dispatch-whatsapp-digests-hourly` | `notifications.dispatch_whatsapp_digests` | Every hour |
 | `cleanup-expired-saved-jobs-daily` | `scheduler.cleanup_expired_saved_jobs` | 00:00 |
 | `cleanup-expired-recommendations-daily` | `scheduler.cleanup_expired_recommendations` | 00:05 |
 | `cleanup-old-jobs-daily` | `scheduler.cleanup_old_jobs` | 00:10 |
 
 The smoke test in `backend/tests/test_periodic_tasks.py` asserts these entries
 exist so they cannot be silently removed.
+
+## WhatsApp digest delivery
+
+`notifications.dispatch_whatsapp_digests` finds verified, opted-in WhatsApp
+users whose local digest time is due and queues
+`notifications.send_whatsapp_digest`. The send task pulls up to
+`WHATSAPP_DIGEST_MAX_JOBS` Tier-1 recommendations, writes an idempotent audit
+row to `whatsapp_messages`, then sends the `WHATSAPP_TEMPLATE_DIGEST` template.
+
+Required production settings:
+
+- `APP_PUBLIC_URL` — frontend URL used for the Job Match CTA.
+- `WHATSAPP_ENABLED=true`
+- `WHATSAPP_SEND_MODE=live`
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- Approved `WHATSAPP_TEMPLATE_DIGEST` template.
+
+`WHATSAPP_SEND_MODE=dry_run` exercises the whole task path without calling
+Meta, which is useful in staging and local verification.
 
 ## Manual triggers
 
