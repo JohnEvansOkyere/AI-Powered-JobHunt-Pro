@@ -13,7 +13,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.api.v1.dependencies import get_current_user
+from app.api.v1.dependencies import get_current_user, get_optional_user
 from app.core.logging import get_logger
 from app.models.job import Job
 from app.models.scraping_job import ScrapingJob
@@ -134,7 +134,7 @@ async def search_jobs(
     matched: bool = Query(False, description="Deprecated. Use /api/v1/recommendations."),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """

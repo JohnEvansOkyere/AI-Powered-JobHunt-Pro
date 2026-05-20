@@ -13,7 +13,6 @@ import { saveJob, markJobApplied } from '@/lib/api/applications'
 import {
   Star,
   Zap,
-  List,
   RefreshCw,
   ExternalLink,
   Bookmark,
@@ -77,16 +76,6 @@ const TIER_CONFIG: {
     iconColor: 'text-brand-turquoise-600',
     dotColor: 'bg-brand-turquoise-500',
     description: 'Adjacent roles with strong semantic match.',
-  },
-  {
-    id: 'tier3',
-    label: 'All roles',
-    mobileLabel: 'All',
-    icon: List,
-    iconColor: 'text-neutral-500',
-    dotColor: 'bg-neutral-400',
-    description:
-      'All visible roles in your current pool, including your top picks.',
   },
 ]
 
@@ -294,7 +283,7 @@ export default function RecommendationsPage() {
   const [tierStates, setTierStates] = useState<Record<Tier, TierState>>({
     tier1: { ...INITIAL_TIER_STATE },
     tier2: { ...INITIAL_TIER_STATE },
-    tier3: { ...INITIAL_TIER_STATE },
+    tier3: { items: [], total: 0, loading: false, error: null },
   })
   const [activeTab, setActiveTab] = useState<TabId>('tier1')
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set())
@@ -331,8 +320,7 @@ export default function RecommendationsPage() {
       return
     }
 
-    const tiers: Tier[] = ['tier1', 'tier2', 'tier3']
-    void Promise.all(tiers.map((t) => loadTier(t)))
+    void Promise.all((['tier1', 'tier2'] as Tier[]).map((t) => loadTier(t)))
   }, [authLoading, isAuthenticated, loadTier])
 
   const handleTabChange = (tier: TabId) => {
@@ -379,11 +367,9 @@ export default function RecommendationsPage() {
         setTierStates({
           tier1: { ...INITIAL_TIER_STATE },
           tier2: { ...INITIAL_TIER_STATE },
-          tier3: { ...INITIAL_TIER_STATE },
+          tier3: { items: [], total: 0, loading: false, error: null },
         })
-        void Promise.all(
-          (['tier1', 'tier2', 'tier3'] as const).map((t) => loadTier(t)),
-        )
+        void Promise.all((['tier1', 'tier2'] as Tier[]).map((t) => loadTier(t)))
       }
     } catch {
       toast.error('Could not refresh. Try again later.')

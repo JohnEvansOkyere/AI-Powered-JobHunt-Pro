@@ -52,3 +52,14 @@ This file is the repo-local operating guide for coding agents working on `AI-Pow
 - If schema changes, update both migrations and the complete Supabase setup script or clearly document the migration order.
 - Audit documents should separate confirmed findings, inferred risks, and verification gaps.
 
+## MEMORY.md — Required After Every Task
+
+After completing any task, append a row to the Change Log table in `MEMORY.md` (repo root). Format:
+
+```
+| YYYY-MM-DD | What changed (files touched, behaviour before/after) | Why (user intent or bug being fixed) |
+```
+
+Do not skip this step. Do not rewrite or delete existing rows. Append only.
+Also update sections 6–10 of `MEMORY.md` if your task changes navigation structure, public access rules, open items, or known issues.
+

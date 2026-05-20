@@ -16,6 +16,7 @@ import {
   X,
   Home,
   Star,
+  Briefcase,
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -24,7 +25,8 @@ interface DashboardLayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Jobs', href: '/dashboard/recommendations', icon: Star },
+  { name: 'Job Match', href: '/dashboard/recommendations', icon: Star },
+  { name: 'All Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { name: 'Applications', href: '/dashboard/applications', icon: FileText },
   { name: 'Profile', href: '/dashboard/profile', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

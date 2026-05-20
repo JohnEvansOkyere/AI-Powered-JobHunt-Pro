@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { JobFilters, FilterState } from '@/components/jobs/JobFilters'
 import { JobCard, type Job as JobCardJob } from '@/components/jobs/JobCard'
@@ -18,6 +17,7 @@ import { markJobApplied } from '@/lib/api/applications'
 import { Search, Loader, X, ArrowLeft } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
+import { PostApplyModal } from '@/components/jobs/PostApplyModal'
 
 const TIER_META: Record<Tier, { label: string; description: string; dot: string }> = {
   tier1: {
@@ -93,13 +93,11 @@ export default function JobsPage() {
 
 function JobsPageFallback() {
   return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader className="h-6 w-6 text-neutral-300 animate-spin" />
-        </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout>
+      <div className="flex items-center justify-center py-12">
+        <Loader className="h-6 w-6 text-neutral-300 animate-spin" />
+      </div>
+    </DashboardLayout>
   )
 }
 
@@ -121,6 +119,7 @@ function JobsPageContent() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
+  const [showPostApplyModal, setShowPostApplyModal] = useState(false)
 
   // Cache of all recommendations for the current tier (client-side filter).
   const [tierItems, setTierItems] = useState<RecommendationItem[]>([])
@@ -215,6 +214,10 @@ function JobsPageContent() {
   }
 
   const handleApply = async (jobId: string) => {
+    if (!isAuthenticated) {
+      setShowPostApplyModal(true)
+      return
+    }
     try {
       await markJobApplied(jobId)
     } catch (error) {
@@ -261,7 +264,7 @@ function JobsPageContent() {
     router.push('/dashboard/jobs')
   }
 
-  const pageTitle = activeTier ? TIER_META[activeTier].label : isJobBoard ? 'Job Board' : 'All Jobs'
+  const pageTitle = activeTier ? TIER_META[activeTier].label : isJobBoard ? 'Local Jobs' : 'Overall Jobs'
   const pageDescription = activeTier
     ? TIER_META[activeTier].description
     : isJobBoard
@@ -281,7 +284,8 @@ function JobsPageContent() {
   }, [appliedSearchQuery, filters])
 
   return (
-    <ProtectedRoute>
+    <>
+      <PostApplyModal open={showPostApplyModal} onClose={() => setShowPostApplyModal(false)} />
       <DashboardLayout>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -322,16 +326,6 @@ function JobsPageContent() {
               {!activeTier && (
                 <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-1 text-sm">
                   <Link
-                    href="/dashboard/jobs?view=board"
-                    className={`rounded-md px-3 py-1.5 transition-colors ${
-                      isJobBoard
-                        ? 'bg-neutral-900 text-white'
-                        : 'text-neutral-600 hover:text-neutral-900'
-                    }`}
-                  >
-                    Job Board
-                  </Link>
-                  <Link
                     href="/dashboard/jobs"
                     className={`rounded-md px-3 py-1.5 transition-colors ${
                       !isJobBoard
@@ -339,7 +333,17 @@ function JobsPageContent() {
                         : 'text-neutral-600 hover:text-neutral-900'
                     }`}
                   >
-                    All Jobs
+                    Overall Jobs
+                  </Link>
+                  <Link
+                    href="/dashboard/jobs?view=board"
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      isJobBoard
+                        ? 'bg-neutral-900 text-white'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Local Jobs
                   </Link>
                 </div>
               )}
@@ -447,7 +451,7 @@ function JobsPageContent() {
           </div>
         </div>
       </DashboardLayout>
-    </ProtectedRoute>
+    </>
   )
 }
 

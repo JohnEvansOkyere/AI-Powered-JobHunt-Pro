@@ -1,5 +1,6 @@
 """Shared API dependencies for authentication, authorization, and common operations."""
 
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -138,6 +139,21 @@ async def get_current_user(
         )
 
         raise _unauthorized()
+
+
+security_optional = HTTPBearer(auto_error=False)
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+) -> Optional[dict]:
+    """Like get_current_user but returns None for unauthenticated requests."""
+    if not credentials:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except HTTPException:
+        return None
 
 
 def get_supabase(

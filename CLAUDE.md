@@ -178,7 +178,17 @@ Hard requirements when editing relevant code:
 - Frontend has no test runner yet; `npm run type-check` and `npm run build` are the gate.
 - There is no CI workflow in-repo yet. Manual runs of the default commands stand in for CI.
 
-## 9. Documentation expectations
+## 9. MEMORY.md — Required After Every Task
+
+`MEMORY.md` in the repo root is the living cross-session memory of the entire ecosystem. After completing **any** task:
+
+1. Append a row to the **Change Log** table — date (UTC), what changed (files + behaviour), why.
+2. If your task changed navigation, public access rules, open items, or known issues, update the relevant section (6–10).
+3. Never delete or rewrite existing rows — append only.
+
+This applies to Claude, Codex, and any other agent working in this repo.
+
+## 10. Documentation expectations
 
 - When behavior changes, update the closest doc in `docs/`. Common ones: `SETUP.md`, `JOB_SCHEDULER_SETUP.md`, `JOB_SCRAPING_GUIDE.md`, `AI_CV_GENERATOR_*`, `ERRORS_AND_SOLUTIONS.md`, `DEPLOYMENT.md`.
 - When schema changes:
