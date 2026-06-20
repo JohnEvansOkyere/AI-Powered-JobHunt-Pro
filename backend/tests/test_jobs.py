@@ -9,8 +9,30 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
+from app.scrapers.base import BaseScraper
+
+
+class _NormalizingScraper(BaseScraper):
+    """Concrete BaseScraper to exercise the shared normalization helpers.
+
+    BaseScraper is abstract (scrape/normalize_job), so tests can't instantiate
+    it directly; this minimal subclass populates normalized_title via the
+    inherited helper.
+    """
+
+    def __init__(self):
+        super().__init__("test")
+
+    async def scrape(self, *args, **kwargs):
+        return []
+
+    def normalize_job(self, job):
+        job.normalized_title = self.normalize_title(job.title)
+        return job
+
 
 @pytest.mark.jobs
+@pytest.mark.integration
 class TestJobSearch:
     """Test job search endpoint."""
 
@@ -136,6 +158,7 @@ class TestJobSearch:
 
 
 @pytest.mark.jobs
+@pytest.mark.integration
 class TestJobRetrieval:
     """Test individual job retrieval."""
 
@@ -247,6 +270,7 @@ class TestJobScraping:
 
 
 @pytest.mark.jobs
+@pytest.mark.integration
 class TestScrapingJobStatus:
     """Test scraping job status tracking."""
 
@@ -298,6 +322,7 @@ class TestScrapingJobStatus:
 
 
 @pytest.mark.jobs
+@pytest.mark.integration
 @pytest.mark.integration
 class TestJobDeduplication:
     """Test job deduplication logic."""
@@ -376,9 +401,9 @@ class TestJobNormalization:
 
     def test_normalize_job_title(self):
         """Test job title normalization."""
-        from app.scrapers.base import BaseScraper, JobListing
+        from app.scrapers.base import JobListing
 
-        scraper = BaseScraper()
+        scraper = _NormalizingScraper()
 
         job = JobListing(
             title="Senior Python Developer - Remote (San Francisco)",
@@ -396,9 +421,9 @@ class TestJobNormalization:
 
     def test_extract_remote_type(self):
         """Test remote type extraction."""
-        from app.scrapers.base import BaseScraper, JobListing
+        from app.scrapers.base import JobListing
 
-        scraper = BaseScraper()
+        scraper = _NormalizingScraper()
 
         # Remote job
         job1 = JobListing(
@@ -415,9 +440,9 @@ class TestJobNormalization:
 
     def test_extract_salary_range(self):
         """Test salary range extraction from description."""
-        from app.scrapers.base import BaseScraper, JobListing
+        from app.scrapers.base import JobListing
 
-        scraper = BaseScraper()
+        scraper = _NormalizingScraper()
 
         job = JobListing(
             title="Developer",

@@ -11,9 +11,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestHealthCheck:
-    """Test health check endpoint."""
+    """Test health check endpoint.
+
+    Integration: /health actively pings the database and Redis, so it needs
+    live services (returns 503 without them).
+    """
 
     def test_health_check_success(self, client: TestClient):
         """Test that health check returns 200."""

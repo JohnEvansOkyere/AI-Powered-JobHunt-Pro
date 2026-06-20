@@ -5,7 +5,7 @@ Tests for AI model router, usage tracking, and cost optimization.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.ai.router import ModelRouter
 from app.ai.base import TaskType, AIProvider
 
@@ -122,7 +122,9 @@ class TestTokenEstimation:
         router = ModelRouter()
 
         text = "A" * 100
-        tokens = router._estimate_tokens(text)
+        # tiktoken is installed in CI, so force the fallback path explicitly.
+        with patch("app.ai.router.TIKTOKEN_AVAILABLE", False):
+            tokens = router._estimate_tokens(text)
 
         # Fallback: ~1 token per 4 characters
         # So 100 chars ≈ 25 tokens
