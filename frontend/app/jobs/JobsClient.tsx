@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Bell, Bookmark, Briefcase, Filter, Loader, Search, Sparkles, X } from 'lucide-react'
+import {
+  ArrowRight,
+  Bell,
+  Bookmark,
+  Briefcase,
+  Banknote,
+  Filter,
+  Globe,
+  MapPin,
+  Search,
+  Sparkles,
+  TrendingUp,
+  X,
+} from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { searchJobs, type Job, type JobSearchParams } from '@/lib/api/jobs'
 
@@ -21,8 +34,197 @@ function formatDate(dateString?: string | null) {
   return `Posted ${Math.floor(diffDays / 30)}mo ago`
 }
 
+function isNew(dateString?: string | null) {
+  if (!dateString) return false
+  const diffDays = Math.floor((Date.now() - new Date(dateString).getTime()) / 86400000)
+  return diffDays <= 3
+}
+
 function jobApplyHref(job: Job) {
   return job.job_link || job.source_url || ''
+}
+
+function prettify(value?: string | null) {
+  if (!value) return ''
+  return value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function salaryLabel(job: Job): string | null {
+  if (job.salary_range) return job.salary_range
+  const cur = job.salary_currency || ''
+  if (job.salary_min && job.salary_max) return `${cur}${job.salary_min} – ${cur}${job.salary_max}`
+  if (job.salary_min) return `From ${cur}${job.salary_min}`
+  return null
+}
+
+function parseSkills(skills?: string | null): string[] {
+  if (!skills) return []
+  try {
+    const parsed = JSON.parse(skills)
+    if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String)
+  } catch {
+    // fall back to comma-separated
+    return skills.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+  return []
+}
+
+// Deterministic on-brand avatar colour from the company name.
+const AVATAR_STYLES = [
+  'bg-brand-turquoise-100 text-brand-turquoise-800',
+  'bg-emerald-100 text-emerald-800',
+  'bg-amber-100 text-amber-800',
+  'bg-indigo-100 text-indigo-800',
+  'bg-rose-100 text-rose-800',
+  'bg-forest-500/15 text-forest-700',
+]
+function avatarFor(name?: string | null) {
+  const safe = (name || '?').trim()
+  const initials = safe
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase() || '?'
+  let hash = 0
+  for (let i = 0; i < safe.length; i++) hash = (hash * 31 + safe.charCodeAt(i)) >>> 0
+  return { initials, style: AVATAR_STYLES[hash % AVATAR_STYLES.length] }
+}
+
+function Chip({ icon: Icon, children }: { icon: typeof MapPin; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600">
+      <Icon className="h-3 w-3 text-neutral-400" />
+      {children}
+    </span>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="flex gap-4">
+        <div className="h-11 w-11 shrink-0 rounded-xl bg-neutral-100" />
+        <div className="min-w-0 flex-1">
+          <div className="h-3 w-24 rounded bg-neutral-100" />
+          <div className="mt-3 h-4 w-2/3 rounded bg-neutral-100" />
+          <div className="mt-2 h-3 w-1/3 rounded bg-neutral-100" />
+          <div className="mt-4 flex gap-2">
+            <div className="h-6 w-20 rounded-md bg-neutral-100" />
+            <div className="h-6 w-16 rounded-md bg-neutral-100" />
+            <div className="h-6 w-24 rounded-md bg-neutral-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id: string) => void }) {
+  const avatar = avatarFor(job.company)
+  const fresh = isNew(job.posted_date || job.scraped_at)
+  const salary = salaryLabel(job)
+  const skills = parseSkills(job.skills).slice(0, 4)
+  const applyHref = jobApplyHref(job)
+
+  return (
+    <article className="group relative rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-turquoise-300 hover:shadow-md">
+      <div className="flex gap-4">
+        {/* Avatar */}
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${avatar.style}`}>
+          {avatar.initials}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            {job.source === 'recruiter' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                <Sparkles className="h-3 w-3" /> Direct role
+              </span>
+            )}
+            {fresh && (
+              <span className="rounded-full bg-ember-400/15 px-2 py-0.5 text-xs font-semibold text-ember-700">
+                New
+              </span>
+            )}
+            <span className="text-xs text-neutral-400">{formatDate(job.posted_date || job.scraped_at)}</span>
+          </div>
+
+          <Link
+            href={`/jobs/${job.id}`}
+            className="block text-lg font-semibold leading-snug text-neutral-900 transition-colors hover:text-brand-turquoise-700"
+          >
+            {job.title}
+          </Link>
+          <p className="mt-0.5 text-sm font-medium text-neutral-600">{job.company}</p>
+
+          {/* Metadata chips */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {job.location && <Chip icon={MapPin}>{job.location}</Chip>}
+            {(job.remote_type || job.remote_option) && (
+              <Chip icon={Globe}>{prettify(job.remote_type || job.remote_option)}</Chip>
+            )}
+            {job.job_type && <Chip icon={Briefcase}>{prettify(job.job_type)}</Chip>}
+            {job.experience_level && <Chip icon={TrendingUp}>{prettify(job.experience_level)}</Chip>}
+            {salary && <Chip icon={Banknote}>{salary}</Chip>}
+          </div>
+
+          <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-neutral-500">{job.description}</p>
+
+          {/* Skills */}
+          {skills.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="rounded-full border border-brand-turquoise-100 bg-brand-turquoise-50 px-2 py-0.5 text-xs font-medium text-brand-turquoise-700"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {applyHref && (
+              <a
+                href={applyHref}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                onClick={() => toast.success('Create a profile later to track applications and get similar jobs.')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
+              >
+                Apply <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            )}
+            <Link
+              href={`/jobs/${job.id}`}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              View details
+            </Link>
+          </div>
+        </div>
+
+        {/* Save */}
+        <button
+          type="button"
+          aria-label={saved ? 'Saved' : 'Save job'}
+          onClick={() => onSave(job.id)}
+          className={`absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+            saved
+              ? 'border-brand-turquoise-200 bg-brand-turquoise-50 text-brand-turquoise-700'
+              : 'border-transparent text-neutral-300 hover:border-neutral-200 hover:bg-neutral-50 hover:text-neutral-500'
+          }`}
+        >
+          <Bookmark className={`h-4 w-4 ${saved ? 'fill-current' : ''}`} />
+        </button>
+      </div>
+    </article>
+  )
 }
 
 export default function JobsClient() {
@@ -32,20 +234,22 @@ export default function JobsClient() {
   const [location, setLocation] = useState('')
   const [appliedLocation, setAppliedLocation] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('all')
+  const [remoteOnly, setRemoteOnly] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setPage(1)
-  }, [appliedQuery, appliedLocation, viewMode])
+  }, [appliedQuery, appliedLocation, viewMode, remoteOnly])
 
   useEffect(() => {
     void loadJobs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, appliedQuery, appliedLocation, viewMode])
+  }, [page, appliedQuery, appliedLocation, viewMode, remoteOnly])
 
   const loadJobs = async () => {
     try {
@@ -54,6 +258,7 @@ export default function JobsClient() {
       if (appliedQuery.trim()) params.q = appliedQuery.trim()
       if (appliedLocation.trim()) params.location = appliedLocation.trim()
       if (viewMode === 'recruiter') params.source = 'recruiter'
+      if (remoteOnly) params.remote_type = 'remote'
 
       const response = await searchJobs(params)
       setJobs(response.jobs)
@@ -71,8 +276,8 @@ export default function JobsClient() {
   }
 
   const hasFilters = useMemo(
-    () => appliedQuery.trim() || appliedLocation.trim() || viewMode !== 'all',
-    [appliedQuery, appliedLocation, viewMode],
+    () => appliedQuery.trim() || appliedLocation.trim() || viewMode !== 'all' || remoteOnly,
+    [appliedQuery, appliedLocation, viewMode, remoteOnly],
   )
 
   const submitSearch = (event: React.FormEvent) => {
@@ -88,6 +293,20 @@ export default function JobsClient() {
     setAppliedQuery('')
     setAppliedLocation('')
     setViewMode('all')
+    setRemoteOnly(false)
+  }
+
+  const toggleSave = (id: string) => {
+    setSavedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        toast('Sign up free to keep your saved jobs & track applications.', { icon: '🔖' })
+      }
+      return next
+    })
   }
 
   return (
@@ -147,7 +366,7 @@ export default function JobsClient() {
               />
             </label>
             <label className="relative lg:w-64">
-              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
               <input
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
@@ -172,16 +391,26 @@ export default function JobsClient() {
             <button
               type="button"
               onClick={() => setViewMode('all')}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${viewMode === 'all' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'}`}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'all' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'}`}
             >
               All jobs
             </button>
             <button
               type="button"
               onClick={() => setViewMode('recruiter')}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${viewMode === 'recruiter' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'recruiter' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'}`}
             >
+              <Sparkles className="h-3.5 w-3.5" />
               Direct recruiter roles
+            </button>
+            <span className="mx-1 hidden h-5 w-px bg-neutral-200 sm:block" />
+            <button
+              type="button"
+              onClick={() => setRemoteOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${remoteOnly ? 'bg-brand-turquoise-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'}`}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              Remote
             </button>
             {hasFilters && (
               <button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900">
@@ -194,7 +423,7 @@ export default function JobsClient() {
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <p className="text-sm text-neutral-500">
-            {loading ? 'Loading jobs...' : `${total} job${total === 1 ? '' : 's'} found`}
+            {loading ? 'Loading jobs…' : `${total.toLocaleString()} job${total === 1 ? '' : 's'} found`}
             {!loading && totalPages > 1 ? ` · page ${page} of ${totalPages}` : ''}
           </p>
           <Link href="/auth/signup" className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-brand-turquoise-700 hover:text-brand-turquoise-800">
@@ -204,57 +433,33 @@ export default function JobsClient() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader className="h-7 w-7 animate-spin text-neutral-300" />
+          <div className="mt-6 grid gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
         ) : jobs.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-neutral-200 bg-white p-10 text-center">
+          <div className="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-white p-12 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
+              <Search className="h-5 w-5 text-neutral-400" />
+            </div>
             <p className="font-semibold text-neutral-900">No jobs match your search</p>
-            <p className="mt-1 text-sm text-neutral-500">Try a broader title or clear your filters.</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500">
+              Try a broader title, a different location, or clear your filters to see everything.
+            </p>
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+              >
+                Clear filters & browse all
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-6 grid gap-3">
             {jobs.map((job) => (
-              <article key={job.id} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-brand-turquoise-200 hover:shadow-md">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      {job.source === 'recruiter' && (
-                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                          Direct role
-                        </span>
-                      )}
-                      <span className="text-xs text-neutral-400">{formatDate(job.posted_date || job.scraped_at)}</span>
-                    </div>
-                    <Link href={`/jobs/${job.id}`} className="text-lg font-semibold text-neutral-900 hover:text-brand-turquoise-700">
-                      {job.title}
-                    </Link>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {job.company}{job.location ? ` · ${job.location}` : ''}
-                    </p>
-                    <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-neutral-600">
-                      {job.description}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col">
-                    <Link href={`/jobs/${job.id}`} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 hover:border-neutral-300">
-                      View details
-                    </Link>
-                    {jobApplyHref(job) && (
-                      <a
-                        href={jobApplyHref(job)}
-                        target="_blank"
-                        rel="noopener noreferrer nofollow"
-                        onClick={() => toast.success('Create a profile later to track applications and get similar jobs.')}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
-                      >
-                        Apply
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </article>
+              <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} onSave={toggleSave} />
             ))}
           </div>
         )}

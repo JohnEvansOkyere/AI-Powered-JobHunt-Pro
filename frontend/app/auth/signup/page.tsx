@@ -7,8 +7,10 @@ import Image from 'next/image'
 import { signUp } from '@/lib/auth'
 import { apiClient } from '@/lib/api/client'
 import { toast } from 'react-hot-toast'
-import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import AuthBrandPanel from '@/components/auth/AuthBrandPanel'
+import PasswordStrength, { isPasswordStrong } from '@/components/auth/PasswordStrength'
 
 interface HandoffVerifyResponse {
   valid: boolean
@@ -18,11 +20,15 @@ interface HandoffVerifyResponse {
   job_id?: string | null
 }
 
+const inputCls =
+  'block w-full rounded-xl border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-500/20'
+
 function SignUpContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState<string | null>(null)
   const [handoffJobId, setHandoffJobId] = useState<string | null>(null)
@@ -54,8 +60,19 @@ function SignUpContent() {
     }
   }, [searchParams])
 
+  const passwordsMatch = password === confirmPassword
+  const canSubmit = isPasswordStrong(password) && passwordsMatch
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isPasswordStrong(password)) {
+      toast.error('Please choose a stronger password.')
+      return
+    }
+    if (!passwordsMatch) {
+      toast.error('Passwords do not match.')
+      return
+    }
     setLoading(true)
 
     try {
@@ -79,141 +96,168 @@ function SignUpContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-turquoise-50/50 via-white to-white px-4">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full"
-      >
-        <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center gap-2.5 group mb-8">
-            <Image
-              src="/logo.png"
-              alt="VeloxaHire"
-              width={36}
-              height={36}
-              priority
-              className="object-contain transition-transform group-hover:scale-105"
-              style={{ width: 'auto', height: 'auto' }}
-            />
-            <span className="text-2xl font-semibold tracking-tight text-neutral-900">
+    <div className="flex min-h-screen bg-cream-50">
+      <AuthBrandPanel variant="signup" />
+
+      {/* Form panel */}
+      <div className="relative flex w-full flex-col justify-center px-6 py-12 sm:px-10 lg:w-1/2 xl:px-20">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mx-auto w-full max-w-[440px]"
+        >
+          {/* Mobile logo */}
+          <Link href="/" className="mb-10 inline-flex items-center gap-2.5 lg:hidden">
+            <Image src="/logo.png" alt="VeloxaHire" width={32} height={32} priority className="object-contain" style={{ width: 'auto', height: 'auto' }} />
+            <span className="text-xl font-semibold tracking-tight text-neutral-900">
               Veloxa<span className="text-brand-turquoise-700">Hire</span>
             </span>
           </Link>
-          <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
-            {handoffPrefilled ? 'Create your job profile' : 'Create your account'}
-          </h2>
+
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
+            {handoffPrefilled ? 'Finish your application' : 'Create your free account'}
+          </h1>
           <p className="mt-2 text-neutral-500">
             {handoffPrefilled
-              ? 'Your application details are ready. Set a password to continue.'
-              : 'Create your VeloxaHire account and get started.'}
+              ? 'Your application details are ready — just set a password to continue.'
+              : 'Browse free, then get a shortlist built around your CV.'}
           </p>
-        </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-neutral-100 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-turquoise-500 to-brand-orange-500"></div>
-          
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="fullName" className="block text-xs font-black text-neutral-400 uppercase tracking-widest mb-2 ml-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="block w-full pl-12 pr-4 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl focus:ring-2 focus:ring-brand-turquoise-500 focus:bg-white transition-all outline-none text-neutral-900 font-medium"
-                    placeholder="Jeff Bezos"
-                  />
-                </div>
-              </div>
+          {handoffPrefilled && (
+            <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700">
+              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              Application details imported from VeloxaRecruit
+            </div>
+          )}
 
-              <div>
-                <label htmlFor="email" className="block text-xs font-black text-neutral-400 uppercase tracking-widest mb-2 ml-1">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    readOnly={handoffPrefilled}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-12 pr-4 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl focus:ring-2 focus:ring-brand-turquoise-500 focus:bg-white transition-all outline-none text-neutral-900 font-medium read-only:text-neutral-600"
-                    placeholder="name@company.com"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-xs font-black text-neutral-400 uppercase tracking-widest mb-2 ml-1">
-                  Create Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-12 pr-12 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl focus:ring-2 focus:ring-brand-turquoise-500 focus:bg-white transition-all outline-none text-neutral-900 font-medium"
-                    placeholder="••••••••"
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-turquoise-500 focus:ring-offset-0"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-                <p className="mt-2 text-[10px] text-neutral-400 font-bold uppercase tracking-wider ml-1">Min. 6 characters for security</p>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                Full name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className={inputCls}
+                  placeholder="Ama Mensah"
+                />
               </div>
             </div>
+
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                Email address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  readOnly={handoffPrefilled}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`${inputCls} read-only:bg-neutral-50 read-only:text-neutral-500`}
+                  placeholder="you@email.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                Create password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${inputCls} pr-11`}
+                  placeholder="••••••••"
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <PasswordStrength password={password} />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                Confirm password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`${inputCls} pr-4`}
+                  placeholder="••••••••"
+                />
+              </div>
+              {confirmPassword && !passwordsMatch && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">Passwords do not match.</p>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={loading}
-              className="btn-premium w-full flex justify-center py-4 px-4 bg-brand-turquoise-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-brand-turquoise-500/20 disabled:opacity-50"
+              disabled={loading || !canSubmit}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-turquoise-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-turquoise-500/20 transition-all hover:bg-brand-turquoise-700 disabled:opacity-60"
             >
-              {loading ? 'Processing...' : 'Create My Free Account'}
+              {loading ? 'Creating account…' : 'Create my free account'}
+              {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
           </form>
-        </div>
 
-        <p className="mt-10 text-center text-neutral-500 font-medium">
-          Already a member?{' '}
-          <Link
-            href="/auth/login"
-            className="font-black text-brand-turquoise-600 hover:text-brand-turquoise-700 underline underline-offset-4 decoration-2"
-          >
-            Sign In Here
-          </Link>
-        </p>
-      </motion.div>
+          <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-6 text-sm text-neutral-500">
+            <span>
+              Already a member?{' '}
+              <Link href="/auth/login" className="font-semibold text-brand-turquoise-700 hover:text-brand-turquoise-800">
+                Sign in
+              </Link>
+            </span>
+            <Link href="/jobs" className="transition-colors hover:text-neutral-800">
+              Browse jobs →
+            </Link>
+          </div>
+
+          <p className="mt-4 text-xs text-neutral-400">
+            By creating an account you agree to our{' '}
+            <Link href="/terms" className="underline hover:text-neutral-600">Terms</Link> and{' '}
+            <Link href="/privacy" className="underline hover:text-neutral-600">Privacy Policy</Link>.
+          </p>
+        </motion.div>
+      </div>
     </div>
   )
 }
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-cream-50" />}>
       <SignUpContent />
     </Suspense>
   )
