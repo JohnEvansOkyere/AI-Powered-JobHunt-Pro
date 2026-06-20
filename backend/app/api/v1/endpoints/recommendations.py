@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from app.api.v1.dependencies import get_current_user
 from app.core.config import settings
 from app.core.database import get_db, SessionLocal
 from app.core.logging import get_logger
+from app.core.rate_limit import CRON_RATE_LIMIT, RECOMMENDATION_REGENERATE_RATE_LIMIT, enforce_rate_limit
 from app.models.job_recommendation import JobRecommendation
 from app.models.job import Job
 
@@ -280,6 +281,7 @@ async def get_recommendations(
 
 @router.post("/regenerate", status_code=status.HTTP_202_ACCEPTED)
 async def regenerate_recommendations(
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -291,6 +293,11 @@ async def regenerate_recommendations(
     shortly after.
     """
     user_id = current_user["id"]
+    await enforce_rate_limit(
+        request,
+        RECOMMENDATION_REGENERATE_RATE_LIMIT,
+        subject=str(user_id),
+    )
     # Check if we have fresh enough results to skip early.
     # "Fresh" = at least one non-expired recommendation from the last hour.
     recent_cutoff = datetime.now(timezone.utc) - timedelta(seconds=REGENERATE_COOLDOWN_SECONDS)
@@ -315,16 +322,17 @@ async def regenerate_recommendations(
 
 @router.post("/generate-all", status_code=status.HTTP_200_OK)
 async def generate_all(
+    request: Request,
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
     db: Session = Depends(get_db),
 ):
     """Run recommendations for ALL eligible users. Requires X-Cron-Secret header."""
-    if settings.CRON_SECRET:
-        if not x_cron_secret or x_cron_secret != settings.CRON_SECRET:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid or missing X-Cron-Secret header",
-            )
+    if not settings.CRON_SECRET or x_cron_secret != settings.CRON_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing X-Cron-Secret header",
+        )
+    await enforce_rate_limit(request, CRON_RATE_LIMIT, subject="recommendations-generate-all")
     try:
         from app.services.recommendation_engine_v2 import RecommendationEngineV2
 

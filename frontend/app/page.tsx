@@ -153,6 +153,12 @@ export default function HomePage() {
 
             <div className="hidden md:flex items-center gap-8 text-sm">
               <Link
+                href="/jobs"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                Browse jobs
+              </Link>
+              <Link
                 href="#how"
                 className="text-cream-100/70 hover:text-cream-100 transition-colors"
               >
@@ -205,6 +211,7 @@ export default function HomePage() {
           {navOpen && (
             <div className="md:hidden border-t border-cream-100/10 py-4 space-y-2 text-sm">
               {[
+                ['Browse jobs', '/jobs'],
                 ['How it works', '#how'],
                 ['Features', '#features'],
                 ['FAQ', '#faq'],
@@ -245,10 +252,10 @@ export default function HomePage() {
         eyebrow="Built for candidates, not job boards"
         title="Find the job that fits you"
         lede="Upload your CV once. We'll read between the lines, learn what you actually want next, and hand you a short, honest shortlist of roles worth your Monday morning."
-        ctaLabel="Build my shortlist — it's free"
-        ctaHref="/auth/signup"
-        secondaryCtaLabel="See how it works"
-        secondaryCtaHref="#how"
+        ctaLabel="Browse jobs"
+        ctaHref="/jobs"
+        secondaryCtaLabel="Get my shortlist"
+        secondaryCtaHref="/auth/signup"
       />
 
       {/* ================================================================ */}
@@ -688,22 +695,22 @@ export default function HomePage() {
               </span>
             </h2>
             <p className="mt-6 text-cream-100/75 text-lg max-w-xl leading-relaxed">
-              Let VeloxaHire find it quietly in the background. Sign up in under a minute &mdash;
-              the first shortlist is on us.
+              Browse the market first. When you want the short version, create a profile and let
+              VeloxaHire rank the roles that fit your CV.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link
-                href="/auth/signup"
+                href="/jobs"
                 className="inline-flex items-center gap-2 px-7 py-3.5 bg-cream-100 text-ink-900 rounded-full font-semibold hover:bg-cream-50 transition-colors shadow-sm"
               >
-                Build my shortlist
+                Browse jobs
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/auth/login"
+                href="/auth/signup"
                 className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
               >
-                I&rsquo;ve got an account
+                Get my shortlist
               </Link>
             </div>
           </div>

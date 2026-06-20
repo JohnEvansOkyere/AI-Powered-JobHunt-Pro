@@ -114,8 +114,8 @@ class ATSJobSyncService:
             raise RuntimeError("ATS published-jobs endpoint returned an unsuccessful payload")
         return body.get("data", {}).get("jobs", [])
 
-    def sync(self) -> ATSJobSyncStats:
-        updated_since = self._updated_since()
+    def sync(self, *, force_full: bool = False) -> ATSJobSyncStats:
+        updated_since = None if force_full else self._updated_since()
         payloads = list(self._fetch_jobs(updated_since=updated_since))
         created = updated = archived = skipped = 0
         jobs_to_embed = []

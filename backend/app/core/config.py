@@ -114,7 +114,21 @@ class Settings(BaseSettings):
     # Cron / scheduled task auth (optional - for triggering cleanup from external cron)
     CRON_SECRET: str = Field(
         default="",
-        description="Secret for cron endpoints (X-Cron-Secret header). If set, required to trigger cleanup.",
+        description="Secret for cron endpoints (X-Cron-Secret header). Required in production.",
+    )
+
+    # External URL parsing guardrails
+    EXTERNAL_URL_ALLOW_HTTP: bool = Field(
+        default=False,
+        description="Allow plain HTTP for user-submitted external job URLs. Keep False in production.",
+    )
+    EXTERNAL_URL_MAX_BYTES: int = Field(
+        default=2 * 1024 * 1024,
+        description="Maximum decompressed response bytes accepted from external job URL fetches.",
+    )
+    EXTERNAL_URL_MAX_REDIRECTS: int = Field(
+        default=5,
+        description="Maximum redirects followed when fetching external job URLs.",
     )
 
     # ATS job mirroring (private ecosystem integration)
@@ -134,6 +148,18 @@ class Settings(BaseSettings):
         default=15.0,
         description="HTTP timeout for ATS job sync calls.",
     )
+    ATS_SYNC_STALE_AFTER_MINUTES: int = Field(
+        default=20,
+        description="Minutes after last successful ATS sync before ops status is stale.",
+    )
+    HANDOFF_TOKEN_SECRET: str = Field(
+        default="",
+        description="Shared ATS -> VeloxaHire signup handoff JWT secret.",
+    )
+    PREVIOUS_HANDOFF_TOKEN_SECRET: str = Field(
+        default="",
+        description="Optional previous handoff JWT secret during rotation.",
+    )
 
     # Job Scraping
     SCRAPING_USER_AGENT: str = Field(
@@ -150,6 +176,14 @@ class Settings(BaseSettings):
     )
     SCRAPING_RATE_LIMIT_PER_MINUTE: int = Field(
         default=10, description="Scraping rate limit per minute"
+    )
+    RATE_LIMIT_ENABLED: bool = Field(
+        default=True,
+        description="Enable HTTP-layer rate limits for costly or abuse-prone endpoints.",
+    )
+    RATE_LIMIT_FAIL_CLOSED: bool = Field(
+        default=True,
+        description="In production, return 503 for protected endpoints when Redis rate limiting is unavailable.",
     )
 
     # ---- Recommendations V2 AI routing (docs/RECOMMENDATIONS_V2_PLAN.md §3.1) ----
@@ -300,6 +334,22 @@ class Settings(BaseSettings):
             return v
         return ["*"]
 
+    @field_validator("ENVIRONMENT", mode="before")
+    @classmethod
+    def normalize_environment(cls, v) -> str:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return "development"
+
+    @field_validator("EXTERNAL_URL_MAX_BYTES")
+    @classmethod
+    def validate_external_url_max_bytes(cls, v: int) -> int:
+        if v < 100_000:
+            raise ValueError("EXTERNAL_URL_MAX_BYTES must be at least 100000")
+        if v > 10 * 1024 * 1024:
+            raise ValueError("EXTERNAL_URL_MAX_BYTES must not exceed 10485760")
+        return v
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -315,6 +365,30 @@ class Settings(BaseSettings):
         """Check if OpenAI API key is set (for AI matching/recommendations). App does not crash if missing."""
         key = getattr(self, "OPENAI_API_KEY", None) or ""
         return bool(key and isinstance(key, str) and key.strip() != "")
+
+    def validate_runtime_safety(self) -> None:
+        """Fail closed for production settings that would expose public users."""
+        if not self.is_production:
+            return
+
+        errors = []
+        if self.DEBUG:
+            errors.append("DEBUG must be False when ENVIRONMENT=production")
+        if not self.CRON_SECRET.strip():
+            errors.append("CRON_SECRET is required when ENVIRONMENT=production")
+        if "*" in self.ALLOWED_HOSTS:
+            errors.append("ALLOWED_HOSTS must not contain '*' when ENVIRONMENT=production")
+        if not self.CORS_ORIGINS or any(
+            origin.startswith("http://localhost")
+            or origin.startswith("http://127.0.0.1")
+            for origin in self.CORS_ORIGINS
+        ):
+            errors.append("CORS_ORIGINS must be explicitly set to production origins")
+        if self.EXTERNAL_URL_ALLOW_HTTP:
+            errors.append("EXTERNAL_URL_ALLOW_HTTP must be False when ENVIRONMENT=production")
+
+        if errors:
+            raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
 
 # Global settings instance

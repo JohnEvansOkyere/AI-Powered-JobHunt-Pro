@@ -56,7 +56,7 @@ export default function ProfilePage() {
       <ProtectedRoute>
         <DashboardLayout>
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-xl border border-neutral-200 p-8 text-center">
+            <div className="card p-8 text-center">
               <AlertCircle className="h-8 w-8 text-neutral-400 mx-auto mb-3" />
               <h2 className="text-base font-semibold text-neutral-900 mb-1">
                 No profile found
@@ -66,7 +66,7 @@ export default function ProfilePage() {
               </p>
               <button
                 onClick={() => router.push('/profile/setup')}
-                className="inline-flex items-center px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium rounded-lg transition-colors"
+                className="inline-flex items-center px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:shadow-md cursor-pointer"
               >
                 Set up your profile
               </button>
@@ -97,7 +97,7 @@ export default function ProfilePage() {
       <DashboardLayout>
         <div className="max-w-4xl mx-auto space-y-5">
           <header>
-            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
               Your profile
             </h1>
             <p className="text-sm text-neutral-500 mt-0.5">
@@ -178,7 +178,7 @@ function CompletionCard({ percentage }: { percentage: number }) {
   const isDone = percentage >= 100
 
   return (
-    <section className="bg-white rounded-xl border border-neutral-200 p-5">
+    <section className="card p-5">
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
           <h2 className="text-sm font-semibold text-neutral-900">
@@ -197,7 +197,7 @@ function CompletionCard({ percentage }: { percentage: number }) {
       </div>
       <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
         <div
-          className="h-full bg-brand-turquoise-500 rounded-full transition-all duration-500"
+          className="h-full bg-gradient-to-r from-brand-turquoise-400 to-brand-turquoise-600 rounded-full transition-all duration-700 ease-out"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -237,7 +237,7 @@ function EditableSection({
   children,
 }: EditableSectionProps) {
   return (
-    <section className="bg-white rounded-xl border border-neutral-200 p-5">
+    <section className="card p-5">
       <header className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex-shrink-0 text-neutral-600">{icon}</span>
@@ -255,7 +255,7 @@ function EditableSection({
             <button
               onClick={onCancel}
               disabled={saving}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-xs font-medium transition-all duration-150 disabled:opacity-50 cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
               Cancel
@@ -263,7 +263,7 @@ function EditableSection({
             <button
               onClick={onSave}
               disabled={!canSave || saving}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium transition-all duration-150 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Check className="h-3.5 w-3.5" />
               {saving ? 'Saving\u2026' : 'Save'}
@@ -728,7 +728,7 @@ function ExperienceSection({
                     onChange={(e) => updateAchievements(index, e.target.value)}
                     placeholder="Led training pipeline, shipped recommender, mentored 2 engineers"
                     rows={3}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-1 focus:ring-brand-turquoise-500 focus:border-brand-turquoise-500 bg-white"
+                    className="w-full px-3 py-2.5 text-sm border border-neutral-200 rounded-xl focus:ring-2 focus:ring-brand-turquoise-100 focus:border-brand-turquoise-500 bg-white transition-all duration-150"
                   />
                 </div>
               </div>
@@ -947,7 +947,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-1 focus:ring-brand-turquoise-500 focus:border-brand-turquoise-500 bg-white"
+      className="w-full px-3 py-2.5 text-sm border border-neutral-200 rounded-xl focus:ring-2 focus:ring-brand-turquoise-100 focus:border-brand-turquoise-500 bg-white transition-all duration-150"
     />
   )
 }
@@ -965,7 +965,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-1 focus:ring-brand-turquoise-500 focus:border-brand-turquoise-500 bg-white"
+      className="w-full px-3 py-2.5 text-sm border border-neutral-200 rounded-xl focus:ring-2 focus:ring-brand-turquoise-100 focus:border-brand-turquoise-500 bg-white transition-all duration-150 cursor-pointer"
     >
       {children}
     </select>
@@ -1005,7 +1005,7 @@ function ChipInput({ values, onChange, placeholder, firstChipLabel }: ChipInputP
 
   return (
     <div
-      className="w-full min-h-[42px] px-2 py-1.5 border border-neutral-300 rounded-lg bg-white focus-within:ring-1 focus-within:ring-brand-turquoise-500 focus-within:border-brand-turquoise-500"
+      className="w-full min-h-[42px] px-2 py-1.5 border border-neutral-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-brand-turquoise-100 focus-within:border-brand-turquoise-500 transition-all duration-150"
       onClick={() => inputRef.current?.focus()}
     >
       <div className="flex flex-wrap items-center gap-1.5">

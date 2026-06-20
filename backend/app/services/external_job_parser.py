@@ -12,11 +12,15 @@ Strategy for URL parsing:
 
 import re
 import json
+import asyncio
+import ipaddress
+import socket
 from typing import Optional, Dict, Any, List
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from app.core.config import settings
 from app.core.logging import get_logger
 from app.ai.router import get_model_router
 from app.ai.base import TaskType
@@ -32,6 +36,24 @@ AUTH_REQUIRED_DOMAINS = [
 
 # Jina Reader API (free tier) - renders JavaScript and returns markdown
 JINA_READER_URL = "https://r.jina.ai/"
+
+BLOCKED_HOSTNAMES = {"localhost", "localhost.localdomain"}
+BLOCKED_IPS = {
+    ipaddress.ip_address("169.254.169.254"),  # cloud metadata
+}
+
+
+def _is_blocked_ip(address: str) -> bool:
+    ip = ipaddress.ip_address(address)
+    return (
+        ip in BLOCKED_IPS
+        or ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
 
 
 class ExternalJobParser:
@@ -52,6 +74,92 @@ class ExternalJobParser:
         domain = parsed.netloc.lower()
         return any(domain == d or domain.endswith('.' + d) for d in AUTH_REQUIRED_DOMAINS)
 
+    async def _validate_public_url(self, url: str) -> str:
+        """Validate that a user-submitted URL resolves only to public IPs."""
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        if scheme != "https" and not (scheme == "http" and settings.EXTERNAL_URL_ALLOW_HTTP):
+            raise ValueError("Only HTTPS job posting URLs are allowed.")
+
+        if parsed.username or parsed.password:
+            raise ValueError("URLs with embedded credentials are not allowed.")
+
+        host = parsed.hostname
+        if not host:
+            raise ValueError("URL must include a valid hostname.")
+
+        normalized_host = host.rstrip(".").lower()
+        if normalized_host in BLOCKED_HOSTNAMES:
+            raise ValueError("This URL host is not allowed.")
+
+        try:
+            if _is_blocked_ip(normalized_host):
+                raise ValueError("This URL resolves to a blocked network address.")
+            return url
+        except ValueError as exc:
+            if "blocked network" in str(exc):
+                raise
+
+        loop = asyncio.get_running_loop()
+        try:
+            addrinfo = await loop.run_in_executor(
+                None,
+                lambda: socket.getaddrinfo(
+                    normalized_host,
+                    parsed.port or (443 if scheme == "https" else 80),
+                    type=socket.SOCK_STREAM,
+                ),
+            )
+        except socket.gaierror:
+            raise ValueError("Could not resolve this URL hostname.")
+
+        resolved_ips = {item[4][0] for item in addrinfo}
+        if not resolved_ips:
+            raise ValueError("Could not resolve this URL hostname.")
+
+        for resolved_ip in resolved_ips:
+            if _is_blocked_ip(resolved_ip):
+                raise ValueError("This URL resolves to a blocked network address.")
+
+        return url
+
+    async def _fetch_url_text(
+        self,
+        url: str,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
+        max_redirects: Optional[int] = None,
+    ) -> str:
+        """Fetch a public URL with redirect revalidation and a response byte cap."""
+        current_url = await self._validate_public_url(url)
+        redirects_remaining = (
+            settings.EXTERNAL_URL_MAX_REDIRECTS if max_redirects is None else max_redirects
+        )
+
+        async with httpx.AsyncClient(timeout=timeout or self.timeout, follow_redirects=False) as client:
+            while True:
+                async with client.stream("GET", current_url, headers=headers or self.headers) as response:
+                    if response.status_code in {301, 302, 303, 307, 308}:
+                        if redirects_remaining <= 0:
+                            raise ValueError("Too many redirects while fetching this URL.")
+                        location = response.headers.get("location")
+                        if not location:
+                            raise ValueError("Redirect response did not include a Location header.")
+                        current_url = await self._validate_public_url(urljoin(current_url, location))
+                        redirects_remaining -= 1
+                        continue
+
+                    response.raise_for_status()
+                    chunks = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        chunks.extend(chunk)
+                        if len(chunks) > settings.EXTERNAL_URL_MAX_BYTES:
+                            raise ValueError("URL response is too large to process safely.")
+
+                    encoding = response.encoding or "utf-8"
+                    return bytes(chunks).decode(encoding, errors="replace")
+
     async def parse_from_url(self, url: str) -> Dict[str, Any]:
         """
         Fetch and parse a job posting from a URL.
@@ -67,6 +175,8 @@ class ExternalJobParser:
         Returns:
             Dictionary with extracted job details
         """
+        url = await self._validate_public_url(url)
+
         # Check if URL requires authentication (check domain, not query params)
         if self._is_auth_required_domain(url):
             raise ValueError(
@@ -137,10 +247,7 @@ class ExternalJobParser:
         Strategy 1: Direct HTTP fetch and parse with BeautifulSoup.
         Works for static HTML pages.
         """
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            response = await client.get(url, headers=self.headers)
-            response.raise_for_status()
-            html_content = response.text
+        html_content = await self._fetch_url_text(url, headers=self.headers, timeout=self.timeout)
 
         soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -179,10 +286,7 @@ class ExternalJobParser:
         Strategy 2: Extract structured data from JSON-LD (Schema.org).
         Many career pages include JobPosting schema even in SPAs.
         """
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            response = await client.get(url, headers=self.headers)
-            response.raise_for_status()
-            html_content = response.text
+        html_content = await self._fetch_url_text(url, headers=self.headers, timeout=self.timeout)
 
         soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -292,18 +396,17 @@ class ExternalJobParser:
         Strategy 3: Use Jina Reader API to render JavaScript and get markdown.
         Free tier handles most career pages that require JS rendering.
         """
+        url = await self._validate_public_url(url)
         jina_url = f"{JINA_READER_URL}{url}"
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(
-                jina_url,
-                headers={
-                    'Accept': 'text/plain',
-                    'User-Agent': 'Mozilla/5.0 (compatible; JobHuntPro/1.0)',
-                }
-            )
-            response.raise_for_status()
-            text = response.text
+        text = await self._fetch_url_text(
+            jina_url,
+            headers={
+                'Accept': 'text/plain',
+                'User-Agent': 'Mozilla/5.0 (compatible; JobHuntPro/1.0)',
+            },
+            timeout=30.0,
+        )
 
         # Clean the response - Jina returns markdown
         if not text or len(text.strip()) < 200:

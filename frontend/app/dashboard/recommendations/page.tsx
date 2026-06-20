@@ -132,7 +132,7 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 transition-colors p-4 flex flex-col gap-3"
+      className="card-interactive p-4 flex flex-col gap-3"
     >
       {/* Header: meta + save */}
       <div className="flex items-start justify-between gap-2">
@@ -156,10 +156,10 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
         <button
           onClick={() => onSave(item.job_id)}
           aria-label={isSaved ? 'Remove from saved' : 'Save for later'}
-          className={`p-1.5 -mr-1 rounded-md transition-colors flex-shrink-0 ${
+          className={`p-1.5 -mr-1 rounded-md transition-all duration-150 flex-shrink-0 cursor-pointer ${
             isSaved
-              ? 'text-brand-turquoise-600'
-              : 'text-neutral-300 hover:text-neutral-600 hover:bg-neutral-50'
+              ? 'text-brand-turquoise-600 hover:text-brand-turquoise-700'
+              : 'text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100'
           }`}
         >
           {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
@@ -198,7 +198,7 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
             target="_blank"
             rel="noopener noreferrer nofollow"
             onClick={() => onApply(item.job_id)}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white rounded-xl text-xs font-semibold transition-all duration-200 hover:shadow-md cursor-pointer"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Apply
@@ -206,7 +206,7 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
         ) : (
           <button
             onClick={() => onApply(item.job_id)}
-            className="flex-1 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex-1 px-3 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold transition-all duration-200 hover:shadow-md cursor-pointer"
           >
             Mark applied
           </button>
@@ -218,7 +218,7 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 p-4 animate-pulse space-y-3">
+    <div className="card p-4 animate-pulse space-y-3">
       <div className="flex gap-1.5">
         <div className="h-4 w-16 bg-neutral-100 rounded-md" />
       </div>
@@ -232,8 +232,8 @@ function SkeletonCard() {
 
 function EmptyTier1() {
   return (
-    <div className="bg-white rounded-xl border border-dashed border-neutral-200 py-10 px-4 text-center">
-      <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+    <div className="card border-dashed py-10 px-4 text-center">
+      <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-4">
         <Star className="w-5 h-5 text-amber-500" />
       </div>
       <h3 className="text-sm font-semibold text-neutral-900 mb-1">
@@ -260,8 +260,8 @@ function EmptyGeneric({ tier }: { tier: Tier }) {
   const cfg = TIER_CONFIG.find((t) => t.id === tier)!
   const isTier3 = tier === 'tier3'
   return (
-    <div className="bg-white rounded-xl border border-dashed border-neutral-200 py-10 px-4 text-center">
-      <div className="w-10 h-10 bg-neutral-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+    <div className="card border-dashed py-10 px-4 text-center">
+      <div className="w-12 h-12 bg-neutral-50 rounded-xl flex items-center justify-center mx-auto mb-4">
         <cfg.icon className="w-5 h-5 text-neutral-400" />
       </div>
       <h3 className="text-sm font-semibold text-neutral-900 mb-1">
@@ -383,11 +383,11 @@ export default function RecommendationsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Page header */}
           <div className="flex items-start justify-between gap-3 mb-6">
             <div>
-              <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
                 Recommendations
               </h1>
               <p className="text-sm text-neutral-500 mt-0.5">
@@ -397,7 +397,7 @@ export default function RecommendationsPage() {
             <button
               onClick={handleRegenerate}
               disabled={regenerating}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-md disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
@@ -465,7 +465,7 @@ export default function RecommendationsPage() {
           </div>
 
           {/* Desktop: 3 columns */}
-          <div className="hidden lg:grid lg:grid-cols-3 gap-5">
+          <div className="hidden lg:grid lg:grid-cols-2 gap-5">
             {TIER_CONFIG.map((cfg) => {
               const state = tierStates[cfg.id]
               const hasItems = state.items.length > 0
