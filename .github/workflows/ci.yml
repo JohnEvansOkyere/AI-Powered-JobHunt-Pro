@@ -40,7 +40,9 @@ jobs:
           python -m pip install pytest pytest-asyncio pytest-cov pytest-mock "httpx<0.28"
 
       - name: Run tests
-        run: python -m pytest -q
+        # Integration tests need live DB/Redis/Supabase (not available in CI).
+        # Run the unit suite; integration tests are tracked test debt.
+        run: python -m pytest -q -m "not integration"
 
   frontend:
     name: Frontend Build
