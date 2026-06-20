@@ -22,9 +22,9 @@ class DataSanitizer:
     # Common prompt injection patterns
     INJECTION_PATTERNS = [
         # System prompt overrides
-        r"\bignore\s+(previous|all)\s+(instructions|prompts|commands)\b",
-        r"\bdisregard\s+(previous|all)\s+(instructions|prompts|commands)\b",
-        r"\bforget\s+(previous|all)\s+(instructions|prompts|commands)\b",
+        r"\bignore\s+(?:(?:all|previous|prior|the|above)\s+)+(instructions|prompts|commands)\b",
+        r"\bdisregard\s+(?:(?:all|previous|prior|the|above)\s+)+(instructions|prompts|commands)\b",
+        r"\bforget\s+(?:(?:all|previous|prior|the|above)\s+)+(instructions|prompts|commands)\b",
         r"\bnew\s+(instructions|system\s+prompt|prompt)\b",
 
         # Role manipulation
