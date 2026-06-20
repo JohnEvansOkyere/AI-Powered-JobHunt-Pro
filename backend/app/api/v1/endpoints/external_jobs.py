@@ -6,7 +6,7 @@ Endpoints for users to manually add external job postings.
 
 import json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, HttpUrl, Field, validator
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,11 @@ from app.api.v1.dependencies import get_current_user
 from app.services.external_job_parser import get_job_parser
 from app.models.job import Job
 from app.core.logging import get_logger
+from app.core.rate_limit import (
+    EXTERNAL_TEXT_PARSE_RATE_LIMIT,
+    EXTERNAL_URL_PARSE_RATE_LIMIT,
+    enforce_rate_limit,
+)
 
 logger = get_logger(__name__)
 
@@ -49,6 +54,7 @@ class ExternalJobResponse(BaseModel):
 
 @router.post("/external/from-url", response_model=ExternalJobResponse, status_code=status.HTTP_201_CREATED)
 async def add_job_from_url(
+    http_request: Request,
     request: ExternalJobURLRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -60,6 +66,11 @@ async def add_job_from_url(
     and add it to your job list.
     """
     try:
+        await enforce_rate_limit(
+            http_request,
+            EXTERNAL_URL_PARSE_RATE_LIMIT,
+            subject=str(current_user["id"]),
+        )
         # Parse job from URL
         parser = get_job_parser()
         job_data = await parser.parse_from_url(str(request.url))
@@ -117,6 +128,7 @@ async def add_job_from_url(
 
 @router.post("/external/from-text", response_model=ExternalJobResponse, status_code=status.HTTP_201_CREATED)
 async def add_job_from_text(
+    http_request: Request,
     request: ExternalJobTextRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -127,6 +139,11 @@ async def add_job_from_text(
     The system will use AI to extract job details and add it to your job list.
     """
     try:
+        await enforce_rate_limit(
+            http_request,
+            EXTERNAL_TEXT_PARSE_RATE_LIMIT,
+            subject=str(current_user["id"]),
+        )
         # Parse job from text
         parser = get_job_parser()
         job_data = await parser.parse_from_text(

@@ -307,7 +307,7 @@ function JobsPageContent() {
                       className={`w-1.5 h-1.5 rounded-full ${TIER_META[activeTier].dot}`}
                     />
                   )}
-                  <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
                     {pageTitle}
                   </h1>
                   {activeTier && (
@@ -402,7 +402,7 @@ function JobsPageContent() {
                   <Loader className="h-6 w-6 text-neutral-300 animate-spin" />
                 </div>
               ) : cardJobs.length === 0 ? (
-                <div className="bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center">
+                <div className="card border-dashed p-10 text-center">
                   <p className="text-sm font-medium text-neutral-800 mb-1">
                     No jobs match your filters
                   </p>
@@ -429,7 +429,7 @@ function JobsPageContent() {
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="inline-flex items-center px-3 py-1.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm cursor-pointer"
                       >
                         Previous
                       </button>
@@ -439,7 +439,7 @@ function JobsPageContent() {
                       <button
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                         disabled={page === totalPages}
-                        className="inline-flex items-center px-3 py-1.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm cursor-pointer"
                       >
                         Next
                       </button>

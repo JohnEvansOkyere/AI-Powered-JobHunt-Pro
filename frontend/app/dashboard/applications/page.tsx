@@ -154,7 +154,7 @@ export default function ApplicationsPage() {
       <DashboardLayout>
         <div className="max-w-6xl mx-auto space-y-6">
           <header className="space-y-1">
-            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
               Applications
             </h1>
             <p className="text-sm text-neutral-500 max-w-2xl">
@@ -201,7 +201,7 @@ export default function ApplicationsPage() {
                   action={
                     <Link
                       href="/dashboard/recommendations"
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-medium text-sm transition-colors"
+                      className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-semibold text-sm transition-all duration-200 hover:shadow-md cursor-pointer"
                     >
                       Browse recommendations
                     </Link>
@@ -218,7 +218,7 @@ export default function ApplicationsPage() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        className="group bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 p-5 transition-colors flex flex-col"
+                        className="group card-interactive p-5 flex flex-col"
                       >
                         <header className="flex items-start justify-between gap-3 mb-3">
                           <div className="min-w-0">
@@ -251,7 +251,7 @@ export default function ApplicationsPage() {
                               href={job.job_link}
                               target="_blank"
                               rel="noopener noreferrer nofollow"
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-medium text-xs transition-colors"
+                              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white font-semibold text-xs transition-all duration-200 hover:shadow-md cursor-pointer"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                               Apply
@@ -259,14 +259,14 @@ export default function ApplicationsPage() {
                           )}
                           <button
                             onClick={() => handleMarkApplied(app)}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-xs transition-colors"
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs transition-all duration-200 hover:shadow-md cursor-pointer"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             Mark applied
                           </button>
                           <button
                             onClick={() => handleUnsave(app.job_id)}
-                            className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-medium transition-colors ml-auto"
+                            className="inline-flex items-center gap-1.5 px-2 py-2 rounded-xl text-neutral-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-medium transition-all duration-150 ml-auto cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             Remove
@@ -326,7 +326,7 @@ function ApplicationList({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.03 }}
-          className="bg-white rounded-xl border border-neutral-200 p-5"
+          className="card-interactive p-5"
         >
           <header className="flex items-start justify-between gap-3 mb-3">
             <div className="min-w-0">
@@ -351,7 +351,7 @@ function ApplicationList({
                 href={app.job.job_link}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs transition-all duration-200 hover:shadow-md cursor-pointer"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 View listing
@@ -385,8 +385,8 @@ function EmptyCard({
   action?: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center">
-      <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-neutral-50 flex items-center justify-center">
+    <div className="card border-dashed p-10 text-center">
+      <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-neutral-50 flex items-center justify-center">
         <Icon className="h-4 w-4 text-neutral-400" />
       </div>
       <h3 className="text-base font-semibold text-neutral-900 mb-1">{title}</h3>

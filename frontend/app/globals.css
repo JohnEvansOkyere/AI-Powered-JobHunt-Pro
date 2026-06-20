@@ -126,6 +126,47 @@ a {
   .btn-premium {
     @apply transition-shadow duration-200 hover:shadow-md;
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Production card system                                              */
+  /* ------------------------------------------------------------------ */
+
+  /* Base card with subtle resting shadow */
+  .card {
+    @apply bg-white rounded-xl border border-neutral-200 shadow-sm;
+  }
+
+  /* Interactive card — lifts on hover with smooth transition */
+  .card-interactive {
+    @apply bg-white rounded-xl border border-neutral-200 shadow-sm
+           cursor-pointer
+           transition-all duration-200 ease-out
+           hover:shadow-md hover:-translate-y-0.5 hover:border-neutral-300;
+  }
+
+  /* Stat card accent backgrounds */
+  .stat-turquoise {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.06) 0%, rgba(13, 148, 136, 0.02) 100%);
+  }
+  .stat-amber {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(217, 119, 6, 0.02) 100%);
+  }
+  .stat-blue {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(37, 99, 235, 0.02) 100%);
+  }
+  .stat-emerald {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(5, 150, 105, 0.02) 100%);
+  }
+
+  /* Icon container for stat cards */
+  .stat-icon {
+    @apply w-10 h-10 rounded-xl flex items-center justify-center;
+  }
+
+  /* Sidebar active indicator */
+  .nav-active-bar {
+    @apply absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-brand-turquoise-500;
+  }
 }
 
 /* Landing page animations */

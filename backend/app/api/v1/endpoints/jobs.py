@@ -4,7 +4,7 @@ Job Management API Endpoints
 Handles job listing, searching, filtering, and scraping operations.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from typing import List, Optional
@@ -13,6 +13,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.rate_limit import CRON_RATE_LIMIT, SCRAPING_RATE_LIMIT, enforce_rate_limit
 from app.api.v1.dependencies import get_current_user, get_optional_user
 from app.core.logging import get_logger
 from app.models.job import Job
@@ -233,11 +234,19 @@ async def get_recommendations_legacy(
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(
     job_id: uuid.UUID,
-    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get a specific job by ID."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    """Get a public job by ID.
+
+    Job detail pages are part of the browse-first funnel, so this endpoint is
+    intentionally anonymous. Auth-only actions like saving, tracking, and
+    recommendations stay on their dedicated protected endpoints.
+    """
+    job = (
+        db.query(Job)
+        .filter(Job.id == job_id, Job.processing_status != "archived")
+        .first()
+    )
 
     if not job:
         raise HTTPException(
@@ -257,7 +266,8 @@ def get_available_sources(
 
 
 @router.post("/scrape", response_model=ScrapeJobsResponse, status_code=status.HTTP_202_ACCEPTED)
-def start_scraping(
+async def start_scraping(
+    http_request: Request,
     request: ScrapeJobsRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -268,6 +278,12 @@ def start_scraping(
     Returns immediately with scraping job ID.
     Scraping runs in the background via Celery.
     """
+    await enforce_rate_limit(
+        http_request,
+        SCRAPING_RATE_LIMIT,
+        subject=str(current_user["id"]),
+    )
+
     # Validate sources
     available_sources = scraper_service.get_available_sources()
     invalid_sources = [s for s in request.sources if s.lower() not in available_sources]
@@ -327,6 +343,7 @@ def start_scraping(
 
 @router.post("/cleanup-old", status_code=status.HTTP_200_OK)
 async def trigger_cleanup_old_jobs(
+    request: Request,
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
 ):
     """
@@ -336,11 +353,12 @@ async def trigger_cleanup_old_jobs(
     does not run at midnight (e.g. sleeping dyno, restarts). If CRON_SECRET is set
     in the environment, the request must include header: X-Cron-Secret: <CRON_SECRET>.
     """
-    if settings.CRON_SECRET and x_cron_secret != settings.CRON_SECRET:
+    if not settings.CRON_SECRET or x_cron_secret != settings.CRON_SECRET:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-Cron-Secret header",
         )
+    await enforce_rate_limit(request, CRON_RATE_LIMIT, subject="cleanup-old")
     try:
         from app.tasks.periodic_tasks import trigger_cleanup_old_jobs_sync
 
@@ -358,6 +376,7 @@ async def trigger_cleanup_old_jobs(
 
 @router.post("/recommendations/generate-all", status_code=status.HTTP_200_OK)
 async def generate_recommendations_for_all_users(
+    request: Request,
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
     db: Session = Depends(get_db),
 ):
@@ -367,11 +386,12 @@ async def generate_recommendations_for_all_users(
     Intended for external cron (e.g. cron-job.org) so you don't have to run the script locally.
     If CRON_SECRET is set, the request must include header: X-Cron-Secret: <CRON_SECRET>.
     """
-    if settings.CRON_SECRET and x_cron_secret != settings.CRON_SECRET:
+    if not settings.CRON_SECRET or x_cron_secret != settings.CRON_SECRET:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-Cron-Secret header",
         )
+    await enforce_rate_limit(request, CRON_RATE_LIMIT, subject="jobs-generate-all")
     try:
         from app.services.recommendation_generator import RecommendationGenerator
         generator = RecommendationGenerator(db)

@@ -12,11 +12,12 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import logging
+import asyncio
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.api.v1.router import api_router
-from app.middleware import ErrorHandlerMiddleware, RequestLoggingMiddleware
+from app.middleware import ErrorHandlerMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 
 logger = get_logger(__name__)
@@ -24,6 +25,22 @@ logger = get_logger(__name__)
 
 # Setup logging
 setup_logging()
+
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=0.05 if settings.is_production else 0.0,
+            integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        )
+        logger.info("sentry_initialized")
+    except ImportError:
+        logger.warning("sentry_dsn_configured_but_sdk_missing")
 
 
 @asynccontextmanager
@@ -38,6 +55,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         "🚀 Starting application (scheduler_mode=%s)...", settings.SCHEDULER_MODE
     )
+    settings.validate_runtime_safety()
     if settings.SCHEDULER_MODE not in {"celery", "disabled"}:
         logger.warning(
             "Unknown SCHEDULER_MODE=%s; treating as 'disabled'",
@@ -91,6 +109,9 @@ def create_application() -> FastAPI:
             allowed_hosts=settings.ALLOWED_HOSTS,
         )
 
+    # Security headers for all API responses. Added last so it wraps errors too.
+    app.add_middleware(SecurityHeadersMiddleware)
+
     # Include API routes
     app.include_router(api_router, prefix="/api/v1")
 
@@ -123,7 +144,41 @@ def create_application() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """Health check endpoint for monitoring."""
-        return {"status": "healthy", "version": "1.0.0"}
+        checks = {"database": "unknown", "redis": "unknown"}
+
+        try:
+            from sqlalchemy import text
+            from app.core.database import engine
+
+            def check_database():
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+
+            await asyncio.to_thread(check_database)
+            checks["database"] = "healthy"
+        except Exception as exc:
+            logger.error("health_database_unhealthy", error=str(exc))
+            checks["database"] = "unhealthy"
+
+        try:
+            from app.core.redis_client import get_async_redis
+
+            redis = await get_async_redis()
+            await redis.ping()
+            checks["redis"] = "healthy"
+        except Exception as exc:
+            logger.error("health_redis_unhealthy", error=str(exc))
+            checks["redis"] = "unhealthy"
+
+        healthy = all(value == "healthy" for value in checks.values())
+        return JSONResponse(
+            status_code=status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "healthy" if healthy else "unhealthy",
+                "version": "1.0.0",
+                "checks": checks,
+            },
+        )
 
     return app
 

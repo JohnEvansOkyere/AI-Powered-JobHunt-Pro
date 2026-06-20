@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app.services.ats_job_sync_service import job_values_from_payload
+import pytest
+
+from app.services.ats_job_sync_service import ATSJobSyncService, job_values_from_payload
 
 
 def test_job_values_from_payload_maps_published_ats_job():
@@ -58,3 +60,37 @@ def test_job_values_from_payload_archives_hidden_ats_job():
 
     assert values["company"] == "Hiring company"
     assert values["processing_status"] == "archived"
+
+
+def test_force_full_sync_skips_updated_since():
+    class FakeDB:
+        committed = False
+
+        def commit(self):
+            self.committed = True
+
+    db = FakeDB()
+    service = ATSJobSyncService(db)  # type: ignore[arg-type]
+    fetch_calls = []
+
+    def fail_updated_since():
+        pytest.fail("_updated_since should not be called during force_full sync")
+
+    def fake_fetch_jobs(*, updated_since, limit=500):
+        fetch_calls.append((updated_since, limit))
+        return []
+
+    service._updated_since = fail_updated_since  # type: ignore[method-assign]
+    service._fetch_jobs = fake_fetch_jobs  # type: ignore[method-assign]
+
+    stats = service.sync(force_full=True)
+
+    assert fetch_calls == [(None, 500)]
+    assert stats.as_dict() == {
+        "fetched": 0,
+        "created": 0,
+        "updated": 0,
+        "archived": 0,
+        "skipped": 0,
+    }
+    assert db.committed is True

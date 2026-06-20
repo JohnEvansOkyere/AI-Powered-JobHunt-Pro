@@ -1,19 +1,34 @@
-"""
-User Endpoints
+"""User endpoints and account privacy workflows."""
 
-Handles user information synced from Supabase Auth.
-"""
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any, Dict, Optional
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
-from typing import Optional, Dict, Any
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import uuid
 
 from app.api.v1.dependencies import get_current_user
 from app.core.database import get_db
-from app.models.user import User
 from app.core.logging import get_logger
+from app.core.supabase_client import get_supabase_service_client
+from app.core.config import settings
+from app.models.application import Application
+from app.models.cv import CV
+from app.models.embeddings import UserEmbedding
+from app.models.job import Job
+from app.models.job_match import JobMatch
+from app.models.job_recommendation import JobRecommendation
+from app.models.notification import (
+    NotificationPreferences,
+    WhatsappIncomingEvent,
+    WhatsappMessage,
+)
+from app.models.scraping_job import ScrapingJob
+from app.models.user import User
+from app.models.user_profile import UserProfile
 
 logger = get_logger(__name__)
 
@@ -44,6 +59,65 @@ class UserUpdate(BaseModel):
     user_metadata: Optional[Dict[str, Any]] = None
 
 
+def _current_user_uuid(current_user: dict) -> uuid.UUID:
+    try:
+        user_id_str = current_user.get("id")
+        if not user_id_str:
+            raise ValueError("missing user id")
+        return uuid.UUID(str(user_id_str))
+    except (ValueError, TypeError) as exc:
+        logger.error("Invalid user ID format: %s, error: %s", current_user.get("id"), exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format",
+        ) from exc
+
+
+def _serialize_model(row: Any) -> Dict[str, Any]:
+    """Serialize one SQLAlchemy model without loading relationships."""
+    if row is None:
+        return {}
+    data: Dict[str, Any] = {}
+    for column in row.__table__.columns:
+        value = getattr(row, column.name)
+        if isinstance(value, Decimal):
+            value = float(value)
+        data[column.name] = value
+    return jsonable_encoder(data)
+
+
+def _serialize_rows(rows: list[Any]) -> list[Dict[str, Any]]:
+    return [_serialize_model(row) for row in rows]
+
+
+def _remove_cv_storage_files(paths: list[str]) -> None:
+    if not paths:
+        return
+    try:
+        response = (
+            get_supabase_service_client()
+            .storage
+            .from_(settings.SUPABASE_STORAGE_BUCKET)
+            .remove(paths)
+        )
+    except Exception as exc:
+        logger.error("cv_storage_delete_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete stored CV files. Account deletion was not completed.",
+        ) from exc
+
+    error = getattr(response, "error", None)
+    if isinstance(response, dict):
+        error = response.get("error")
+    if error:
+        logger.error("cv_storage_delete_failed", error=str(error))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete stored CV files. Account deletion was not completed.",
+        )
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_my_user_info(
     current_user: dict = Depends(get_current_user),
@@ -55,20 +129,7 @@ async def get_my_user_info(
     Returns:
         UserResponse: User information
     """
-    try:
-        user_id_str = current_user.get("id")
-        if not user_id_str:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user ID",
-            )
-        user_id = uuid.UUID(str(user_id_str))
-    except (ValueError, TypeError) as e:
-        logger.error(f"Invalid user ID format: {user_id_str}, error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user ID format",
-        )
+    user_id = _current_user_uuid(current_user)
     
     user = db.query(User).filter(User.id == user_id).first()
     
@@ -113,20 +174,7 @@ async def update_my_user_info(
     Returns:
         UserResponse: Updated user information
     """
-    try:
-        user_id_str = current_user.get("id")
-        if not user_id_str:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user ID",
-            )
-        user_id = uuid.UUID(str(user_id_str))
-    except (ValueError, TypeError) as e:
-        logger.error(f"Invalid user ID format: {user_id_str}, error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user ID format",
-        )
+    user_id = _current_user_uuid(current_user)
     
     user = db.query(User).filter(User.id == user_id).first()
     
@@ -171,3 +219,133 @@ async def update_my_user_info(
         updated_at=user.updated_at.isoformat() if user.updated_at else "",
     )
 
+
+@router.get("/me/export")
+async def export_my_data(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Export the current user's candidate-platform data as JSON."""
+    user_id = _current_user_uuid(current_user)
+
+    local_user = db.query(User).filter(User.id == user_id).first()
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    cvs = db.query(CV).filter(CV.user_id == user_id).all()
+    applications = db.query(Application).filter(Application.user_id == user_id).all()
+    job_matches = db.query(JobMatch).filter(JobMatch.user_id == user_id).all()
+    recommendations = (
+        db.query(JobRecommendation).filter(JobRecommendation.user_id == user_id).all()
+    )
+    scraping_jobs = db.query(ScrapingJob).filter(ScrapingJob.user_id == user_id).all()
+    user_embedding = db.query(UserEmbedding).filter(UserEmbedding.user_id == user_id).first()
+    notification_preferences = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user_id)
+        .first()
+    )
+    whatsapp_messages = (
+        db.query(WhatsappMessage).filter(WhatsappMessage.user_id == user_id).all()
+    )
+    whatsapp_incoming_events = (
+        db.query(WhatsappIncomingEvent)
+        .filter(WhatsappIncomingEvent.user_id == user_id)
+        .all()
+    )
+    external_jobs = db.query(Job).filter(Job.added_by_user_id == user_id).all()
+
+    return {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "auth_user": jsonable_encoder(
+            {
+                "id": current_user.get("id"),
+                "email": current_user.get("email"),
+                "email_confirmed_at": current_user.get("email_confirmed_at"),
+                "created_at": current_user.get("created_at"),
+                "user_metadata": current_user.get("user_metadata", {}),
+            }
+        ),
+        "user": _serialize_model(local_user) if local_user else None,
+        "profile": _serialize_model(profile) if profile else None,
+        "cvs": _serialize_rows(cvs),
+        "applications": _serialize_rows(applications),
+        "job_matches": _serialize_rows(job_matches),
+        "job_recommendations": _serialize_rows(recommendations),
+        "scraping_jobs": _serialize_rows(scraping_jobs),
+        "user_embedding": _serialize_model(user_embedding) if user_embedding else None,
+        "notification_preferences": (
+            _serialize_model(notification_preferences)
+            if notification_preferences
+            else None
+        ),
+        "whatsapp_messages": _serialize_rows(whatsapp_messages),
+        "whatsapp_incoming_events": _serialize_rows(whatsapp_incoming_events),
+        "external_jobs_added_by_user": _serialize_rows(external_jobs),
+    }
+
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_my_account(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete the current user's candidate data and best-effort remove Auth user."""
+    user_id = _current_user_uuid(current_user)
+
+    cvs = db.query(CV).filter(CV.user_id == user_id).all()
+    cv_paths = [cv.file_path for cv in cvs if cv.file_path]
+    _remove_cv_storage_files(cv_paths)
+
+    deleted_counts: Dict[str, int] = {}
+    try:
+        delete_specs = (
+            ("whatsapp_incoming_events", WhatsappIncomingEvent),
+            ("whatsapp_messages", WhatsappMessage),
+            ("notification_preferences", NotificationPreferences),
+            ("job_recommendations", JobRecommendation),
+            ("job_matches", JobMatch),
+            ("applications", Application),
+            ("scraping_jobs", ScrapingJob),
+            ("user_embeddings", UserEmbedding),
+            ("cvs", CV),
+            ("user_profiles", UserProfile),
+        )
+        for name, model in delete_specs:
+            deleted_counts[name] = (
+                db.query(model)
+                .filter(getattr(model, "user_id") == user_id)
+                .delete(synchronize_session=False)
+            )
+
+        deleted_counts["external_jobs_detached_from_user"] = (
+            db.query(Job)
+            .filter(Job.added_by_user_id == user_id)
+            .update({"added_by_user_id": None}, synchronize_session=False)
+        )
+        deleted_counts["users"] = (
+            db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("account_delete_failed", user_id=str(user_id), error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete account data.",
+        ) from exc
+
+    auth_user_deleted = False
+    auth_delete_error: Optional[str] = None
+    try:
+        get_supabase_service_client().auth.admin.delete_user(str(user_id))
+        auth_user_deleted = True
+    except Exception as exc:
+        auth_delete_error = "Supabase Auth user deletion failed; local data was deleted."
+        logger.error("auth_user_delete_failed", user_id=str(user_id), error=str(exc))
+
+    return {
+        "status": "deleted",
+        "deleted_counts": deleted_counts,
+        "cv_files_deleted": len(cv_paths),
+        "auth_user_deleted": auth_user_deleted,
+        "warning": auth_delete_error,
+    }

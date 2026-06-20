@@ -1,21 +1,58 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signUp } from '@/lib/auth'
+import { apiClient } from '@/lib/api/client'
 import { toast } from 'react-hot-toast'
 import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export default function SignUpPage() {
+interface HandoffVerifyResponse {
+  valid: boolean
+  email?: string | null
+  full_name?: string | null
+  phone?: string | null
+  job_id?: string | null
+}
+
+function SignUpContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState<string | null>(null)
+  const [handoffJobId, setHandoffJobId] = useState<string | null>(null)
+  const [handoffPrefilled, setHandoffPrefilled] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const token = searchParams.get('h')
+    if (!token) return
+
+    let cancelled = false
+    apiClient
+      .post<HandoffVerifyResponse>('/auth/handoff/verify', { token })
+      .then((result) => {
+        if (cancelled || !result.valid) return
+        if (result.email) setEmail(result.email)
+        if (result.full_name) setFullName(result.full_name)
+        if (result.phone) setPhone(result.phone)
+        if (result.job_id) setHandoffJobId(result.job_id)
+        setHandoffPrefilled(Boolean(result.email || result.full_name))
+      })
+      .catch(() => {
+        // Expired or invalid handoffs fall back to normal signup.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,6 +64,9 @@ export default function SignUpPage() {
         password,
         metadata: {
           full_name: fullName,
+          phone: phone || undefined,
+          source: handoffPrefilled ? 'veloxarecruit_apply_handoff' : undefined,
+          ats_job_id: handoffJobId || undefined,
         },
       })
       toast.success('Account created! You can sign in now.')
@@ -61,10 +101,12 @@ export default function SignUpPage() {
             </span>
           </Link>
           <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
-            Create your account
+            {handoffPrefilled ? 'Create your job profile' : 'Create your account'}
           </h2>
           <p className="mt-2 text-neutral-500">
-            Create your VeloxaHire account and get started.
+            {handoffPrefilled
+              ? 'Your application details are ready. Set a password to continue.'
+              : 'Create your VeloxaHire account and get started.'}
           </p>
         </div>
 
@@ -103,9 +145,10 @@ export default function SignUpPage() {
                     name="email"
                     type="email"
                     required
+                    readOnly={handoffPrefilled}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-12 pr-4 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl focus:ring-2 focus:ring-brand-turquoise-500 focus:bg-white transition-all outline-none text-neutral-900 font-medium"
+                    className="block w-full pl-12 pr-4 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl focus:ring-2 focus:ring-brand-turquoise-500 focus:bg-white transition-all outline-none text-neutral-900 font-medium read-only:text-neutral-600"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -165,5 +208,13 @@ export default function SignUpPage() {
         </p>
       </motion.div>
     </div>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <SignUpContent />
+    </Suspense>
   )
 }

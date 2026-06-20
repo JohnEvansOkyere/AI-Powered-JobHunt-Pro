@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     external_jobs,
     recommendations,
     whatsapp,
+    ops,
 )
 
 api_router = APIRouter()
@@ -32,8 +33,8 @@ api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(applications.router, prefix="/applications", tags=["applications"])
 api_router.include_router(external_jobs.router, prefix="/jobs", tags=["external-jobs"])
 api_router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
+api_router.include_router(ops.router, prefix="/ops", tags=["ops"])
 api_router.include_router(
     whatsapp.router_notifications, prefix="/notifications", tags=["notifications"]
 )
 api_router.include_router(whatsapp.router_webhooks, prefix="/webhooks", tags=["webhooks"])
-

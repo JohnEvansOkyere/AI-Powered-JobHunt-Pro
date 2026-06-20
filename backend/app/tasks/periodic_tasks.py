@@ -126,6 +126,11 @@ def sync_ats_jobs() -> Dict[str, Any]:
     """Mirror published recruiter jobs from the ATS into the candidate DB."""
     from app.core.config import settings
     from app.services.ats_job_sync_service import ATSJobSyncService
+    from app.services.ats_sync_status_service import (
+        record_sync_failure_sync,
+        record_sync_started_sync,
+        record_sync_success_sync,
+    )
 
     if not settings.ATS_SYNC_ENABLED:
         logger.info("scheduled.sync_ats_jobs.disabled")
@@ -134,11 +139,14 @@ def sync_ats_jobs() -> Dict[str, Any]:
     logger.info("scheduled.sync_ats_jobs.start")
     db: Session = SessionLocal()
     try:
+        record_sync_started_sync("scheduled")
         stats = ATSJobSyncService(db).sync()
+        record_sync_success_sync(stats.as_dict(), "scheduled")
         return {"status": "success", **stats.as_dict()}
     except Exception as exc:
         logger.error("scheduled.sync_ats_jobs.failed", error=str(exc), exc_info=True)
         db.rollback()
+        record_sync_failure_sync(str(exc), "scheduled")
         return {"status": "failed", "error": str(exc)}
     finally:
         db.close()

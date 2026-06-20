@@ -48,7 +48,7 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
   const hasExternalLink = Boolean(job.url)
 
   return (
-    <article className="bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 transition-colors p-5">
+    <article className="card-interactive p-5">
       {/* Header */}
       <header className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0 flex-1">
@@ -75,10 +75,10 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
             onSave?.(job.id)
           }}
           aria-label={isSaved ? 'Remove from saved' : 'Save for later'}
-          className={`p-1.5 -m-1 rounded-md transition-colors flex-shrink-0 ${
+          className={`p-1.5 -m-1 rounded-md transition-all duration-150 flex-shrink-0 cursor-pointer ${
             isSaved
-              ? 'text-brand-turquoise-600'
-              : 'text-neutral-300 hover:text-neutral-600 hover:bg-neutral-50'
+              ? 'text-brand-turquoise-600 hover:text-brand-turquoise-700'
+              : 'text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100'
           }`}
         >
           {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
@@ -127,7 +127,7 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
             target="_blank"
             rel="noopener noreferrer nofollow"
             onClick={() => onApply?.(job.id)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-md cursor-pointer"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Apply
@@ -135,7 +135,7 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
         ) : (
           <button
             onClick={() => onApply?.(job.id)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-md cursor-pointer"
           >
             View details
           </button>

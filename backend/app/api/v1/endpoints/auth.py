@@ -7,16 +7,22 @@ provide session validation and user info retrieval.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from app.api.v1.dependencies import get_current_user, get_supabase
+from app.core.config import settings
 from app.core.logging import get_logger
 from supabase import Client
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+HANDOFF_TOKEN_ISSUER = "veloxarecruit"
+HANDOFF_TOKEN_AUDIENCE = "veloxahire"
+HANDOFF_TOKEN_PURPOSE = "ats_apply"
 
 
 class UserResponse(BaseModel):
@@ -32,6 +38,58 @@ class SessionResponse(BaseModel):
     """Session validation response."""
     valid: bool
     user: Optional[UserResponse] = None
+
+
+class HandoffVerifyRequest(BaseModel):
+    token: str
+
+
+class HandoffVerifyResponse(BaseModel):
+    valid: bool
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    job_id: Optional[str] = None
+
+
+def _decode_handoff_token(token: str) -> dict:
+    if not settings.HANDOFF_TOKEN_SECRET:
+        raise JWTError("HANDOFF_TOKEN_SECRET is not configured")
+
+    decode_kwargs = {
+        "algorithms": ["HS256"],
+        "audience": HANDOFF_TOKEN_AUDIENCE,
+        "issuer": HANDOFF_TOKEN_ISSUER,
+    }
+    try:
+        payload = jwt.decode(token, settings.HANDOFF_TOKEN_SECRET, **decode_kwargs)
+    except JWTError:
+        if not settings.PREVIOUS_HANDOFF_TOKEN_SECRET:
+            raise
+        payload = jwt.decode(token, settings.PREVIOUS_HANDOFF_TOKEN_SECRET, **decode_kwargs)
+
+    if payload.get("purpose") != HANDOFF_TOKEN_PURPOSE:
+        raise JWTError("Invalid handoff token purpose")
+    if not payload.get("email"):
+        raise JWTError("Handoff token missing email")
+    return payload
+
+
+@router.post("/handoff/verify", response_model=HandoffVerifyResponse)
+async def verify_handoff_token(payload: HandoffVerifyRequest):
+    """Verify an ATS signup handoff token and return safe prefill fields."""
+    try:
+        claims = _decode_handoff_token(payload.token)
+        return HandoffVerifyResponse(
+            valid=True,
+            email=claims.get("email"),
+            full_name=claims.get("full_name"),
+            phone=claims.get("phone"),
+            job_id=claims.get("job_id"),
+        )
+    except Exception as exc:
+        logger.info("handoff_token_invalid", error=str(exc))
+        return HandoffVerifyResponse(valid=False)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -113,4 +171,3 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to logout",
         )
-
