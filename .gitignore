@@ -76,3 +76,8 @@ Thumbs.db
 # Deployment
 .vercel
 .render
+
+# Build / coverage artifacts (untracked 2026-06-21)
+coverage.xml
+*.tsbuildinfo
+.ipynb_checkpoints/
