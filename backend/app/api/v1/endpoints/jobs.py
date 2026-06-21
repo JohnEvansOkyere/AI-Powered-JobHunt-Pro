@@ -13,7 +13,13 @@ import uuid
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.rate_limit import CRON_RATE_LIMIT, SCRAPING_RATE_LIMIT, enforce_rate_limit
+from app.core.rate_limit import (
+    CRON_RATE_LIMIT,
+    PUBLIC_JOB_DETAIL_RATE_LIMIT,
+    PUBLIC_JOB_SEARCH_RATE_LIMIT,
+    SCRAPING_RATE_LIMIT,
+    enforce_rate_limit,
+)
 from app.api.v1.dependencies import get_current_user, get_optional_user
 from app.core.logging import get_logger
 from app.models.job import Job
@@ -126,6 +132,7 @@ class ScrapingJobResponse(BaseModel):
 
 @router.get("/", response_model=JobSearchResponse)
 async def search_jobs(
+    request: Request,
     q: Optional[str] = Query(None, description="Search query (title, company, description)"),
     source: Optional[str] = Query(None, description="Filter by source"),
     location: Optional[str] = Query(None, description="Filter by location"),
@@ -144,6 +151,8 @@ async def search_jobs(
     Recommendation-specific matching now lives on /api/v1/recommendations.
     Otherwise returns all jobs matching the criteria.
     """
+    await enforce_rate_limit(request, PUBLIC_JOB_SEARCH_RATE_LIMIT)
+
     query = db.query(Job)
     
     # Text search (sanitize length to avoid expensive full scans; max 100 chars)
@@ -232,7 +241,8 @@ async def get_recommendations_legacy(
 
 
 @router.get("/{job_id}", response_model=JobResponse)
-def get_job(
+async def get_job(
+    request: Request,
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
@@ -242,6 +252,8 @@ def get_job(
     intentionally anonymous. Auth-only actions like saving, tracking, and
     recommendations stay on their dedicated protected endpoints.
     """
+    await enforce_rate_limit(request, PUBLIC_JOB_DETAIL_RATE_LIMIT)
+
     job = (
         db.query(Job)
         .filter(Job.id == job_id, Job.processing_status != "archived")

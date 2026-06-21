@@ -30,17 +30,45 @@ class Settings(BaseSettings):
         default=30, description="Access token expiration in minutes"
     )
 
-    # Supabase Configuration
-    SUPABASE_URL: str = Field(..., description="Supabase project URL")
-    SUPABASE_KEY: str = Field(..., description="Supabase anon/public key")
+    # Supabase data/storage configuration.
+    # Keep this pointed at the VeloxaHire Supabase project.
+    SUPABASE_URL: str = Field(..., description="VeloxaHire Supabase project URL for data/storage")
+    SUPABASE_KEY: str = Field(..., description="VeloxaHire Supabase anon/public key for data/storage")
     SUPABASE_SERVICE_KEY: str = Field(..., description="Supabase service role key")
     SUPABASE_JWT_SECRET: str = Field(
         default="",
-        description="Supabase JWT secret for local access-token verification",
+        description="Deprecated fallback JWT secret for auth verification when AUTH_SUPABASE_JWT_SECRET is unset",
     )
     SUPABASE_STORAGE_BUCKET: str = Field(
         default="cvs", description="Supabase storage bucket name for CVs"
     )
+
+    # Supabase auth-provider configuration.
+    # Point these at VeloxaRecruit when running shared ecosystem auth.
+    AUTH_SUPABASE_URL: str = Field(
+        default="",
+        description="Canonical Supabase Auth project URL. Falls back to SUPABASE_URL.",
+    )
+    AUTH_SUPABASE_KEY: str = Field(
+        default="",
+        description="Canonical Supabase Auth anon/public key. Falls back to SUPABASE_KEY.",
+    )
+    AUTH_SUPABASE_JWT_SECRET: str = Field(
+        default="",
+        description="Canonical Supabase Auth JWT secret. Falls back to SUPABASE_JWT_SECRET.",
+    )
+
+    @property
+    def auth_supabase_url(self) -> str:
+        return self.AUTH_SUPABASE_URL or self.SUPABASE_URL
+
+    @property
+    def auth_supabase_key(self) -> str:
+        return self.AUTH_SUPABASE_KEY or self.SUPABASE_KEY
+
+    @property
+    def auth_supabase_jwt_secret(self) -> str:
+        return self.AUTH_SUPABASE_JWT_SECRET or self.SUPABASE_JWT_SECRET
 
     # Database
     DATABASE_URL: str = Field(..., description="PostgreSQL database connection URL")

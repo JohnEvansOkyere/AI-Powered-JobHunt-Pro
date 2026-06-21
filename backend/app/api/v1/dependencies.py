@@ -31,7 +31,7 @@ def _verify_supabase_jwt_locally(token: str) -> dict | None:
     Supabase access tokens are JWTs whose subject is the user ID. Local validation avoids
     turning a temporary Supabase Auth network problem into a dashboard-wide 401 loop.
     """
-    jwt_secret = (getattr(settings, "SUPABASE_JWT_SECRET", "") or "").strip()
+    jwt_secret = (getattr(settings, "auth_supabase_jwt_secret", "") or "").strip()
     if not jwt_secret:
         return None
 
@@ -92,10 +92,10 @@ async def get_current_user(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.SUPABASE_URL}/auth/v1/user",
+                f"{settings.auth_supabase_url}/auth/v1/user",
                 headers={
                     "Authorization": f"Bearer {token}",
-                    "apikey": settings.SUPABASE_KEY,
+                    "apikey": settings.auth_supabase_key,
                 },
                 timeout=5.0,
             )
@@ -127,7 +127,7 @@ async def get_current_user(
             "supabase_auth_http_error",
             error_type=type(e).__name__,
             message=str(e) or repr(e),
-            supabase_url=settings.SUPABASE_URL,
+            supabase_url=settings.auth_supabase_url,
         )
 
         raise _unauthorized()

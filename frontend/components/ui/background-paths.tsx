@@ -61,6 +61,9 @@ export interface BackgroundPathsProps {
   /** Optional secondary CTA, rendered next to the primary one. */
   secondaryCtaLabel?: string
   secondaryCtaHref?: string
+  /** Optional tertiary CTA, rendered after the secondary one. */
+  tertiaryCtaLabel?: string
+  tertiaryCtaHref?: string
 }
 
 export function BackgroundPaths({
@@ -71,6 +74,8 @@ export function BackgroundPaths({
   ctaHref = '/auth/signup',
   secondaryCtaLabel,
   secondaryCtaHref,
+  tertiaryCtaLabel,
+  tertiaryCtaHref,
 }: BackgroundPathsProps) {
   const words = title.split(' ')
 
@@ -174,6 +179,15 @@ export function BackgroundPaths({
                 className="inline-flex items-center gap-2 px-7 py-4 rounded-full text-sm font-semibold text-cream-100/80 hover:text-cream-100 border border-cream-100/25 hover:border-cream-100/50 transition-colors"
               >
                 {secondaryCtaLabel}
+              </Link>
+            )}
+
+            {tertiaryCtaLabel && tertiaryCtaHref && (
+              <Link
+                href={tertiaryCtaHref}
+                className="inline-flex items-center gap-2 px-7 py-4 rounded-full text-sm font-semibold text-cream-100/80 hover:text-cream-100 border border-cream-100/25 hover:border-cream-100/50 transition-colors"
+              >
+                {tertiaryCtaLabel}
               </Link>
             )}
           </motion.div>

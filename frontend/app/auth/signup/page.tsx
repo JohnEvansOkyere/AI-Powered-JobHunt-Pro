@@ -20,6 +20,17 @@ interface HandoffVerifyResponse {
   job_id?: string | null
 }
 
+const handoffVerifyCache = new Map<string, Promise<HandoffVerifyResponse>>()
+
+function verifyHandoffToken(token: string) {
+  const cached = handoffVerifyCache.get(token)
+  if (cached) return cached
+
+  const request = apiClient.post<HandoffVerifyResponse>('/auth/handoff/verify', { token })
+  handoffVerifyCache.set(token, request)
+  return request
+}
+
 const inputCls =
   'block w-full rounded-xl border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-500/20'
 
@@ -41,8 +52,7 @@ function SignUpContent() {
     if (!token) return
 
     let cancelled = false
-    apiClient
-      .post<HandoffVerifyResponse>('/auth/handoff/verify', { token })
+    verifyHandoffToken(token)
       .then((result) => {
         if (cancelled || !result.valid) return
         if (result.email) setEmail(result.email)

@@ -26,6 +26,8 @@ import {
 } from 'lucide-react'
 import { BackgroundPaths } from '@/components/ui/background-paths'
 
+const VELOXARECRUIT_START_URL = `${process.env.NEXT_PUBLIC_VELOXARECRUIT_URL || 'https://www.veloxarecruit.com'}/get-started`
+
 // ---------------------------------------------------------------------------
 // Small building blocks
 // ---------------------------------------------------------------------------
@@ -186,6 +188,12 @@ export default function HomePage() {
 
             <div className="hidden md:flex items-center gap-2">
               <Link
+                href={VELOXARECRUIT_START_URL}
+                className="px-4 py-2 text-sm font-medium text-cream-100/80 hover:text-cream-100 transition-colors rounded-lg"
+              >
+                Create job for free
+              </Link>
+              <Link
                 href="/auth/login"
                 className="px-4 py-2 text-sm font-medium text-cream-100/80 hover:text-cream-100 transition-colors rounded-lg"
               >
@@ -228,14 +236,22 @@ export default function HomePage() {
               ))}
               <div className="flex gap-2 pt-2 border-t border-cream-100/10">
                 <Link
+                  href={VELOXARECRUIT_START_URL}
+                  className="flex-1 text-center py-2 border border-cream-100/30 rounded-full font-medium text-cream-100"
+                >
+                  Create job
+                </Link>
+                <Link
                   href="/auth/login"
                   className="flex-1 text-center py-2 border border-cream-100/30 rounded-full font-medium text-cream-100"
                 >
                   Sign in
                 </Link>
+              </div>
+              <div className="flex pt-2">
                 <Link
                   href="/auth/signup"
-                  className="flex-1 text-center py-2 bg-cream-100 text-ink-900 rounded-full font-semibold"
+                  className="w-full text-center py-2 bg-cream-100 text-ink-900 rounded-full font-semibold"
                 >
                   Get started
                 </Link>
@@ -256,6 +272,8 @@ export default function HomePage() {
         ctaHref="/jobs"
         secondaryCtaLabel="Get my shortlist"
         secondaryCtaHref="/auth/signup"
+        tertiaryCtaLabel="Create job for free"
+        tertiaryCtaHref={VELOXARECRUIT_START_URL}
       />
 
       {/* ================================================================ */}
@@ -389,8 +407,10 @@ export default function HomePage() {
           <span className="uppercase tracking-[0.22em] font-semibold text-ink-500">
             Trusted across the Veloxa family
           </span>
-          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 font-display font-semibold text-ink-500">
-            <span>Veloxa Recruit</span>
+          <div className="flex flex-wrap items-center justify-center gap-5 md:gap-8 font-display font-semibold text-ink-500">
+            <Link href={VELOXARECRUIT_START_URL} className="hover:text-forest-700 transition-colors">
+              Create job for free
+            </Link>
             <span className="w-1 h-1 rounded-full bg-ink-500/40 hidden md:block" />
             <span>VeloxaHire</span>
           </div>
@@ -711,6 +731,12 @@ export default function HomePage() {
                 className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
               >
                 Get my shortlist
+              </Link>
+              <Link
+                href={VELOXARECRUIT_START_URL}
+                className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
+              >
+                Create job for free
               </Link>
             </div>
           </div>

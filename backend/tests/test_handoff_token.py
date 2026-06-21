@@ -16,6 +16,7 @@ def _handoff_payload(**overrides):
         "purpose": auth.HANDOFF_TOKEN_PURPOSE,
         "iss": auth.HANDOFF_TOKEN_ISSUER,
         "aud": auth.HANDOFF_TOKEN_AUDIENCE,
+        "jti": "handoff-token-id",
         "iat": now,
         "exp": now + timedelta(minutes=15),
     }
@@ -46,3 +47,39 @@ def test_decode_handoff_token_rejects_wrong_audience(monkeypatch):
 
     with pytest.raises(JWTError):
         auth._decode_handoff_token(token)
+
+
+def test_decode_handoff_token_rejects_missing_jti(monkeypatch):
+    monkeypatch.setattr(auth.settings, "HANDOFF_TOKEN_SECRET", "handoff-secret-123")
+    monkeypatch.setattr(auth.settings, "PREVIOUS_HANDOFF_TOKEN_SECRET", "")
+    payload = _handoff_payload()
+    payload.pop("jti")
+    token = jwt.encode(payload, "handoff-secret-123", algorithm="HS256")
+
+    with pytest.raises(JWTError):
+        auth._decode_handoff_token(token)
+
+
+@pytest.mark.asyncio
+async def test_consume_handoff_jti_rejects_replay(monkeypatch):
+    class FakeRedis:
+        def __init__(self):
+            self.keys = set()
+
+        async def set(self, key, value, ex=None, nx=False):
+            if nx and key in self.keys:
+                return None
+            self.keys.add(key)
+            return True
+
+    fake_redis = FakeRedis()
+
+    async def fake_get_async_redis():
+        return fake_redis
+
+    monkeypatch.setattr(auth, "get_async_redis", fake_get_async_redis)
+    claims = _handoff_payload()
+
+    await auth._consume_handoff_jti(claims)
+    with pytest.raises(JWTError):
+        await auth._consume_handoff_jti(claims)
