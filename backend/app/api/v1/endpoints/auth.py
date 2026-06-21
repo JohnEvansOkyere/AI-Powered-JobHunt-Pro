@@ -6,7 +6,9 @@ Since Supabase handles most auth logic, these endpoints primarily
 provide session validation and user info retrieval.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -14,6 +16,8 @@ from typing import Optional
 from app.api.v1.dependencies import get_current_user, get_supabase
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.rate_limit import HANDOFF_VERIFY_RATE_LIMIT, enforce_rate_limit
+from app.core.redis_client import get_async_redis
 from supabase import Client
 
 logger = get_logger(__name__)
@@ -72,14 +76,37 @@ def _decode_handoff_token(token: str) -> dict:
         raise JWTError("Invalid handoff token purpose")
     if not payload.get("email"):
         raise JWTError("Handoff token missing email")
+    if not payload.get("jti"):
+        raise JWTError("Handoff token missing jti")
     return payload
 
 
+async def _consume_handoff_jti(claims: dict) -> None:
+    """Atomically mark a handoff token as used for the rest of its lifetime."""
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    if not jti or not exp:
+        raise JWTError("Handoff token missing replay protection claims")
+
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    exp_ts = int(exp.timestamp()) if isinstance(exp, datetime) else int(exp)
+    ttl = max(exp_ts - now_ts, 1)
+    key = f"handoff:jti:{jti}"
+
+    redis = await get_async_redis()
+    was_set = await redis.set(key, "used", ex=ttl, nx=True)
+    if not was_set:
+        raise JWTError("Handoff token has already been used")
+
+
 @router.post("/handoff/verify", response_model=HandoffVerifyResponse)
-async def verify_handoff_token(payload: HandoffVerifyRequest):
+async def verify_handoff_token(request: Request, payload: HandoffVerifyRequest):
     """Verify an ATS signup handoff token and return safe prefill fields."""
+    await enforce_rate_limit(request, HANDOFF_VERIFY_RATE_LIMIT)
+
     try:
         claims = _decode_handoff_token(payload.token)
+        await _consume_handoff_jti(claims)
         return HandoffVerifyResponse(
             valid=True,
             email=claims.get("email"),
