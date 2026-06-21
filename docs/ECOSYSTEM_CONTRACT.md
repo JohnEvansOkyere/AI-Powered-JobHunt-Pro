@@ -10,7 +10,7 @@
 
 # Veloxa Ecosystem Contract
 
-**Contract version:** 2026-06-21.4
+**Contract version:** 2026-06-21.7
 **Last synced:** 2026-06-21
 **Authoritative for:** the cross-repo integration handshake between VeloxaRecruit (ATS) and VeloxaHire (candidate platform).
 
@@ -186,14 +186,17 @@ The candidate→recruiter loop does **not** need a return-path API. It is closed
 4. ATS `POST /applications/apply` inserts the **canonical** application and returns the public
    application response **including the handoff token** (§4).
 5. ATS apply success screen shows "other jobs" + a CTA to VeloxaHire's board
-   (`{NEXT_PUBLIC_VELOXAHIRE_URL}/jobs`, optionally `…/auth/signup?h=<token>`).
+   (`{origin}/jobs`, or with handoff `{origin}/register?h=<token>`, where `{origin}` is the bare
+   origin of `NEXT_PUBLIC_VELOXAHIRE_URL`).
 
 **Cross-repo env the CTA depends on (ATS frontend):** `NEXT_PUBLIC_VELOXAHIRE_URL` — must be set in
 ATS production (Vercel) or the CTA does not render.
 
-**Open contract caution (from audit):** the ATS public apply response currently returns the full
-`PublicJobApplication` shape (internal ids, screening state) to an anonymous caller. Narrow it to
-`{application_id, handoff_token, received}` — do not expand what the public endpoint exposes.
+**Public apply response is narrowed (RESOLVED 2026-06-21).** `PublicJobApplication`
+(`backend/app/models/job_application.py`) no longer inherits the full application shape; it now
+exposes only `{application_id, received, handoff_token}`. Internal ids (`candidate_id`, `cv_id`,
+`recruiter_owner_id`) and all `pre_screen_*` / decision / pipeline state are no longer returned to
+the anonymous applicant. **Do not re-widen this model.**
 
 **Front-door routing (approved near-term UX):**
 - VeloxaRecruit is the employer/recruiter entry point. Its landing page should show explicit
@@ -315,8 +318,24 @@ Keep VeloxaHire `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_KEY`, and
 `SUPABASE_STORAGE_BUCKET` pointed at the VeloxaHire data/storage project. Do not set the auth
 scaffold env in production until the Recruit-owned broker/provisioning flow in §6 is implemented.
 
-**Cross-repo URL env:** ATS frontend needs `NEXT_PUBLIC_VELOXAHIRE_URL`; VeloxaHire backend needs
-`ATS_PUBLISHED_JOBS_URL`.
+**Cross-repo URL env:** ATS frontend needs `NEXT_PUBLIC_VELOXAHIRE_URL`; VeloxaHire frontend needs
+`NEXT_PUBLIC_VELOXARECRUIT_URL`; VeloxaHire backend needs `ATS_PUBLISHED_JOBS_URL`.
+
+> **RULE — the two landing nav env vars hold the FULL destination URL (incl. path), used verbatim.**
+> - `NEXT_PUBLIC_VELOXAHIRE_URL=https://<hire-host>/jobs` — ATS landing "looking for a job" links here as-is.
+> - `NEXT_PUBLIC_VELOXARECRUIT_URL=https://<recruit-host>/register` — VeloxaHire landing "I'm hiring" links here as-is.
+>
+> Code no longer appends a path for these buttons; whatever you put in the env var is exactly where
+> users land. To change a destination, edit the Vercel env var and redeploy — no code change.
+>
+> **Exception — the post-apply handoff** (`apply/[jobId]/page.tsx`) reuses `NEXT_PUBLIC_VELOXAHIRE_URL`
+> but needs `…/register?h=<token>`, so it derives the **origin** from that var (`new URL(x).origin`)
+> and appends `/register?h=`. That's why `NEXT_PUBLIC_VELOXAHIRE_URL` can safely carry the `/jobs`
+> path: the nav button uses it whole, the handoff strips to origin. The `?h=<token>` is per-applicant
+> and therefore must stay in code.
+>
+> History: a prod bug where the env had a path AND code appended another produced `/jobs/jobs` and
+> `/register/get-started`; fixed 2026-06-21 by making nav links use the env var verbatim.
 
 **Migration coupling:**
 - VeloxaHire ecosystem migrations: **`010_add_ats_job_mirroring.sql`**,
@@ -348,7 +367,7 @@ From the 2026-06-21 danger audit. Do not launch the unified ecosystem until all 
    incompatible `supabase` import surface — not a valid verification environment).
 8. Focused VeloxaHire tests run from `backend/`.
 9. Conversational-interview WIP isolated or its flag/migrations/buckets/billing verified.
-10. Public ATS apply response narrowed (§5).
+10. Public ATS apply response narrowed (§5). ✅ DONE 2026-06-21.
 11. Sync pagination cursor added before scaling the catalog (§3).
 12. Existing VeloxaHire user migration plan documented before retiring the old VeloxaHire auth pool.
 
@@ -373,6 +392,9 @@ Keep this section honest. When you reconcile an item, move it to the Change Log.
 
 | Date (UTC) | Contract version | Change | By |
 |---|---|---|---|
+| 2026-06-21 | 2026-06-21.7 | Simplified the two landing nav buttons to use the env var **verbatim** (Evans: "just sending them to the next page, make it easy"). [ATS] `LandingPageClient.tsx` → `NEXT_PUBLIC_VELOXAHIRE_URL` used as-is (set it to the full `…/jobs` URL); [HIRE] `app/page.tsx` → `NEXT_PUBLIC_VELOXARECRUIT_URL` used as-is (full `…/register` URL). Removed the `siteOrigin()` helper from both. Destination is now fully env-controlled — change the Vercel value + redeploy, no code edit. The apply-page handoff still derives origin from `NEXT_PUBLIC_VELOXAHIRE_URL` and appends `/register?h=<token>` (token must stay in code). Updated §7 rule + `.env.example`/`.env.local`. Supersedes the origin-in-env rule from .6. | Claude (Evans) |
+| 2026-06-21 | 2026-06-21.6 | Fixed cross-site nav double-pathing. Prod env vars carried a path (`NEXT_PUBLIC_VELOXAHIRE_URL=…/jobs`, `NEXT_PUBLIC_VELOXARECRUIT_URL=…/register`) and the code appended another → `/jobs/jobs` and `/register/get-started`. Now all link builders use `new URL(x).origin` then append one path: [ATS] `LandingPageClient.tsx` (`/jobs`) + `apply/[jobId]/page.tsx` (handoff `/register?h=`, `/jobs`); [HIRE] `app/page.tsx` (recruiter CTA now `/register`, was `/get-started`). Added the **origin-only env rule** to §7. Path-safe regardless of env, but keep env values as bare origins. | Claude (Evans) |
+| 2026-06-21 | 2026-06-21.5 | Closed three audit code items. (1) **Narrowed the public apply response** — `PublicJobApplication` now `{application_id, received, handoff_token}` only; internal ids + pre_screen/decision/pipeline state no longer exposed to anonymous applicants (§5, gate #10 done). (2) [HIRE] **Restricted the Next image optimizer host** from `**.supabase.co` to the single project host (`frontend/next.config.js`) — closes the open image-proxy/cost vector. (3) Untracked build artifacts (`coverage.xml`, `*.tsbuildinfo`, `.ipynb_checkpoints/`) in both repos + added `.gitignore` rules. Verified: ATS handoff tests pass, narrowed model asserts only 3 fields. Remaining open: secret rotation + worker/beat/migrations (operational, owner), sync pagination cursor (§3, future). | Claude (Evans) |
 | 2026-06-21 | 2026-06-21.4 | Added approved near-term front-door routing: VeloxaRecruit shows "I'm hiring" and "I'm looking for a job"; job seekers go to VeloxaHire `/jobs`; VeloxaHire shows "Create job for free" back to VeloxaRecruit request access. Auth remains separate; avoid one-login wording until the §6 broker exists. | Codex (Evans) |
 | 2026-06-21 | 2026-06-21.3 | Corrected the identity contract after re-reading VeloxaRecruit auth code. Recruit auth must remain unchanged: it uses Supabase Auth via existing `SUPABASE_*` settings plus Recruit backend profile/status/email/rate-limit/session rules. Directly pointing VeloxaHire `supabase-js` at Recruit Supabase is not enough and can create orphaned users. Final one-login design must use a Recruit-owned auth broker/code exchange/provisioning flow while keeping databases separate. | Codex (Evans) |
 | 2026-06-21 | 2026-06-21.2 | Updated identity contract from "SSO deferred" to auth-only unification: VeloxaRecruit Supabase Auth is canonical, VeloxaHire consumes that auth via `AUTH_SUPABASE_*` / `NEXT_PUBLIC_AUTH_SUPABASE_*`, and VeloxaHire data/storage stays on its own Supabase project. Added capability-model, callback URL, existing-user migration, and migration `012_drop_jobs_source_check.sql` notes. | Codex (Evans) |

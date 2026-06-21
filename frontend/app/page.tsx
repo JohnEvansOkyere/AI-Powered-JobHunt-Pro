@@ -26,7 +26,9 @@ import {
 } from 'lucide-react'
 import { BackgroundPaths } from '@/components/ui/background-paths'
 
-const VELOXARECRUIT_START_URL = `${process.env.NEXT_PUBLIC_VELOXARECRUIT_URL || 'https://www.veloxarecruit.com'}/get-started`
+// Full destination URL comes straight from the env var — this is just a nav link to
+// VeloxaRecruit. Set NEXT_PUBLIC_VELOXARECRUIT_URL to the complete URL (incl. /register) in Vercel.
+const VELOXARECRUIT_START_URL = process.env.NEXT_PUBLIC_VELOXARECRUIT_URL || 'https://www.veloxarecruit.com/register'
 
 // ---------------------------------------------------------------------------
 // Small building blocks
