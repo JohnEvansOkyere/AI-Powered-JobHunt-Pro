@@ -1,6 +1,7 @@
 # FastAPI and Server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+gunicorn>=21.2.0  # production web process manager (DigitalOcean systemd service)
 python-multipart==0.0.6
 
 # Database
