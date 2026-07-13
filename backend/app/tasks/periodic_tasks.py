@@ -334,7 +334,12 @@ def cleanup_expired_recommendations() -> int:
 
 @celery_app.task(name="scheduler.cleanup_old_jobs", ignore_result=False)
 def cleanup_old_jobs() -> int:
-    """Delete scraped jobs older than 7 days, preserving those with applications."""
+    """Delete scraped jobs older than 7 days, preserving those with applications.
+
+    Recruiter jobs are exempt: they mirror the ATS, whose incremental sync keys off
+    max(origin_updated_at). Deleting one would not resync it and would strand any
+    application referencing its id — their lifecycle is publication_status instead.
+    """
     from app.models.application import Application
     from app.models.job import Job
 
@@ -345,7 +350,7 @@ def cleanup_old_jobs() -> int:
             db.query(Job)
             .filter(
                 Job.scraped_at < cutoff_date,
-                Job.source.notin_(("external", "recruiter")),
+                Job.source != "recruiter",
             )
             .all()
         )
