@@ -55,6 +55,16 @@ class JobScraperService:
             "adzuna": None,
             "joinrise": None,
             "arbeitnow": None,
+            "jobicy": None,
+            "himalayas": None,
+            "themuse": None,
+            "workingnomads": None,
+            "weworkremotely": None,
+            "myjobmag": None,
+            "myjobmag_ng": None,
+            "myjobmag_ke": None,
+            "myjobmag_za": None,
+            "jobwebghana": None,
             # "hiringcafe" disabled - API not publicly available (returns 429)
             # Scrapers requiring API key
             "serpapi": None,
@@ -101,6 +111,30 @@ class JobScraperService:
             logger.info("Arbeitnow scraper initialized (FREE)")
         except Exception as e:
             logger.warning(f"Arbeitnow scraper unavailable: {e}")
+
+        # Free JSON APIs: Jobicy, Himalayas, The Muse, Working Nomads (global remote,
+        # tech + non-tech). RSS feeds: We Work Remotely (global remote), MyJobMag
+        # (Ghana/Nigeria/Kenya/South Africa) + JobWeb Ghana (all role types).
+        free_scrapers = [
+            ("jobicy", "app.scrapers.jobicy_scraper", "JobicyScraper", {}),
+            ("himalayas", "app.scrapers.himalayas_scraper", "HimalayasScraper", {}),
+            ("themuse", "app.scrapers.themuse_scraper", "TheMuseScraper", {}),
+            ("workingnomads", "app.scrapers.workingnomads_scraper", "WorkingNomadsScraper", {}),
+            ("weworkremotely", "app.scrapers.weworkremotely_scraper", "WeWorkRemotelyScraper", {}),
+            ("myjobmag", "app.scrapers.myjobmag_scraper", "MyJobMagScraper", {"country": "gh"}),
+            ("myjobmag_ng", "app.scrapers.myjobmag_scraper", "MyJobMagScraper", {"country": "ng"}),
+            ("myjobmag_ke", "app.scrapers.myjobmag_scraper", "MyJobMagScraper", {"country": "ke"}),
+            ("myjobmag_za", "app.scrapers.myjobmag_scraper", "MyJobMagScraper", {"country": "za"}),
+            ("jobwebghana", "app.scrapers.jobwebghana_scraper", "JobWebGhanaScraper", {}),
+        ]
+        for name, module_path, class_name, init_kwargs in free_scrapers:
+            try:
+                import importlib
+                module = importlib.import_module(module_path)
+                self.scrapers[name] = getattr(module, class_name)(**init_kwargs)
+                logger.info(f"{name} scraper initialized (FREE)")
+            except Exception as e:
+                logger.warning(f"{name} scraper unavailable: {e}")
 
         # HiringCafe disabled - API not publicly available (returns 429 rate limit)
         # Uncomment if API becomes available
