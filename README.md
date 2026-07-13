@@ -154,3 +154,29 @@ See [docs/JOB_SCHEDULER_SETUP.md](docs/JOB_SCHEDULER_SETUP.md) for details.
 MIT License - See [LICENSE](LICENSE) file for details.
 
 codex resume 019dc58d-9637-7761-b1b6-e0e6b853cd41
+
+
+## DO instructions
+# Then restart the services:
+
+systemctl restart veloxahire veloxahire-worker veloxahire-beat
+systemctl status veloxahire veloxahire-worker veloxahire-beat --no-pager
+
+Once you set up hello@veloxahire.org later (Zoho Mail or whichever you land on), you can switch it with:
+
+certbot update_account --email hello@veloxahire.org
+
+
+cd /var/www/veloxahire/backend
+source venv/bin/activate
+
+That gets you back into the working directory with the venv active. If you're reconnecting to pull new code and redeploy manually (same as Phase 7 of the migration doc), the fuller sequence is:
+
+cd /var/www/veloxahire && git pull
+cd backend && source venv/bin/activate && pip install -r requirements.txt
+systemctl restart veloxahire veloxahire-worker veloxahire-beat
+
+And to check status/logs after reconnecting:
+
+systemctl status veloxahire veloxahire-worker veloxahire-beat --no-pager
+journalctl -u veloxahire -f
