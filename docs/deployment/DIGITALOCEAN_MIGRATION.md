@@ -105,6 +105,12 @@ cron hitting it) can be retired — beat handles the 10-minute sync.
 
 - **Minimum 2 GB RAM** (4 GB recommended). The recommendation/embeddings tasks
   and the worker are memory-hungry; on a 1 GB box the worker will OOM-kill.
+- **Actual (2026-07-11): running on 1 GB RAM / 1 vCPU** (`ubuntu-s-1vcpu-1gb-lon1`)
+  for cost reasons. Mitigated with a 2 GB swap file (§4) plus conservative
+  Celery worker settings (`--concurrency=1 --max-tasks-per-child=100`, §5) so
+  memory pressure degrades gracefully instead of triggering an OOM-kill.
+  Monitor `free -h` and `systemctl status veloxahire-worker` after go-live;
+  upgrade to 2 GB once budget allows if the worker is under strain.
 - Ubuntu 24.04 LTS. 1–2 vCPU is fine to start.
 - Redis runs on the same droplet (localhost) — no managed Redis needed initially.
 
@@ -118,6 +124,16 @@ apt update && apt upgrade -y
 apt install -y python3 python3-venv python3-pip redis-server nginx git certbot python3-certbot-nginx
 
 systemctl enable --now redis-server      # broker + result backend
+```
+
+**Swap file** (required on the 1 GB box — see §3):
+```bash
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+free -h
 ```
 
 **SSH auth for GitHub** (same pattern as VeloxaRecruit's droplet):
@@ -205,7 +221,7 @@ User=www-data
 WorkingDirectory=/var/www/veloxahire/backend
 EnvironmentFile=/var/www/veloxahire/backend/.env
 ExecStart=/var/www/veloxahire/backend/venv/bin/celery -A app.tasks.celery_app worker \
-    --loglevel=info --concurrency=2 --max-tasks-per-child=200
+    --loglevel=info --concurrency=1 --max-tasks-per-child=100
 Restart=always
 RestartSec=5
 
