@@ -90,8 +90,8 @@ class RemoteOKScraper(BaseScraper):
                         job_link=job.get('url') or f"https://remoteok.com/remote-jobs/{job.get('slug', '')}",
                         source="remoteok",
                         source_id=str(job.get('id')),
-                        posted_date=self._parse_epoch(job.get('date')),
-                        salary_range=None,  # RemoteOK doesn't provide salary in API
+                        posted_date=self._parse_date(job.get('epoch') or job.get('date')),
+                        salary_range=self._format_salary(job.get('salary_min'), job.get('salary_max')),
                         job_type=None,
                         remote_type="remote",
                     )
@@ -107,14 +107,23 @@ class RemoteOKScraper(BaseScraper):
             logger.error(f"RemoteOK scraping failed: {e}", exc_info=True)
             return []
 
-    def _parse_epoch(self, timestamp: Optional[int]) -> Optional[datetime]:
-        """Parse Unix timestamp to datetime."""
-        if not timestamp:
+    def _parse_date(self, value) -> Optional[datetime]:
+        """Parse the API's `epoch` (unix int) or `date` (ISO 8601 string) field."""
+        if not value:
             return None
         try:
-            return datetime.fromtimestamp(int(timestamp))
+            return datetime.fromtimestamp(int(value))
+        except (ValueError, TypeError):
+            pass
+        try:
+            return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
         except Exception:
             return None
+
+    def _format_salary(self, salary_min, salary_max) -> Optional[str]:
+        if salary_min and salary_max:
+            return f"${int(salary_min):,} - ${int(salary_max):,}"
+        return None
 
     def _clean_html(self, html: str) -> str:
         """Remove HTML tags from description."""

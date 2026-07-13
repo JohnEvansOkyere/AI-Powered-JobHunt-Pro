@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from app.constants import TECH_JOB_KEYWORDS
+from app.constants import ALL_JOB_KEYWORDS
 from app.core.database import SessionLocal
 from app.core.logging import get_logger
 from app.tasks.celery_app import celery_app
@@ -44,8 +44,11 @@ def _run_async(coro) -> Any:
 @celery_app.task(name="scheduler.scrape_recent_jobs", ignore_result=False)
 def scrape_recent_jobs() -> Dict[str, Any]:
     """
-    Scrape jobs posted within the last 3 days from all FREE sources, plus any
+    Scrape jobs posted within the last 7 days from all FREE sources, plus any
     configured API-key sources. Runs on the Celery Beat schedule.
+
+    The 7-day ingest window matches the 7-day retention window in
+    cleanup_old_jobs, so the index holds a rolling week of postings.
     """
     from app.core.config import settings
     from app.services.job_scraper_service import JobScraperService
@@ -54,9 +57,14 @@ def scrape_recent_jobs() -> Dict[str, Any]:
 
     db: Session = SessionLocal()
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=3)
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
 
-        sources = ["remotive", "remoteok", "joinrise", "arbeitnow"]
+        # joinrise removed 2026-07-13 — site and API are down (503)
+        sources = [
+            "remotive", "remoteok", "arbeitnow",
+            "jobicy", "himalayas", "themuse", "workingnomads", "weworkremotely",
+            "myjobmag", "myjobmag_ng", "myjobmag_ke", "myjobmag_za", "jobwebghana",
+        ]
         if getattr(settings, "JOOBLE_API_KEY", None):
             sources.append("jooble")
         if getattr(settings, "FINDWORK_API_KEY", None):
@@ -71,7 +79,7 @@ def scrape_recent_jobs() -> Dict[str, Any]:
         logger.info(
             "scheduled.scrape_recent_jobs.sources",
             sources=sources,
-            keyword_count=len(TECH_JOB_KEYWORDS),
+            keyword_count=len(ALL_JOB_KEYWORDS),
             cutoff=cutoff_date.isoformat(),
         )
 
@@ -79,7 +87,7 @@ def scrape_recent_jobs() -> Dict[str, Any]:
         result = _run_async(
             scraper.scrape_jobs(
                 sources=sources,
-                keywords=TECH_JOB_KEYWORDS,
+                keywords=ALL_JOB_KEYWORDS,
                 location="Worldwide",
                 max_results_per_source=100,
                 db=db,

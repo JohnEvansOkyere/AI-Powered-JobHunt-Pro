@@ -2,11 +2,11 @@
 Remotive Job Scraper
 
 Scrapes public remote jobs from the Remotive API (no API key required).
-Docs: https://remotive.io/api/remote-jobs
+Docs: https://remotive.com/api/remote-jobs
 """
 
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 
 from app.scrapers.base import BaseScraper, JobListing
@@ -24,7 +24,8 @@ HEADERS = {
 class RemotiveScraper(BaseScraper):
     """Remotive job scraper using their public API."""
 
-    BASE_URL = "https://remotive.io/api/remote-jobs"
+    # remotive.io stopped serving the API (Cloudflare 526); remotive.com is live
+    BASE_URL = "https://remotive.com/api/remote-jobs"
 
     def __init__(self):
         """Initialize Remotive scraper."""
@@ -48,25 +49,9 @@ class RemotiveScraper(BaseScraper):
         Returns:
             List[JobListing]: Scraped job listings
         """
-        # Note: Remotive API can be flaky with search queries (Cloudflare issues)
-        # Use category parameter instead of search for more reliable results
-        # Available categories: software-dev, data, marketing, sales, etc.
+        # Fetch across all categories (tech and non-tech) and filter client-side;
+        # the category param would silently exclude support/marketing/etc. roles.
         params = {"limit": max_results}
-
-        # Try category=software-dev for tech jobs instead of search
-        if keywords:
-            # Check if any keywords relate to common categories
-            keywords_lower = " ".join(keywords[:5]).lower()
-            if any(k in keywords_lower for k in ["software", "developer", "engineer", "backend", "frontend"]):
-                params["category"] = "software-dev"
-            elif any(k in keywords_lower for k in ["data", "analyst", "scientist"]):
-                params["category"] = "data"
-            elif any(k in keywords_lower for k in ["devops", "sre", "infrastructure"]):
-                params["category"] = "devops-sysadmin"
-            elif any(k in keywords_lower for k in ["design", "ux", "ui"]):
-                params["category"] = "design"
-            elif any(k in keywords_lower for k in ["product", "manager"]):
-                params["category"] = "product"
 
         try:
             async with httpx.AsyncClient(timeout=30.0, headers=HEADERS, follow_redirects=True) as client:
@@ -102,8 +87,7 @@ class RemotiveScraper(BaseScraper):
                 )
                 listings.append(self.normalize_job(listing))
 
-            category = params.get("category", "all")
-            logger.info(f"Remotive: fetched {len(listings)} jobs for category='{category}'")
+            logger.info(f"Remotive: fetched {len(listings)} jobs")
             return listings
         except Exception as e:
             logger.error(f"Remotive scraping failed: {e}", exc_info=True)
@@ -113,7 +97,11 @@ class RemotiveScraper(BaseScraper):
         if not dt_str:
             return None
         try:
-            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+            # Naive UTC — the freshness filter compares against datetime.utcnow()
+            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return dt
         except Exception:
             return None
 
