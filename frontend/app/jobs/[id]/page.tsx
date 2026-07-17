@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Bookmark, Briefcase, Building2, Clock, MapPin, Sparkles } from 'lucide-react'
 import type { Job } from '@/lib/api/jobs'
+import { cleanJobDescription } from '@/lib/text'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.com'
@@ -15,10 +16,6 @@ async function getJob(id: string): Promise<Job | null> {
   if (response.status === 404) return null
   if (!response.ok) throw new Error('Failed to load job')
   return response.json()
-}
-
-function plainText(value?: string | null) {
-  return (value || '').replace(/\s+/g, ' ').trim()
 }
 
 function formatDate(dateString?: string | null) {
@@ -45,7 +42,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   }
 
   const title = `${job.title} at ${job.company} | VeloxaHire`
-  const description = plainText(job.description).slice(0, 155)
+  const description = cleanJobDescription(job.description).slice(0, 155)
   return {
     title,
     description,
@@ -68,7 +65,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
-    description: plainText(job.description),
+    description: cleanJobDescription(job.description),
     datePosted: postedDate,
     employmentType: job.job_type || undefined,
     hiringOrganization: {
@@ -153,7 +150,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             <div className="mt-8 border-t border-neutral-100 pt-8">
               <h2 className="text-lg font-semibold text-neutral-900">Job description</h2>
               <div className="mt-4 whitespace-pre-line text-sm leading-7 text-neutral-700">
-                {job.description}
+                {cleanJobDescription(job.description)}
               </div>
             </div>
 
@@ -161,7 +158,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               <div className="mt-8 border-t border-neutral-100 pt-8">
                 <h2 className="text-lg font-semibold text-neutral-900">Requirements</h2>
                 <div className="mt-4 whitespace-pre-line text-sm leading-7 text-neutral-700">
-                  {job.requirements}
+                  {cleanJobDescription(job.requirements)}
                 </div>
               </div>
             )}

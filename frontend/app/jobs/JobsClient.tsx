@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { searchJobs, type Job, type JobSearchParams } from '@/lib/api/jobs'
+import { cleanJobDescription } from '@/lib/text'
 
 const PAGE_SIZE = 20
 
@@ -171,7 +172,9 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
             {salary && <Chip icon={Banknote}>{salary}</Chip>}
           </div>
 
-          <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-neutral-500">{job.description}</p>
+          <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-neutral-500">
+            {cleanJobDescription(job.description)}
+          </p>
 
           {/* Skills */}
           {skills.length > 0 && (

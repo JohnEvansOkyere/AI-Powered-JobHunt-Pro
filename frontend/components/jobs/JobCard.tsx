@@ -9,6 +9,7 @@ import {
   Bookmark,
   BookmarkCheck,
 } from 'lucide-react'
+import { cleanJobDescription } from '@/lib/text'
 
 export interface Job {
   id: string
@@ -115,7 +116,7 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
       {/* Description preview */}
       {job.description && (
         <p className="text-sm text-neutral-600 leading-relaxed mb-4 line-clamp-2">
-          {job.description}
+          {cleanJobDescription(job.description)}
         </p>
       )}
 
