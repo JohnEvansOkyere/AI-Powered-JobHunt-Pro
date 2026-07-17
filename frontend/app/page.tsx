@@ -51,7 +51,6 @@ function Logo({ size = 32 }: { size?: number }) {
       height={size}
       priority
       className="object-contain"
-      style={{ width: 'auto', height: 'auto' }}
     />
   )
 }

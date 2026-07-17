@@ -73,7 +73,7 @@ export default function AuthBrandPanel({ variant }: { variant: 'signup' | 'login
         {/* Logo */}
         <Link href="/" className="group mb-12 inline-flex w-fit items-center gap-3">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-cream-100/15 bg-cream-100/10 backdrop-blur-md transition-all group-hover:scale-105 group-hover:bg-cream-100/15">
-            <Image src="/logo.png" alt="VeloxaHire" width={26} height={26} className="object-contain" style={{ width: 'auto', height: 'auto' }} priority />
+            <Image src="/logo.png" alt="VeloxaHire" width={26} height={26} className="object-contain" priority />
           </div>
           <span className="font-display text-xl font-semibold tracking-tight">
             Veloxa<span className="text-ember-400">Hire</span>

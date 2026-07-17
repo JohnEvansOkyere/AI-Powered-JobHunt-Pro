@@ -80,7 +80,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 height={30}
                 priority
                 className="object-contain transition-transform duration-200 group-hover:scale-105"
-                style={{ width: 'auto', height: 'auto' }}
               />
               <span className="text-base font-semibold tracking-tight text-neutral-900">
                 Veloxa<span className="text-brand-turquoise-600">Hire</span>

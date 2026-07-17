@@ -119,7 +119,7 @@ function SignUpContent() {
         >
           {/* Mobile logo */}
           <Link href="/" className="mb-10 inline-flex items-center gap-2.5 lg:hidden">
-            <Image src="/logo.png" alt="VeloxaHire" width={32} height={32} priority className="object-contain" style={{ width: 'auto', height: 'auto' }} />
+            <Image src="/logo.png" alt="VeloxaHire" width={32} height={32} priority className="object-contain" />
             <span className="text-xl font-semibold tracking-tight text-neutral-900">
               Veloxa<span className="text-brand-turquoise-700">Hire</span>
             </span>

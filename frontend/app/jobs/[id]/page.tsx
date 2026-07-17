@@ -6,7 +6,7 @@ import type { Job } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.com'
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.org'
 
 async function getJob(id: string): Promise<Job | null> {
   const response = await fetch(`${API_URL}/api/v1/jobs/${id}`, {
@@ -51,6 +51,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       description,
       type: 'article',
       url: `${SITE_URL}/jobs/${job.id}`,
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: 'VeloxaRecruit — AI-Powered Recruitment',
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      images: ['/og-image.png'],
     },
   }
 }
