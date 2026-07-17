@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
-from app.scrapers.base import BaseScraper, JobListing
+from app.scrapers.base import BaseScraper, JobListing, clean_job_description
 from app.scrapers.linkedin_scraper import LinkedInScraper
 from app.scrapers.indeed_scraper import IndeedScraper
 from app.scrapers.ai_scraper import AIScraper
@@ -265,6 +265,8 @@ class JobScraperService:
 
                 # Normalize jobs
                 normalized_jobs = [scraper.normalize_job(job) for job in jobs]
+                for job in normalized_jobs:
+                    job.description = clean_job_description(job.description)
 
                 # Filter by posted date if specified (only include recent jobs)
                 if min_posted_date:

@@ -5,9 +5,37 @@ Defines the common interface for all job board scrapers.
 """
 
 from abc import ABC, abstractmethod
+import html
+import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+
+
+_BLOCK_TAG_RE = re.compile(
+    r"(?is)<\s*/?\s*(?:br|p|div|li|h[1-6]|ul|ol|section|article)\b[^>]*>"
+)
+
+
+def clean_job_description(value: Optional[str]) -> str:
+    """Convert scraped HTML descriptions into readable plain text.
+
+    Job-board APIs are inconsistent: some return plain text while others return
+    HTML fragments. Store one safe, predictable representation so every source
+    renders correctly in cards, details, search, and AI processing.
+    """
+    if not value or not isinstance(value, str):
+        return ""
+
+    text = html.unescape(value).replace("\x00", "")
+    text = re.sub(r"(?is)<\s*(?:script|style)\b[^>]*>.*?<\s*/\s*(?:script|style)\s*>", "", text)
+    text = _BLOCK_TAG_RE.sub("\n", text)
+    text = re.sub(r"(?is)<[^>]*>", "", text)
+    text = html.unescape(text).replace("\xa0", " ")
+    text = re.sub(r"[ \t\f\v]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 @dataclass
@@ -195,4 +223,3 @@ class BaseScraper(ABC):
                 location = location[len(prefix):]
         
         return location.strip()
-
