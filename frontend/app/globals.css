@@ -168,49 +168,22 @@ a {
     @apply absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-brand-turquoise-500;
   }
 
-  /* Candidate-facing landing surfaces: fresh off-white with the brand's
-     turquoise/green undertone, while the hero remains deep ink. */
+  /* Candidate-facing landing surfaces stay solid for a calm, focused brand. */
   .landing-surface {
-    background:
-      radial-gradient(circle at 8% 0%, rgba(20, 184, 166, 0.1), transparent 30%),
-      linear-gradient(180deg, #fbfcf8 0%, #f2faf6 100%);
+    background: #0b1210;
   }
 
   .landing-surface-soft {
-    background:
-      radial-gradient(circle at 90% 15%, rgba(245, 158, 11, 0.1), transparent 24%),
-      linear-gradient(135deg, #fdfbf6 0%, #f0faf7 55%, #f7faf2 100%);
+    background: #14201c;
   }
 
-  .landing-grid {
-    background-image:
-      linear-gradient(rgba(15, 61, 45, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(15, 61, 45, 0.045) 1px, transparent 1px);
-    background-size: 42px 42px;
-    mask-image: linear-gradient(to bottom, black, transparent 78%);
+  .landing-card {
+    @apply transition-all duration-300 ease-out;
   }
 
-  .landing-float {
-    animation: softFloat 8s ease-in-out infinite;
-  }
-
-  .landing-float-slow {
-    animation: softFloat 11s ease-in-out -3s infinite reverse;
-  }
-
-  .landing-shimmer {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .landing-shimmer::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(110deg, transparent 25%, rgba(255, 255, 255, 0.45) 50%, transparent 75%);
-    transform: translateX(-120%);
-    animation: shimmer 7s ease-in-out infinite;
+  .landing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
   }
 }
 
@@ -265,24 +238,6 @@ a {
   }
 }
 
-@keyframes softFloat {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(0, -12px, 0) rotate(2deg);
-  }
-}
-
-@keyframes shimmer {
-  0%, 55%, 100% {
-    transform: translateX(-120%);
-  }
-  75% {
-    transform: translateX(120%);
-  }
-}
-
 .animate-blob {
   animation: blob 7s infinite;
 }
@@ -313,12 +268,4 @@ a {
 
 .animation-delay-600 {
   animation-delay: 0.6s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-float,
-  .landing-float-slow,
-  .landing-shimmer::after {
-    animation: none;
-  }
 }
