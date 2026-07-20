@@ -142,6 +142,28 @@ async def get_current_user(
 
 
 security_optional = HTTPBearer(auto_error=False)
+PRIMARY_ADMIN_EMAIL = "okyerevansjohn@gmail.com"
+
+
+def _configured_admin_emails() -> set[str]:
+    configured = {
+        email.strip().casefold()
+        for email in (getattr(settings, "ADMIN_EMAILS", "") or "").split(",")
+        if email.strip()
+    }
+    configured.add(PRIMARY_ADMIN_EMAIL)
+    return configured
+
+
+async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Allow only explicitly configured admin identities into admin APIs."""
+    email = str(current_user.get("email") or "").strip().casefold()
+    if not email or email not in _configured_admin_emails():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access required",
+        )
+    return current_user
 
 
 async def get_optional_user(

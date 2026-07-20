@@ -14,6 +14,7 @@ from app.models.notification import (
     WhatsappIncomingEvent,
     WhatsappMessage,
 )
+from app.models.analytics import AnalyticsEvent, AnalyticsSession
 
 __all__ = [
     "User",
@@ -29,4 +30,6 @@ __all__ = [
     "NotificationPreferences",
     "WhatsappMessage",
     "WhatsappIncomingEvent",
+    "AnalyticsEvent",
+    "AnalyticsSession",
 ]

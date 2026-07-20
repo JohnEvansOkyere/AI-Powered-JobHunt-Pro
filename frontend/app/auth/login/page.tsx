@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast'
 import { Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel'
+import { trackEvent } from '@/lib/analytics'
 
 const inputCls =
   'block w-full rounded-xl border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-500/20'
@@ -31,7 +32,9 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      void trackEvent({ event_name: 'login_started', path: '/auth/login' })
       await signIn({ email, password, remember: rememberMe })
+      void trackEvent({ event_name: 'login_completed', path: '/auth/login' })
       toast.success('Logged in successfully!')
       router.push('/dashboard')
     } catch (error: any) {

@@ -109,6 +109,7 @@ Sidebar:
   Applications      → /dashboard/applications
   Profile           → /dashboard/profile
   Settings          → /dashboard/settings
+  Admin analytics   → /dashboard/admin (only shown to okyerevansjohn@gmail.com; backend-enforced)
 
 Public:
   Browse Jobs       → /jobs                          (anonymous browse/search/filter)
@@ -123,6 +124,7 @@ Public:
 - **All Jobs** under `/dashboard/jobs` remains the authenticated dashboard browse surface
 - **Apply for anonymous users** opens the public recruiter/source apply link; signup prompts sell recommendations/tracking after intent
 - **Recommendations** (Job Match) remain behind auth — AI matching requires a profile
+- **Admin analytics** is a protected operator surface at `/dashboard/admin`; the backend allowlist authorizes the verified `okyerevansjohn@gmail.com` account and the public analytics endpoint stores no raw form contents or IP address.
 
 ---
 
@@ -182,7 +184,8 @@ As of 2026-07-20:
 | Item | Status |
 |---|---|
 | Post-apply profile CTA for logged-in users | Not built — only anonymous modal exists |
-| Sync observability dashboard (last sync, jobs imported/updated/archived) | Backend ops endpoint implemented 2026-06-20; visual admin dashboard not built |
+| Sync observability dashboard (last sync, jobs imported/updated/archived) | Backend ops endpoint implemented 2026-06-20; broader visual admin dashboard now built at `/dashboard/admin`, ATS sync detail remains a follow-up |
+| Historical behavioral analytics before 2026-07-20 | Not available because first-party event collection starts after migration `013_add_first_party_analytics.sql` is applied |
 | Manual ATS job backfill command | Backend ops endpoint implemented 2026-06-20: `POST /api/v1/ops/ats-sync/backfill` |
 | Webhook events from ATS (job.published, job.updated, job.closed) | Deferred |
 | Shared SSO / identity across both products | Deferred |
@@ -252,3 +255,13 @@ As of 2026-07-20:
 | 2026-07-20 | Added the first search-intent SEO page at `/remote-jobs`. It server-renders eligible remote listings from the public jobs API, links to job detail pages, explains location/time-zone eligibility, adds sitemap coverage, and is linked from the homepage and `/jobs`. Frontend type-check/build passed. | Create a useful landing page for remote-job searches instead of relying only on dynamic job detail URLs |
 | 2026-07-20 | Removed the `Remote jobs` link from the homepage desktop and mobile navigation while keeping the `/remote-jobs` SEO landing page and contextual internal links available. File: `frontend/app/page.tsx` | Reduce visual crowding in the primary navigation without removing the remote-jobs search-intent page |
 | 2026-07-20 | Diagnosed Google Search Console's `Sitemap is HTML` error. No app code changed; the local Next.js build recognizes `/sitemap.xml`, so production must be redeployed or the domain is serving a different/stale deployment than the SEO commit. | Identify why Google received HTML instead of the generated XML sitemap |
+| 2026-07-20 | Verified production `/sitemap.xml` now returns valid XML from the updated deployment. The sitemap currently contains only core pages and no `/jobs/[id]` entries, so production `NEXT_PUBLIC_API_URL` or the eligible-job backend projection still needs checking. | Confirm the HTML sitemap issue is resolved and identify the remaining job-discovery gap |
+| 2026-07-20 | Clarified that the working browser platform does not prove the server-rendered sitemap request succeeded: the browser API client and Next.js sitemap use separate requests, while the sitemap fetch silently falls back to core URLs and the backend sitemap projection requires processed jobs, posting dates, descriptions, and apply/source URLs. | Correct the diagnosis of the empty sitemap without implying that the whole backend is down |
+| 2026-07-20 | Confirmed the production sitemap API failure from the live response: `GET /api/v1/jobs/sitemap` returns FastAPI UUID validation for `job_id=sitemap`, proving the backend deployment lacks the new static sitemap route and is matching the older `/{job_id}` route. | Isolate the stale backend deployment as the cause of the empty frontend sitemap |
+| 2026-07-20 | Reviewed Search Console submissions: `https://veloxahire.org/remote-jobs` and `https://veloxahire.org/` were submitted as sitemap URLs, but both are normal HTML pages. | Correct the Search Console submission target to the actual XML sitemap URL |
+| 2026-07-20 | Confirmed Google Search Console processed `https://veloxahire.org/sitemap.xml` successfully and discovered 5 URLs. | Verify the sitemap submission is fixed before continuing with job URL discovery |
+| 2026-07-20 | Clarified Search Console inspection of `https://api.veloxahire.org/api/v1/jobs/sitemap`: the 4xx result is for a backend JSON endpoint, not an indexable public HTML page, so it should not be submitted for indexing. | Direct Search Console testing toward public homepage, landing, and job detail URLs |
+| 2026-07-20 | Evans confirmed a real public `/jobs/<job-id>` URL worked in Search Console inspection. | Verify that individual job detail pages are reachable and ready for Google indexing |
+| 2026-07-20 | Clarified that Search Console should inspect both public catalogue pages, `/jobs` and `/remote-jobs`; `/remote-jobs` was prioritized only because it is the newer search-intent landing page. | Avoid implying that the main jobs catalogue should be skipped |
+| 2026-07-20 | Built the protected admin command center at `/dashboard/admin`. Added email-authorized admin access for `okyerevansjohn@gmail.com`, first-party analytics session/event storage and migration `013_add_first_party_analytics.sql`, global page/click/time tracking, signup/login/apply intent events, operational totals, traffic trend, funnel, anonymous job visitors without signup, recent sessions, and event stream. Frontend type-check/build passed; full backend suite retains pre-existing failures/errors in AI/auth/CV/jobs/profile tests. | Give the owner solid visibility into system activity, anonymous job-page behavior, engagement duration, and signup conversion |
+| 2026-07-20 | Added acquisition attribution on top of the admin analytics. Migration `014_add_acquisition_attribution.sql` persists UTM source/medium/campaign/content/term and inferred referrers; browser tracking carries UTM tags through the session; the admin dashboard now reports visitors, sessions, job views, apply clicks, and signups by acquisition source. Frontend type-check/build passed and focused backend tests passed. | Identify whether candidate traffic came from Google SEO, LinkedIn, X, Reddit, or other campaigns and measure which channels convert |

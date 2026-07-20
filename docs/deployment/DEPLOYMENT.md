@@ -82,6 +82,11 @@ Update `CORS_ORIGINS` in backend to include your Vercel domain:
 CORS_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
 ```
 
+The admin dashboard is available at `/dashboard/admin`. The backend authorizes
+it by the verified Supabase email allowlist; `okyerevansjohn@gmail.com` is the
+primary admin by default. Set `ADMIN_EMAILS` to a comma-separated list when
+adding additional operators.
+
 ## Post-Deployment Checklist
 
 - [ ] Backend health check works
@@ -148,4 +153,3 @@ CORS_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
 - Verify backend URL is correct
 - Check network requests in browser console
 - Verify authentication tokens
-

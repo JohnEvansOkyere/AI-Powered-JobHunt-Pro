@@ -17,6 +17,7 @@ import {
   Home,
   Star,
   Briefcase,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -52,6 +53,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     .map((part) => part[0])
     .join('')
     .toUpperCase() || 'U'
+  const isAdmin = user?.email?.toLowerCase() === 'okyerevansjohn@gmail.com'
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -159,6 +161,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )
             })}
+            {isAdmin && (
+              <Link href="/dashboard/admin" onClick={() => setSidebarOpen(false)} className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${pathname.startsWith('/dashboard/admin') ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'}`}>
+                <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" />
+                <span className="truncate">Admin analytics</span>
+              </Link>
+            )}
           </nav>
 
           {/* Logout */}

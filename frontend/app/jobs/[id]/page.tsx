@@ -209,6 +209,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               {applyUrl ? (
                 <a
                   href={applyUrl}
+                  data-analytics="job_apply_click"
+                  data-job-id={job.id}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
                   className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800"

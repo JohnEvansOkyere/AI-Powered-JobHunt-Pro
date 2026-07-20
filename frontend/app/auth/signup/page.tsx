@@ -11,6 +11,7 @@ import { User, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-
 import { motion } from 'framer-motion'
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel'
 import PasswordStrength, { isPasswordStrong } from '@/components/auth/PasswordStrength'
+import { trackEvent } from '@/lib/analytics'
 
 interface HandoffVerifyResponse {
   valid: boolean
@@ -86,6 +87,7 @@ function SignUpContent() {
     setLoading(true)
 
     try {
+      void trackEvent({ event_name: 'signup_started', path: '/auth/signup' })
       await signUp({
         email,
         password,
@@ -96,6 +98,7 @@ function SignUpContent() {
           ats_job_id: handoffJobId || undefined,
         },
       })
+      void trackEvent({ event_name: 'signup_completed', path: '/auth/signup', metadata: { handoff: handoffPrefilled } })
       toast.success('Account created! You can sign in now.')
       router.push('/auth/login')
     } catch (error: any) {

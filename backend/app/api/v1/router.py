@@ -18,6 +18,8 @@ from app.api.v1.endpoints import (
     recommendations,
     whatsapp,
     ops,
+    analytics,
+    admin,
 )
 
 api_router = APIRouter()
@@ -32,6 +34,8 @@ api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(applications.router, prefix="/applications", tags=["applications"])
 api_router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
 api_router.include_router(ops.router, prefix="/ops", tags=["ops"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(
     whatsapp.router_notifications, prefix="/notifications", tags=["notifications"]
 )

@@ -158,6 +158,7 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
 
           <Link
             href={`/jobs/${job.id}`}
+            data-job-id={job.id}
             className="block text-lg font-semibold leading-snug text-neutral-900 transition-colors hover:text-brand-turquoise-700"
           >
             {job.title}
@@ -196,9 +197,11 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
           {/* Actions */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {applyHref && (
-              <a
-                href={applyHref}
-                target="_blank"
+                <a
+                  href={applyHref}
+                  data-analytics="job_apply_click"
+                  data-job-id={job.id}
+                  target="_blank"
                 rel="noopener noreferrer nofollow"
                 onClick={() => toast.success('Create a profile later to track applications and get similar jobs.')}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"

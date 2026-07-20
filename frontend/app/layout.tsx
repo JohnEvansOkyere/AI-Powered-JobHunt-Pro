@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter, Fraunces } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import { Suspense } from 'react'
+import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -57,6 +59,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="antialiased bg-cream-100 text-ink-900" suppressHydrationWarning>
+        <Suspense fallback={null}><AnalyticsTracker /></Suspense>
         {children}
         <Toaster
           position="top-right"

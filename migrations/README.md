@@ -18,6 +18,10 @@ order against the production database (and any staging/dev copy).
 | `008_recommendations_v2.sql` | **Apply** | Enables `pgvector`, creates `job_embeddings` and `user_embeddings` (model-tagged), extends `job_recommendations` with `tier` + sub-score columns + `user_id` FK, adds supporting indexes |
 | `009_add_whatsapp.sql` | **Apply** | Creates `notification_preferences` (WhatsApp opt-in + digest time + timezone + opt-out), `whatsapp_messages` (append-only send audit with unique-by-idempotency-key index), `whatsapp_incoming_events` (webhook audit for status + user replies), plus a trigger that keeps `notification_preferences.updated_at` fresh |
 | `010_add_ats_job_mirroring.sql` | **Apply** | Adds ATS-origin metadata to `jobs` so recruiter-created ATS roles can be mirrored, updated, and archived safely in the candidate platform |
+| `011_allow_recruiter_source.sql` | **Apply** | Allows the ATS mirror's `recruiter` source value |
+| `012_drop_jobs_source_check.sql` | **Apply** | Removes the obsolete fixed source check as scraper sources evolve |
+| `013_add_first_party_analytics.sql` | **Apply** | Adds anonymous/authenticated sessions and event storage for the admin funnel dashboard |
+| `014_add_acquisition_attribution.sql` | **Apply** | Persists UTM and inferred referrer source/medium/campaign data per analytics session |
 
 All migrations are wrapped in `BEGIN/COMMIT` and use `IF [NOT] EXISTS`, so
 re-running them is safe.
@@ -33,6 +37,10 @@ psql "$DATABASE_URL" -f migrations/007_remove_cv_tailoring.sql
 psql "$DATABASE_URL" -f migrations/008_recommendations_v2.sql
 psql "$DATABASE_URL" -f migrations/009_add_whatsapp.sql
 psql "$DATABASE_URL" -f migrations/010_add_ats_job_mirroring.sql
+psql "$DATABASE_URL" -f migrations/011_allow_recruiter_source.sql
+psql "$DATABASE_URL" -f migrations/012_drop_jobs_source_check.sql
+psql "$DATABASE_URL" -f migrations/013_add_first_party_analytics.sql
+psql "$DATABASE_URL" -f migrations/014_add_acquisition_attribution.sql
 ```
 
 Configure Meta to call your API **callback URL**
