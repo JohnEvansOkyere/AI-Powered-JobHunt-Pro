@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     avatar_url TEXT,
 
     -- Account Status
-    is_active BOOLEAN DEFAULT true,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    is_admin BOOLEAN NOT NULL DEFAULT false,
     email_verified BOOLEAN DEFAULT false,
 
     -- Metadata
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON public.users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_is_admin ON public.users(is_admin);
 
 -- Sync existing Supabase Auth users early so later public.users FKs can validate.
 INSERT INTO public.users (id, email, email_verified, metadata)
@@ -60,6 +62,12 @@ SELECT
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM public.users)
 ON CONFLICT (id) DO NOTHING;
+
+-- Promote the existing owner account. Additional admins can be managed by
+-- setting public.users.is_admin to true in the Supabase Table Editor.
+UPDATE public.users
+SET is_admin = TRUE
+WHERE lower(email) = 'okyerevansjohn@gmail.com';
 
 -- =====================================================
 -- PART 3: USER PROFILES TABLE
@@ -529,6 +537,61 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_incoming_events_received_at
     ON whatsapp_incoming_events(received_at DESC);
 
 -- =====================================================
+-- PART 9B: FIRST-PARTY PRODUCT ANALYTICS
+-- =====================================================
+-- Browser events are accepted by the backend after validation. No IP address
+-- or raw form contents are stored; the admin dashboard uses session IDs and
+-- anonymous IDs to measure traffic, engagement, and signup conversion.
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+    id UUID PRIMARY KEY,
+    anonymous_id VARCHAR(80) NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    landing_path TEXT,
+    last_path TEXT,
+    referrer TEXT,
+    acquisition_source VARCHAR(80),
+    acquisition_medium VARCHAR(80),
+    acquisition_campaign VARCHAR(160),
+    acquisition_content VARCHAR(160),
+    acquisition_term VARCHAR(160),
+    user_agent TEXT,
+    page_views INTEGER NOT NULL DEFAULT 0,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    engaged_seconds INTEGER NOT NULL DEFAULT 0,
+    first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    ended_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_anonymous_first_seen
+    ON analytics_sessions(anonymous_id, first_seen_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_user_last_seen
+    ON analytics_sessions(user_id, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_acquisition
+    ON analytics_sessions(acquisition_source, acquisition_medium, first_seen_at);
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL,
+    anonymous_id VARCHAR(80) NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    event_name VARCHAR(60) NOT NULL,
+    path TEXT NOT NULL,
+    referrer TEXT,
+    target TEXT,
+    label TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    duration_ms INTEGER,
+    user_agent TEXT,
+    occurred_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_session_id ON analytics_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_anonymous_id ON analytics_events(anonymous_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_user_id ON analytics_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_name_occurred ON analytics_events(event_name, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_path_occurred ON analytics_events(path, occurred_at);
+
+-- =====================================================
 -- PART 10: SCRAPING JOBS TABLE
 -- =====================================================
 -- Tracks background scraping jobs
@@ -580,6 +643,8 @@ ALTER TABLE whatsapp_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE whatsapp_incoming_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scraping_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 
 -- Users Table Policies
 DROP POLICY IF EXISTS "Users can view own profile" ON public.users;

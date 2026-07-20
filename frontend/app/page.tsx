@@ -51,7 +51,6 @@ function Logo({ size = 32 }: { size?: number }) {
       height={size}
       priority
       className="object-contain"
-      style={{ width: 'auto', height: 'auto' }}
     />
   )
 }
@@ -64,6 +63,7 @@ function MatchTile({
   score,
   highlight,
   delay = 0,
+  reduceMotion,
 }: {
   title: string
   company: string
@@ -71,11 +71,13 @@ function MatchTile({
   score: number
   highlight?: boolean
   delay?: number
+  reduceMotion?: boolean | null
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={reduceMotion ? undefined : { y: -3 }}
       transition={{ duration: 0.5, delay }}
       className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-4 ${
         highlight
@@ -281,7 +283,8 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* Quiet reassurance bullets — sit below the hero                   */}
       {/* ================================================================ */}
-      <section className="py-8 px-4 sm:px-6 lg:px-8 border-b border-ink-900/10 bg-cream-50">
+      <section className="landing-surface-soft relative py-8 px-4 sm:px-6 lg:px-8 border-b border-forest-700/10 overflow-hidden">
+        <div aria-hidden className="landing-grid pointer-events-none absolute inset-0 opacity-60" />
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-ink-500">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-forest-500" />
@@ -301,7 +304,12 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* Live-match demo                                                  */}
       {/* ================================================================ */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="landing-float absolute -top-16 -left-20 w-64 h-64 rounded-full bg-brand-turquoise-400/15 blur-3xl" />
+          <div className="landing-float-slow absolute top-1/3 -right-24 w-72 h-72 rounded-full bg-ember-400/10 blur-3xl" />
+          <div className="landing-grid absolute inset-x-0 top-0 h-2/3 opacity-40" />
+        </div>
         <div className="max-w-3xl mx-auto text-center mb-14">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
             A peek inside your shortlist
@@ -326,17 +334,17 @@ export default function HomePage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-br from-forest-500/15 to-ember-500/10 rounded-[2.5rem] blur-2xl -z-10" />
 
-              <div className="bg-cream-50 rounded-3xl border border-ink-900/10 shadow-xl shadow-ink-900/5 overflow-hidden">
-                <div className="flex items-center gap-2 px-5 py-3 border-b border-ink-900/10 bg-cream-100">
-                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-ink-900/10" />
+              <div className="landing-shimmer bg-cream-50 rounded-3xl border border-forest-700/15 shadow-xl shadow-forest-900/10 overflow-hidden">
+                <div className="relative z-10 flex items-center gap-2 px-5 py-3 border-b border-forest-700/10 bg-brand-turquoise-50/70">
+                  <span className="w-2.5 h-2.5 rounded-full bg-ember-400/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-turquoise-400/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-forest-500/60" />
                   <span className="ml-3 text-xs text-ink-500 font-medium">
                     Your matches · updated just now
                   </span>
                 </div>
 
-                <div className="p-5 space-y-3 bg-cream-50">
+                <div className="relative z-10 p-5 space-y-3 bg-cream-50/90">
                   <MatchTile
                     title="Senior Data Scientist — ML"
                     company="Northwind Labs"
@@ -344,6 +352,7 @@ export default function HomePage() {
                     score={96}
                     highlight
                     delay={0.2}
+                    reduceMotion={reduceMotion}
                   />
                   <MatchTile
                     title="Applied AI Engineer"
@@ -351,6 +360,7 @@ export default function HomePage() {
                     location="Hybrid · London"
                     score={88}
                     delay={0.35}
+                    reduceMotion={reduceMotion}
                   />
                   <MatchTile
                     title="Machine Learning Scientist"
@@ -358,6 +368,7 @@ export default function HomePage() {
                     location="Remote"
                     score={82}
                     delay={0.5}
+                    reduceMotion={reduceMotion}
                   />
 
                   <div className="pt-2">
@@ -404,16 +415,17 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* Trust strip                                                      */}
       {/* ================================================================ */}
-      <section className="py-10 border-y border-ink-900/10 bg-cream-200/40">
+      <section className="relative py-10 border-y border-forest-500/30 bg-forest-800 text-cream-100 overflow-hidden">
+        <div aria-hidden className="landing-float absolute -top-20 left-1/4 w-56 h-56 rounded-full bg-brand-turquoise-500/10 blur-3xl" />
         <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-10 text-xs">
-          <span className="uppercase tracking-[0.22em] font-semibold text-ink-500">
+          <span className="relative z-10 uppercase tracking-[0.22em] font-semibold text-cream-100/70">
             Trusted across the Veloxa family
           </span>
-          <div className="flex flex-wrap items-center justify-center gap-5 md:gap-8 font-display font-semibold text-ink-500">
-            <Link href={VELOXARECRUIT_START_URL} className="hover:text-forest-700 transition-colors">
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-5 md:gap-8 font-display font-semibold text-cream-100/85">
+            <Link href={VELOXARECRUIT_START_URL} className="hover:text-ember-400 transition-colors">
               Create job for free
             </Link>
-            <span className="w-1 h-1 rounded-full bg-ink-500/40 hidden md:block" />
+            <span className="w-1 h-1 rounded-full bg-ember-400 hidden md:block" />
             <span>VeloxaHire</span>
           </div>
         </div>
@@ -422,7 +434,8 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* How it works                                                     */}
       {/* ================================================================ */}
-      <section id="how" className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+      <section id="how" className="landing-surface-soft relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div aria-hidden className="landing-grid pointer-events-none absolute inset-0 opacity-50" />
         <div className="max-w-6xl mx-auto">
           <motion.div {...fadeUp} className="max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
@@ -468,7 +481,7 @@ export default function HomePage() {
                 key={step.n}
                 {...fadeUp}
                 transition={{ duration: 0.5, delay: i * 0.08 }}
-                className="relative rounded-2xl border border-ink-900/10 bg-cream-50 p-8 hover:border-forest-500/30 hover:shadow-sm transition-all"
+                className="landing-shimmer relative rounded-2xl border border-forest-700/10 bg-cream-50/90 p-8 hover:border-brand-turquoise-500/50 hover:shadow-lg hover:shadow-brand-turquoise-900/10 transition-all"
               >
                 <span className="font-display text-sm font-semibold tracking-[0.18em] text-ember-600">
                   {step.n}
@@ -491,8 +504,9 @@ export default function HomePage() {
       {/* ================================================================ */}
       <section
         id="features"
-        className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-200/40 border-y border-ink-900/10"
+        className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8 border-y border-forest-700/10 overflow-hidden"
       >
+        <div aria-hidden className="landing-float-slow pointer-events-none absolute -right-24 top-24 w-80 h-80 rounded-full bg-brand-turquoise-400/10 blur-3xl" />
         <div className="max-w-6xl mx-auto">
           <motion.div {...fadeUp} className="max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
@@ -511,7 +525,7 @@ export default function HomePage() {
           <div className="mt-16 grid md:grid-cols-6 gap-5">
             <motion.div
               {...fadeUp}
-              className="md:col-span-4 rounded-2xl bg-cream-50 border border-ink-900/10 p-8 flex flex-col justify-between min-h-[280px]"
+              className="landing-shimmer md:col-span-4 rounded-2xl bg-cream-50/90 border border-forest-700/10 p-8 flex flex-col justify-between min-h-[280px] hover:border-brand-turquoise-500/50 hover:shadow-lg hover:shadow-brand-turquoise-900/10 transition-all"
             >
               <div>
                 <div className="w-11 h-11 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
@@ -548,7 +562,7 @@ export default function HomePage() {
             <motion.div
               {...fadeUp}
               transition={{ duration: 0.5, delay: 0.05 }}
-              className="md:col-span-2 rounded-2xl bg-cream-50 border border-ink-900/10 p-8 min-h-[280px] flex flex-col"
+              className="landing-shimmer md:col-span-2 rounded-2xl bg-cream-50/90 border border-forest-700/10 p-8 min-h-[280px] flex flex-col hover:border-ember-500/40 hover:shadow-lg hover:shadow-ember-900/10 transition-all"
             >
               <div className="w-11 h-11 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center">
                 <Layers className="w-5 h-5 text-forest-600" />
@@ -571,7 +585,8 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* Testimonial + stats                                              */}
       {/* ================================================================ */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+      <section className="landing-surface-soft relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div aria-hidden className="landing-float pointer-events-none absolute -left-24 bottom-0 w-72 h-72 rounded-full bg-ember-400/10 blur-3xl" />
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <motion.div {...fadeUp}>
             <div className="w-10 h-10 rounded-xl bg-forest-500/10 border border-forest-500/20 flex items-center justify-center mb-7">
@@ -604,7 +619,7 @@ export default function HomePage() {
             ].map((s) => (
               <div
                 key={s.small}
-                className="rounded-2xl border border-ink-900/10 bg-cream-50 p-6 hover:border-forest-500/30 transition-colors"
+                className="landing-shimmer rounded-2xl border border-forest-700/10 bg-cream-50/90 p-6 hover:border-brand-turquoise-500/50 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-turquoise-900/10 transition-all"
               >
                 <p className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-forest-600">
                   {s.big}
@@ -623,8 +638,9 @@ export default function HomePage() {
       {/* ================================================================ */}
       <section
         id="faq"
-        className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-200/40 border-y border-ink-900/10"
+        className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8 border-y border-forest-700/10 overflow-hidden"
       >
+        <div aria-hidden className="landing-grid pointer-events-none absolute inset-0 opacity-40" />
         <div className="max-w-3xl mx-auto">
           <motion.div {...fadeUp} className="text-center">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-forest-600">
@@ -664,7 +680,7 @@ export default function HomePage() {
                   key={f.q}
                   {...fadeUp}
                   transition={{ duration: 0.35, delay: i * 0.05 }}
-                  className={`rounded-xl border bg-cream-50 overflow-hidden transition-colors ${
+                  className={`landing-shimmer rounded-xl border bg-cream-50/90 overflow-hidden transition-colors ${
                     open ? 'border-forest-500/30' : 'border-ink-900/10'
                   }`}
                 >
@@ -702,7 +718,7 @@ export default function HomePage() {
       {/* ================================================================ */}
       {/* Final CTA — deep ink + forest gradient, mirrors the hero          */}
       {/* ================================================================ */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-cream-100">
+      <section className="landing-surface-soft py-24 px-4 sm:px-6 lg:px-8">
         <motion.div
           {...fadeUp}
           className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-ink-900 via-ink-800 to-forest-700 text-cream-100 px-8 py-16 md:py-20 md:px-16 relative overflow-hidden"

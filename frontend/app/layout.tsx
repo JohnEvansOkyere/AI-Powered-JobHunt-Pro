@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter, Fraunces } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import { Suspense } from 'react'
+import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -15,13 +17,33 @@ const fraunces = Fraunces({
 })
 
 export const metadata: Metadata = {
-  title: 'VeloxaHire — AI that finds the job that fits you',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.org'),
+  title: 'AI Job Search & Personalized Job Matching | VeloxaHire',
   description:
-    'VeloxaHire reads your profile and CV, understands your intent, and surfaces the roles most worth your time. Part of the Veloxa family.',
+    'Browse remote and recruiter-posted jobs, then use your CV and profile to find the roles most worth your time with VeloxaHire.',
+  alternates: {
+    canonical: '/',
+  },
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
     apple: '/logo.png',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'VeloxaHire',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'VeloxaHire — AI job search and personalized job matching',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-image.png'],
   },
 }
 
@@ -37,6 +59,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="antialiased bg-cream-100 text-ink-900" suppressHydrationWarning>
+        <Suspense fallback={null}><AnalyticsTracker /></Suspense>
         {children}
         <Toaster
           position="top-right"

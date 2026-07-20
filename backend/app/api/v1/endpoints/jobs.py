@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.rate_limit import (
     CRON_RATE_LIMIT,
     PUBLIC_JOB_DETAIL_RATE_LIMIT,
+    PUBLIC_JOB_SITEMAP_RATE_LIMIT,
     PUBLIC_JOB_SEARCH_RATE_LIMIT,
     SCRAPING_RATE_LIMIT,
     enforce_rate_limit,
@@ -85,6 +86,13 @@ class JobSearchResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class JobSitemapEntry(BaseModel):
+    """Small public projection used to build the frontend sitemap."""
+
+    id: uuid.UUID
+    updated_at: datetime
 
 
 class ScrapeJobsRequest(BaseModel):
@@ -238,6 +246,40 @@ async def get_recommendations_legacy(
 
     url = f"/api/v1/recommendations?tier=tier2&page={page}&page_size={page_size}"
     return RedirectResponse(url=url, status_code=307)
+
+
+@router.get("/sitemap", response_model=List[JobSitemapEntry])
+async def get_job_sitemap(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return active, complete job pages that are safe to expose in the sitemap.
+
+    Search/list pages are not included. The frontend uses these IDs to publish
+    canonical leaf URLs for individual job postings.
+    """
+    await enforce_rate_limit(request, PUBLIC_JOB_SITEMAP_RATE_LIMIT)
+
+    jobs = (
+        db.query(Job)
+        .filter(
+            Job.processing_status == "processed",
+            Job.posted_date.isnot(None),
+            Job.title.isnot(None),
+            Job.company.isnot(None),
+            Job.description.isnot(None),
+            Job.description != "",
+            or_(
+                and_(Job.job_link.isnot(None), Job.job_link != ""),
+                and_(Job.source_url.isnot(None), Job.source_url != ""),
+            ),
+        )
+        .order_by(desc(Job.updated_at))
+        .limit(50000)
+        .all()
+    )
+
+    return [JobSitemapEntry(id=job.id, updated_at=job.updated_at) for job in jobs]
 
 
 @router.get("/{job_id}", response_model=JobResponse)

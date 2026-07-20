@@ -11,6 +11,7 @@ import { User, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-
 import { motion } from 'framer-motion'
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel'
 import PasswordStrength, { isPasswordStrong } from '@/components/auth/PasswordStrength'
+import { trackEvent } from '@/lib/analytics'
 
 interface HandoffVerifyResponse {
   valid: boolean
@@ -86,6 +87,7 @@ function SignUpContent() {
     setLoading(true)
 
     try {
+      void trackEvent({ event_name: 'signup_started', path: '/auth/signup' })
       await signUp({
         email,
         password,
@@ -96,6 +98,7 @@ function SignUpContent() {
           ats_job_id: handoffJobId || undefined,
         },
       })
+      void trackEvent({ event_name: 'signup_completed', path: '/auth/signup', metadata: { handoff: handoffPrefilled } })
       toast.success('Account created! You can sign in now.')
       router.push('/auth/login')
     } catch (error: any) {
@@ -119,7 +122,7 @@ function SignUpContent() {
         >
           {/* Mobile logo */}
           <Link href="/" className="mb-10 inline-flex items-center gap-2.5 lg:hidden">
-            <Image src="/logo.png" alt="VeloxaHire" width={32} height={32} priority className="object-contain" style={{ width: 'auto', height: 'auto' }} />
+            <Image src="/logo.png" alt="VeloxaHire" width={32} height={32} priority className="object-contain" />
             <span className="text-xl font-semibold tracking-tight text-neutral-900">
               Veloxa<span className="text-brand-turquoise-700">Hire</span>
             </span>

@@ -11,6 +11,7 @@ import { useProfile } from '@/hooks/useProfile'
 import type { UserProfileFormData } from '@/types/profile'
 import { SKILL_CATEGORIES, searchSkills } from '@/lib/skills'
 import { calculateProfileCompletion } from '@/lib/profile-utils'
+import { Save } from 'lucide-react'
 
 interface ProfileFormProps {
   onComplete?: () => void
@@ -59,12 +60,19 @@ export function ProfileForm({ onComplete }: ProfileFormProps) {
     }
   }
 
-  const handleSubmit = async () => {
+  const saveAllChanges = async (): Promise<boolean> => {
     try {
       await saveProfile(formData)
-      onComplete?.()
+      return true
     } catch (error) {
       // Error handling is done in useProfile hook
+      return false
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (await saveAllChanges()) {
+      onComplete?.()
     }
   }
 
@@ -79,9 +87,20 @@ export function ProfileForm({ onComplete }: ProfileFormProps) {
           <span className="text-sm font-medium text-neutral-700">
             Step {currentStep} of {totalSteps}
           </span>
-          <span className="text-sm font-medium text-primary-600">
-            {completionPercentage}% Complete
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-primary-600">
+              {completionPercentage}% Complete
+            </span>
+            <button
+              type="button"
+              onClick={saveAllChanges}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-turquoise-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-turquoise-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saving ? 'Saving…' : 'Save all changes'}
+            </button>
+          </div>
         </div>
         <div className="w-full bg-neutral-200 rounded-full h-2">
           <div
@@ -993,4 +1012,3 @@ function AIPreferencesStep({
     </div>
   )
 }
-

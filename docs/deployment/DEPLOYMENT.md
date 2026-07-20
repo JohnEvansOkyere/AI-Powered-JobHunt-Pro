@@ -82,6 +82,15 @@ Update `CORS_ORIGINS` in backend to include your Vercel domain:
 CORS_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
 ```
 
+The admin command center is available at `/dashboard/admin`, with user controls
+at `/dashboard/admin/users`. Admin access is controlled by the
+`public.users.is_admin` Boolean column. Set it to `true` for an operator in
+Supabase, then refresh their session or sign in again. From User control,
+administrators can suspend/reactivate accounts or permanently revoke an account.
+Suspension is enforced by the backend on authenticated requests; revocation
+deletes the user's platform data and requests deletion of their Supabase Auth
+account.
+
 ## Post-Deployment Checklist
 
 - [ ] Backend health check works
@@ -148,4 +157,3 @@ CORS_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
 - Verify backend URL is correct
 - Check network requests in browser console
 - Verify authentication tokens
-

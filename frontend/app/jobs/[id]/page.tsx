@@ -6,7 +6,7 @@ import type { Job } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.com'
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.org'
 
 async function getJob(id: string): Promise<Job | null> {
   const response = await fetch(`${API_URL}/api/v1/jobs/${id}`, {
@@ -33,6 +33,24 @@ function applyHref(job: Job) {
   return job.job_link || job.source_url || ''
 }
 
+function isIndexableJob(job: Job) {
+  return Boolean(
+    job.processing_status === 'processed' &&
+      job.posted_date &&
+      job.title.trim() &&
+      job.company.trim() &&
+      cleanJobDescription(job.description).trim() &&
+      applyHref(job),
+  )
+}
+
+function serializeJsonLd(value: unknown) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const job = await getJob(params.id)
   if (!job) {
@@ -43,14 +61,31 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
   const title = `${job.title} at ${job.company} | VeloxaHire`
   const description = cleanJobDescription(job.description).slice(0, 155)
+  const indexable = isIndexableJob(job)
   return {
     title,
     description,
+    alternates: {
+      canonical: `/jobs/${job.id}`,
+    },
+    robots: indexable ? undefined : { index: false, follow: true },
     openGraph: {
       title,
       description,
       type: 'article',
       url: `${SITE_URL}/jobs/${job.id}`,
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: 'VeloxaRecruit — AI-Powered Recruitment',
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      images: ['/og-image.png'],
     },
   }
 }
@@ -61,12 +96,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
   const applyUrl = applyHref(job)
   const postedDate = job.posted_date || job.scraped_at
+  const indexable = isIndexableJob(job)
+  const remoteType = (job.remote_type || job.remote_option || '').toLowerCase()
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
     description: cleanJobDescription(job.description),
-    datePosted: postedDate,
+    datePosted: job.posted_date,
     employmentType: job.job_type || undefined,
     hiringOrganization: {
       '@type': 'Organization',
@@ -81,15 +118,18 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           },
         }
       : undefined,
+    jobLocationType: remoteType.includes('remote') ? 'TELECOMMUTE' : undefined,
     url: `${SITE_URL}/jobs/${job.id}`,
   }
 
   return (
     <main className="min-h-screen bg-cream-50 text-ink-900">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      {indexable && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        />
+      )}
       <header className="border-b border-ink-900/10 bg-forest-700 text-cream-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <Link href="/" className="text-lg font-semibold tracking-tight">
@@ -169,6 +209,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               {applyUrl ? (
                 <a
                   href={applyUrl}
+                  data-analytics="job_apply_click"
+                  data-job-id={job.id}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
                   className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800"

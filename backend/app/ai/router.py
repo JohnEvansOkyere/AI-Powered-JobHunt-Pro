@@ -14,7 +14,7 @@ from enum import Enum
 
 from app.ai.base import AIProvider, TaskType
 from app.ai.usage_tracker import get_usage_tracker
-from app.core.config import settings
+from app.core import config
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,10 +74,10 @@ class ModelRouter:
     def _initialize_providers(self) -> None:
         """Initialize all configured AI providers."""
         # OpenAI
-        if settings.OPENAI_API_KEY and OpenAIProvider is not None:
+        if config.settings.OPENAI_API_KEY and OpenAIProvider is not None:
             try:
                 self.providers["openai"] = OpenAIProvider(
-                    api_key=settings.OPENAI_API_KEY,
+                    api_key=config.settings.OPENAI_API_KEY,
                     model_name="gpt-4-turbo-preview"
                 )
                 logger.info("OpenAI provider initialized")
@@ -85,10 +85,10 @@ class ModelRouter:
                 logger.warning(f"Failed to initialize OpenAI: {e}")
 
         # Grok
-        if settings.GROK_API_KEY and GrokProvider is not None:
+        if config.settings.GROK_API_KEY and GrokProvider is not None:
             try:
                 self.providers["grok"] = GrokProvider(
-                    api_key=settings.GROK_API_KEY,
+                    api_key=config.settings.GROK_API_KEY,
                     model_name="grok-beta"
                 )
                 logger.info("Grok provider initialized")
@@ -96,21 +96,21 @@ class ModelRouter:
                 logger.warning(f"Failed to initialize Grok: {e}")
 
         # Gemini
-        if settings.GEMINI_API_KEY and GeminiProvider is not None:
+        if config.settings.GEMINI_API_KEY and GeminiProvider is not None:
             try:
                 self.providers["gemini"] = GeminiProvider(
-                    api_key=settings.GEMINI_API_KEY,
-                    model_name=settings.AI_RERANK_MODEL
+                    api_key=config.settings.GEMINI_API_KEY,
+                    model_name=config.settings.AI_RERANK_MODEL
                 )
                 logger.info("Gemini provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to initialize Gemini: {e}")
 
         # Groq
-        if settings.GROQ_API_KEY and GroqProvider is not None:
+        if config.settings.GROQ_API_KEY and GroqProvider is not None:
             try:
                 self.providers["groq"] = GroqProvider(
-                    api_key=settings.GROQ_API_KEY,
+                    api_key=config.settings.GROQ_API_KEY,
                     model_name="llama-2-70b-4096"
                 )
                 logger.info("Groq provider initialized")
@@ -287,7 +287,7 @@ class ModelRouter:
                 (name for name, p in self.providers.items() if p == provider),
                 "unknown"
             )
-            max_per_minute = getattr(settings, "AI_RATE_LIMIT_PER_MINUTE", 60)
+            max_per_minute = getattr(config.settings, "AI_RATE_LIMIT_PER_MINUTE", 60)
             if not self.usage_tracker.check_rate_limit(user_id, provider_name, max_requests=max_per_minute):
                 logger.warning(f"Rate limit exceeded for user {user_id}")
                 # Try fallback provider

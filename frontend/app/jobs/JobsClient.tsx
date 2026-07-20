@@ -19,8 +19,11 @@ import {
 import { toast } from 'react-hot-toast'
 import { searchJobs, type Job, type JobSearchParams } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
+import { useAuth } from '@/hooks/useAuth'
+import { PostApplyModal } from '@/components/jobs/PostApplyModal'
 
 const PAGE_SIZE = 20
+const SIGNUP_PROMPT_DISMISSED_KEY = 'veloxahire:public-jobs-signup-prompt-dismissed'
 
 type ViewMode = 'all' | 'recruiter'
 
@@ -155,6 +158,7 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
 
           <Link
             href={`/jobs/${job.id}`}
+            data-job-id={job.id}
             className="block text-lg font-semibold leading-snug text-neutral-900 transition-colors hover:text-brand-turquoise-700"
           >
             {job.title}
@@ -193,9 +197,11 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
           {/* Actions */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {applyHref && (
-              <a
-                href={applyHref}
-                target="_blank"
+                <a
+                  href={applyHref}
+                  data-analytics="job_apply_click"
+                  data-job-id={job.id}
+                  target="_blank"
                 rel="noopener noreferrer nofollow"
                 onClick={() => toast.success('Create a profile later to track applications and get similar jobs.')}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
@@ -231,6 +237,7 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
 }
 
 export default function JobsClient() {
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [query, setQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
@@ -244,6 +251,29 @@ export default function JobsClient() {
   const [loading, setLoading] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return
+
+    try {
+      if (window.sessionStorage.getItem(SIGNUP_PROMPT_DISMISSED_KEY) === 'true') return
+    } catch {
+      // Continue if browser storage is unavailable.
+    }
+
+    const timer = window.setTimeout(() => setShowSignupPrompt(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [authLoading, isAuthenticated])
+
+  const closeSignupPrompt = () => {
+    setShowSignupPrompt(false)
+    try {
+      window.sessionStorage.setItem(SIGNUP_PROMPT_DISMISSED_KEY, 'true')
+    } catch {
+      // The prompt is still dismissible if browser storage is unavailable.
+    }
+  }
 
   useEffect(() => {
     setPage(1)
@@ -313,7 +343,15 @@ export default function JobsClient() {
   }
 
   return (
-    <main className="min-h-screen bg-cream-50 text-ink-900">
+    <>
+      <PostApplyModal
+        open={showSignupPrompt}
+        onClose={closeSignupPrompt}
+        heading="Sign up now for tailored roles"
+        description="Create a free profile and get jobs ranked around your experience, skills, and career goals."
+        ctaLabel="Sign up for tailored roles"
+      />
+      <main className="min-h-screen bg-cream-50 text-ink-900">
       <header className="border-b border-ink-900/10 bg-forest-700 text-cream-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <Link href="/" className="text-lg font-semibold tracking-tight">
@@ -340,6 +378,10 @@ export default function JobsClient() {
               <p className="mt-4 text-cream-100/75 text-lg max-w-2xl leading-relaxed">
                 Search recruiter-posted roles and curated listings before creating an account. Sign up when you want AI recommendations, saved jobs, and application tracking.
               </p>
+              <Link href="/remote-jobs" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ember-300 hover:text-cream-100">
+                Explore remote jobs
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
             <div className="rounded-2xl border border-cream-100/15 bg-cream-100/10 p-4">
               <div className="flex items-start gap-3">
@@ -500,6 +542,7 @@ export default function JobsClient() {
           </Link>
         </aside>
       </section>
-    </main>
+      </main>
+    </>
   )
 }

@@ -32,7 +32,9 @@ export class ApiClient {
     if (
       message === 'Email verification required' ||
       message === 'Invalid authentication credentials' ||
-      message === 'Could not validate credentials'
+      message === 'Could not validate credentials' ||
+      message === 'Account is not available' ||
+      message.startsWith('Your account has been suspended')
     ) {
       try {
         await signOut()
