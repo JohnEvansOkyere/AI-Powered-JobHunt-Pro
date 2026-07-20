@@ -42,6 +42,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool = True
+    is_admin: bool = False
     email_verified: bool = False
     last_login_at: Optional[str] = None
     user_metadata: Optional[Dict[str, Any]] = {}
@@ -118,6 +119,53 @@ def _remove_cv_storage_files(paths: list[str]) -> None:
         )
 
 
+def _delete_account_data(db: Session, user_id: uuid.UUID) -> tuple[Dict[str, int], int]:
+    """Delete platform data for one user and return counts plus CV file count."""
+    cvs = db.query(CV).filter(CV.user_id == user_id).all()
+    cv_paths = [cv.file_path for cv in cvs if cv.file_path]
+    _remove_cv_storage_files(cv_paths)
+
+    deleted_counts: Dict[str, int] = {}
+    try:
+        delete_specs = (
+            ("whatsapp_incoming_events", WhatsappIncomingEvent),
+            ("whatsapp_messages", WhatsappMessage),
+            ("notification_preferences", NotificationPreferences),
+            ("job_recommendations", JobRecommendation),
+            ("job_matches", JobMatch),
+            ("applications", Application),
+            ("scraping_jobs", ScrapingJob),
+            ("user_embeddings", UserEmbedding),
+            ("cvs", CV),
+            ("user_profiles", UserProfile),
+        )
+        for name, model in delete_specs:
+            deleted_counts[name] = (
+                db.query(model)
+                .filter(getattr(model, "user_id") == user_id)
+                .delete(synchronize_session=False)
+            )
+
+        deleted_counts["external_jobs_detached_from_user"] = (
+            db.query(Job)
+            .filter(Job.added_by_user_id == user_id)
+            .update({"added_by_user_id": None}, synchronize_session=False)
+        )
+        deleted_counts["users"] = (
+            db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("account_delete_failed", user_id=str(user_id), error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete account data.",
+        ) from exc
+
+    return deleted_counts, len(cv_paths)
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_my_user_info(
     current_user: dict = Depends(get_current_user),
@@ -140,6 +188,7 @@ async def get_my_user_info(
             email=current_user.get("email"),
             full_name=current_user.get("user_metadata", {}).get("full_name"),
             email_verified=current_user.get("email_confirmed_at") is not None,
+            is_admin=False,
             user_metadata=current_user.get("user_metadata", {}),
             created_at=current_user.get("created_at", ""),
             updated_at=current_user.get("updated_at", ""),
@@ -151,6 +200,7 @@ async def get_my_user_info(
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         is_active=user.is_active,
+        is_admin=bool(user.is_admin),
         email_verified=user.email_verified,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
         user_metadata=user.user_metadata or {},
@@ -183,7 +233,8 @@ async def update_my_user_info(
         user = User(
             id=user_id,
             email=current_user.get("email"),
-            email_verified=current_user.get("email_confirmed_at") is not None,
+        email_verified=current_user.get("email_confirmed_at") is not None,
+        is_admin=False,
             user_metadata=current_user.get("user_metadata", {}),
         )
         db.add(user)
@@ -213,6 +264,7 @@ async def update_my_user_info(
         avatar_url=user.avatar_url,
         is_active=user.is_active,
         email_verified=user.email_verified,
+        is_admin=bool(user.is_admin),
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
         user_metadata=user.user_metadata or {},
         created_at=user.created_at.isoformat() if user.created_at else "",
@@ -291,47 +343,7 @@ async def delete_my_account(
     """Delete the current user's candidate data and best-effort remove Auth user."""
     user_id = _current_user_uuid(current_user)
 
-    cvs = db.query(CV).filter(CV.user_id == user_id).all()
-    cv_paths = [cv.file_path for cv in cvs if cv.file_path]
-    _remove_cv_storage_files(cv_paths)
-
-    deleted_counts: Dict[str, int] = {}
-    try:
-        delete_specs = (
-            ("whatsapp_incoming_events", WhatsappIncomingEvent),
-            ("whatsapp_messages", WhatsappMessage),
-            ("notification_preferences", NotificationPreferences),
-            ("job_recommendations", JobRecommendation),
-            ("job_matches", JobMatch),
-            ("applications", Application),
-            ("scraping_jobs", ScrapingJob),
-            ("user_embeddings", UserEmbedding),
-            ("cvs", CV),
-            ("user_profiles", UserProfile),
-        )
-        for name, model in delete_specs:
-            deleted_counts[name] = (
-                db.query(model)
-                .filter(getattr(model, "user_id") == user_id)
-                .delete(synchronize_session=False)
-            )
-
-        deleted_counts["external_jobs_detached_from_user"] = (
-            db.query(Job)
-            .filter(Job.added_by_user_id == user_id)
-            .update({"added_by_user_id": None}, synchronize_session=False)
-        )
-        deleted_counts["users"] = (
-            db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
-        )
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        logger.error("account_delete_failed", user_id=str(user_id), error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not delete account data.",
-        ) from exc
+    deleted_counts, cv_files_deleted = _delete_account_data(db, user_id)
 
     auth_user_deleted = False
     auth_delete_error: Optional[str] = None
@@ -345,7 +357,7 @@ async def delete_my_account(
     return {
         "status": "deleted",
         "deleted_counts": deleted_counts,
-        "cv_files_deleted": len(cv_paths),
+        "cv_files_deleted": cv_files_deleted,
         "auth_user_deleted": auth_user_deleted,
         "warning": auth_delete_error,
     }

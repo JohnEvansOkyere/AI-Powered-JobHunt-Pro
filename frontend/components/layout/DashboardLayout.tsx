@@ -1,12 +1,13 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { calculateProfileCompletion } from '@/lib/profile-utils'
+import { getAdminIdentity } from '@/lib/api/admin'
 import {
   User,
   FileText,
@@ -18,6 +19,8 @@ import {
   Star,
   Briefcase,
   ShieldCheck,
+  BarChart3,
+  Users,
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -33,11 +36,37 @@ const navigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
+const adminNavigation = [
+  { name: 'Analytics', href: '/dashboard/admin', icon: BarChart3 },
+  { name: 'Users', href: '/dashboard/admin/users', icon: Users },
+]
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { profile } = useProfile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    if (!user) {
+      setIsAdmin(false)
+      return () => {
+        mounted = false
+      }
+    }
+    getAdminIdentity()
+      .then((identity) => {
+        if (mounted) setIsAdmin(identity.is_admin)
+      })
+      .catch(() => {
+        if (mounted) setIsAdmin(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [user])
 
   const completionPercentage = calculateProfileCompletion(profile)
   const candidateName = String(
@@ -53,7 +82,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     .map((part) => part[0])
     .join('')
     .toUpperCase() || 'U'
-  const isAdmin = user?.email?.toLowerCase() === 'okyerevansjohn@gmail.com'
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -162,10 +190,31 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               )
             })}
             {isAdmin && (
-              <Link href="/dashboard/admin" onClick={() => setSidebarOpen(false)} className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${pathname.startsWith('/dashboard/admin') ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'}`}>
-                <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" />
-                <span className="truncate">Admin analytics</span>
-              </Link>
+              <div className="mt-5 border-t border-neutral-100 pt-4" role="group" aria-label="Administration">
+                <div className="flex items-center gap-2 px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Administration</span>
+                </div>
+                <div className="space-y-0.5 border-l border-neutral-200 ml-4 pl-2">
+                  {adminNavigation.map((item) => {
+                    const Icon = item.icon
+                    const isActive = item.href === '/dashboard/admin'
+                      ? pathname === item.href
+                      : pathname === item.href || pathname.startsWith(item.href + '/')
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${isActive ? 'bg-neutral-900 text-white shadow-sm' : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'}`}
+                      >
+                        <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-brand-turquoise-300' : 'text-neutral-400'}`} />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </nav>
 

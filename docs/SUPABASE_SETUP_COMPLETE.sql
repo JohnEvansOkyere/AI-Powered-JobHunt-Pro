@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     avatar_url TEXT,
 
     -- Account Status
-    is_active BOOLEAN DEFAULT true,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    is_admin BOOLEAN NOT NULL DEFAULT false,
     email_verified BOOLEAN DEFAULT false,
 
     -- Metadata
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON public.users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_is_admin ON public.users(is_admin);
 
 -- Sync existing Supabase Auth users early so later public.users FKs can validate.
 INSERT INTO public.users (id, email, email_verified, metadata)
@@ -60,6 +62,12 @@ SELECT
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM public.users)
 ON CONFLICT (id) DO NOTHING;
+
+-- Promote the existing owner account. Additional admins can be managed by
+-- setting public.users.is_admin to true in the Supabase Table Editor.
+UPDATE public.users
+SET is_admin = TRUE
+WHERE lower(email) = 'okyerevansjohn@gmail.com';
 
 -- =====================================================
 -- PART 3: USER PROFILES TABLE

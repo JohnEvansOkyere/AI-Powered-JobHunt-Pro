@@ -27,7 +27,8 @@ class User(Base):
     avatar_url = Column(Text, nullable=True)
     
     # Account Status
-    is_active = Column(Boolean, default=True, index=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    is_admin = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
     email_verified = Column(Boolean, default=False)
     
     # Metadata
@@ -37,4 +38,3 @@ class User(Base):
     
     # Additional metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
     user_metadata = Column("metadata", JSONB, default={}, nullable=True)
-

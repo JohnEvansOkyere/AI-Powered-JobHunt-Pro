@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+import uuid
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import distinct, func
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import distinct, func, or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import require_admin
@@ -17,8 +19,30 @@ from app.models.job import Job
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services.ats_sync_status_service import get_sync_status_async
+from app.api.v1.endpoints.users import _current_user_uuid, _delete_account_data
+from app.core.supabase_client import get_supabase_service_client
+from app.core.logging import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
+
+
+class AdminUserStatusUpdate(BaseModel):
+    is_active: bool
+
+
+def _user_payload(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "full_name": user.full_name,
+        "is_active": bool(user.is_active),
+        "is_admin": bool(user.is_admin),
+        "email_verified": bool(user.email_verified),
+        "last_login_at": _iso(user.last_login_at),
+        "created_at": _iso(user.created_at),
+        "updated_at": _iso(user.updated_at),
+    }
 
 
 def _range_start(days: int) -> datetime:
@@ -36,6 +60,100 @@ def _iso(value: Any) -> Optional[str]:
 @router.get("/me")
 async def admin_me(current_user: dict = Depends(require_admin)) -> dict:
     return {"is_admin": True, "email": current_user.get("email")}
+
+
+@router.get("/users")
+async def admin_users(
+    search: str = Query(default="", max_length=120),
+    status_filter: str = Query(default="all", alias="status", pattern="^(all|active|suspended)$"),
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+) -> dict:
+    """List candidate accounts for the admin user-control surface."""
+    query = db.query(User)
+    if search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(or_(User.email.ilike(term), User.full_name.ilike(term)))
+    if status_filter == "active":
+        query = query.filter(User.is_active.is_(True))
+    elif status_filter == "suspended":
+        query = query.filter(User.is_active.is_(False))
+
+    users = query.order_by(User.created_at.desc()).limit(500).all()
+    return {
+        "users": [_user_payload(user) for user in users],
+        "total": db.query(User).count(),
+        "active": db.query(User).filter(User.is_active.is_(True)).count(),
+        "suspended": db.query(User).filter(User.is_active.is_(False)).count(),
+    }
+
+
+@router.patch("/users/{user_id}/status")
+async def admin_update_user_status(
+    user_id: uuid.UUID,
+    payload: AdminUserStatusUpdate,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin),
+) -> dict:
+    """Suspend or reactivate a user; the status is enforced on every API request."""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    admin_id = _current_user_uuid(current_admin)
+    if target.id == admin_id and not payload.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot suspend your own administrator account.",
+        )
+
+    target.is_active = payload.is_active
+    db.commit()
+    db.refresh(target)
+    return {"user": _user_payload(target)}
+
+
+@router.delete("/users/{user_id}")
+async def admin_revoke_user(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin),
+) -> dict:
+    """Permanently revoke a user from the platform and delete their Auth account."""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    admin_id = _current_user_uuid(current_admin)
+    if target.id == admin_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot revoke your own administrator account.",
+        )
+    if target.is_admin and db.query(User).filter(User.is_admin.is_(True)).count() <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Create another administrator before revoking the last administrator.",
+        )
+
+    deleted_counts, cv_files_deleted = _delete_account_data(db, user_id)
+    auth_user_deleted = False
+    warning: Optional[str] = None
+    try:
+        get_supabase_service_client().auth.admin.delete_user(str(user_id))
+        auth_user_deleted = True
+    except Exception as exc:
+        warning = "Platform data was deleted, but the Supabase Auth user could not be deleted."
+        logger.error("admin_auth_user_delete_failed", user_id=str(user_id), error=str(exc))
+
+    return {
+        "status": "revoked",
+        "user_id": str(user_id),
+        "deleted_counts": deleted_counts,
+        "cv_files_deleted": cv_files_deleted,
+        "auth_user_deleted": auth_user_deleted,
+        "warning": warning,
+    }
 
 
 @router.get("/overview")

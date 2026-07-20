@@ -22,6 +22,8 @@ order against the production database (and any staging/dev copy).
 | `012_drop_jobs_source_check.sql` | **Apply** | Removes the obsolete fixed source check as scraper sources evolve |
 | `013_add_first_party_analytics.sql` | **Apply** | Adds anonymous/authenticated sessions and event storage for the admin funnel dashboard |
 | `014_add_acquisition_attribution.sql` | **Apply** | Persists UTM and inferred referrer source/medium/campaign data per analytics session |
+| `015_add_user_admin_flag.sql` | **Apply** | Adds `public.users.is_admin` and promotes the existing owner account |
+| `016_enforce_user_account_status.sql` | **Apply** | Normalizes `public.users.is_active`; backend suspension/revocation controls are enforced on authenticated requests |
 
 All migrations are wrapped in `BEGIN/COMMIT` and use `IF [NOT] EXISTS`, so
 re-running them is safe.
@@ -41,6 +43,8 @@ psql "$DATABASE_URL" -f migrations/011_allow_recruiter_source.sql
 psql "$DATABASE_URL" -f migrations/012_drop_jobs_source_check.sql
 psql "$DATABASE_URL" -f migrations/013_add_first_party_analytics.sql
 psql "$DATABASE_URL" -f migrations/014_add_acquisition_attribution.sql
+psql "$DATABASE_URL" -f migrations/015_add_user_admin_flag.sql
+psql "$DATABASE_URL" -f migrations/016_enforce_user_account_status.sql
 ```
 
 Configure Meta to call your API **callback URL**

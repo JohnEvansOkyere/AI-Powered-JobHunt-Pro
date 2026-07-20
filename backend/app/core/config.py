@@ -135,10 +135,6 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         description="Public frontend URL used in outbound notification CTAs.",
     )
-    ADMIN_EMAILS: str = Field(
-        default="okyerevansjohn@gmail.com",
-        description="Comma-separated emails allowed to access the admin dashboard.",
-    )
 
     # Sentry
     SENTRY_DSN: str = Field(default="", description="Sentry DSN for error tracking")

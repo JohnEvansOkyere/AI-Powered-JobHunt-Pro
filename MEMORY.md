@@ -109,7 +109,9 @@ Sidebar:
   Applications      → /dashboard/applications
   Profile           → /dashboard/profile
   Settings          → /dashboard/settings
-  Admin analytics   → /dashboard/admin (only shown to okyerevansjohn@gmail.com; backend-enforced)
+  Administration (shown to users.public.users.is_admin=true; backend-enforced)
+    └─ Analytics     → /dashboard/admin
+    └─ Users         → /dashboard/admin/users (suspend/reactivate or permanently revoke accounts)
 
 Public:
   Browse Jobs       → /jobs                          (anonymous browse/search/filter)
@@ -124,7 +126,7 @@ Public:
 - **All Jobs** under `/dashboard/jobs` remains the authenticated dashboard browse surface
 - **Apply for anonymous users** opens the public recruiter/source apply link; signup prompts sell recommendations/tracking after intent
 - **Recommendations** (Job Match) remain behind auth — AI matching requires a profile
-- **Admin analytics** is a protected operator surface at `/dashboard/admin`; the backend allowlist authorizes the verified `okyerevansjohn@gmail.com` account and the public analytics endpoint stores no raw form contents or IP address.
+- **Administration** is a protected operator surface at `/dashboard/admin`; the backend authorizes only rows with `public.users.is_admin=true`. `/dashboard/admin/users` can suspend/reactivate accounts and permanently revoke platform data/Auth users; suspended or missing local account rows are rejected by authenticated API dependencies. The public analytics endpoint stores no raw form contents or IP address.
 
 ---
 
@@ -186,6 +188,7 @@ As of 2026-07-20:
 | Post-apply profile CTA for logged-in users | Not built — only anonymous modal exists |
 | Sync observability dashboard (last sync, jobs imported/updated/archived) | Backend ops endpoint implemented 2026-06-20; broader visual admin dashboard now built at `/dashboard/admin`, ATS sync detail remains a follow-up |
 | Historical behavioral analytics before 2026-07-20 | Not available because first-party event collection starts after migration `013_add_first_party_analytics.sql` is applied |
+| Admin promotion | Set `public.users.is_admin = true` in Supabase Table Editor; migration `015_add_user_admin_flag.sql` promotes `okyerevansjohn@gmail.com`; user suspension/revocation is available in `/dashboard/admin/users` |
 | Manual ATS job backfill command | Backend ops endpoint implemented 2026-06-20: `POST /api/v1/ops/ats-sync/backfill` |
 | Webhook events from ATS (job.published, job.updated, job.closed) | Deferred |
 | Shared SSO / identity across both products | Deferred |
@@ -265,3 +268,6 @@ As of 2026-07-20:
 | 2026-07-20 | Clarified that Search Console should inspect both public catalogue pages, `/jobs` and `/remote-jobs`; `/remote-jobs` was prioritized only because it is the newer search-intent landing page. | Avoid implying that the main jobs catalogue should be skipped |
 | 2026-07-20 | Built the protected admin command center at `/dashboard/admin`. Added email-authorized admin access for `okyerevansjohn@gmail.com`, first-party analytics session/event storage and migration `013_add_first_party_analytics.sql`, global page/click/time tracking, signup/login/apply intent events, operational totals, traffic trend, funnel, anonymous job visitors without signup, recent sessions, and event stream. Frontend type-check/build passed; full backend suite retains pre-existing failures/errors in AI/auth/CV/jobs/profile tests. | Give the owner solid visibility into system activity, anonymous job-page behavior, engagement duration, and signup conversion |
 | 2026-07-20 | Added acquisition attribution on top of the admin analytics. Migration `014_add_acquisition_attribution.sql` persists UTM source/medium/campaign/content/term and inferred referrers; browser tracking carries UTM tags through the session; the admin dashboard now reports visitors, sessions, job views, apply clicks, and signups by acquisition source. Frontend type-check/build passed and focused backend tests passed. | Identify whether candidate traffic came from Google SEO, LinkedIn, X, Reddit, or other campaigns and measure which channels convert |
+| 2026-07-20 | Moved admin authorization to `public.users.is_admin`. Migration `015_add_user_admin_flag.sql` adds the Boolean flag, indexes it, and promotes `okyerevansjohn@gmail.com`; backend and dashboard navigation now read the database flag so admins can be managed with a yes/no value in Supabase. | Give the owner direct database control over who can access the admin dashboard |
+| 2026-07-20 | Reworked the admin navigation into an Administration heading with Analytics and Users subpages. Added `/dashboard/admin/users` with searchable account controls, backend-enforced suspend/reactivate status, and destructive revoke flow that deletes platform data and requests Supabase Auth deletion. Added migration `016_enforce_user_account_status.sql`, updated account status model/docs, and signed-out suspended/revoked clients on the frontend. | Give the owner clear admin navigation and direct control to stop, restore, or remove platform users |
+| 2026-07-20 | Refreshed the candidate homepage below the unchanged dark hero with green, off-white, turquoise, and amber brand surfaces; added floating accents, card shimmer, hover lift, and reduced-motion safeguards. Files: `frontend/app/page.tsx`, `frontend/app/globals.css`. Frontend type-check/build passed. | Replace the disliked brown/cream lower-page appearance with the intended brand palette and make the landing experience feel more polished and engaging for candidates |

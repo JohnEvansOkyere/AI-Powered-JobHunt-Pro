@@ -82,10 +82,14 @@ Update `CORS_ORIGINS` in backend to include your Vercel domain:
 CORS_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
 ```
 
-The admin dashboard is available at `/dashboard/admin`. The backend authorizes
-it by the verified Supabase email allowlist; `okyerevansjohn@gmail.com` is the
-primary admin by default. Set `ADMIN_EMAILS` to a comma-separated list when
-adding additional operators.
+The admin command center is available at `/dashboard/admin`, with user controls
+at `/dashboard/admin/users`. Admin access is controlled by the
+`public.users.is_admin` Boolean column. Set it to `true` for an operator in
+Supabase, then refresh their session or sign in again. From User control,
+administrators can suspend/reactivate accounts or permanently revoke an account.
+Suspension is enforced by the backend on authenticated requests; revocation
+deletes the user's platform data and requests deletion of their Supabase Auth
+account.
 
 ## Post-Deployment Checklist
 
