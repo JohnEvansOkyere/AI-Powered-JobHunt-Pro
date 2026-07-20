@@ -7,6 +7,9 @@ import { X, Sparkles, Bell, BarChart2, BookmarkCheck } from 'lucide-react'
 interface PostApplyModalProps {
   open: boolean
   onClose: () => void
+  heading?: string
+  description?: string
+  ctaLabel?: string
 }
 
 const VALUE_PROPS = [
@@ -32,7 +35,13 @@ const VALUE_PROPS = [
   },
 ]
 
-export function PostApplyModal({ open, onClose }: PostApplyModalProps) {
+export function PostApplyModal({
+  open,
+  onClose,
+  heading = 'Find more roles like this one',
+  description = 'Create a free account and let AI do the job hunting for you.',
+  ctaLabel = 'Create free account',
+}: PostApplyModalProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -64,7 +73,7 @@ export function PostApplyModal({ open, onClose }: PostApplyModalProps) {
               {/* Header */}
               <div className="flex items-start justify-between gap-3 mb-1">
                 <h2 className="text-lg font-semibold text-neutral-900 leading-snug">
-                  Find more roles like this one
+                  {heading}
                 </h2>
                 <button
                   onClick={onClose}
@@ -75,7 +84,7 @@ export function PostApplyModal({ open, onClose }: PostApplyModalProps) {
                 </button>
               </div>
               <p className="text-sm text-neutral-500 mb-6">
-                Create a free account and let AI do the job hunting for you.
+                {description}
               </p>
 
               {/* Value props */}
@@ -99,7 +108,7 @@ export function PostApplyModal({ open, onClose }: PostApplyModalProps) {
                   href="/auth/signup"
                   className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-brand-turquoise-600 hover:bg-brand-turquoise-700 text-white text-sm font-semibold rounded-xl transition-colors"
                 >
-                  Create free account
+                  {ctaLabel}
                 </Link>
                 <button
                   onClick={onClose}

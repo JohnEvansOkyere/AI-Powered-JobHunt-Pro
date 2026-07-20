@@ -19,8 +19,11 @@ import {
 import { toast } from 'react-hot-toast'
 import { searchJobs, type Job, type JobSearchParams } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
+import { useAuth } from '@/hooks/useAuth'
+import { PostApplyModal } from '@/components/jobs/PostApplyModal'
 
 const PAGE_SIZE = 20
+const SIGNUP_PROMPT_DISMISSED_KEY = 'veloxahire:public-jobs-signup-prompt-dismissed'
 
 type ViewMode = 'all' | 'recruiter'
 
@@ -231,6 +234,7 @@ function JobCard({ job, saved, onSave }: { job: Job; saved: boolean; onSave: (id
 }
 
 export default function JobsClient() {
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [query, setQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
@@ -244,6 +248,29 @@ export default function JobsClient() {
   const [loading, setLoading] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return
+
+    try {
+      if (window.sessionStorage.getItem(SIGNUP_PROMPT_DISMISSED_KEY) === 'true') return
+    } catch {
+      // Continue if browser storage is unavailable.
+    }
+
+    const timer = window.setTimeout(() => setShowSignupPrompt(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [authLoading, isAuthenticated])
+
+  const closeSignupPrompt = () => {
+    setShowSignupPrompt(false)
+    try {
+      window.sessionStorage.setItem(SIGNUP_PROMPT_DISMISSED_KEY, 'true')
+    } catch {
+      // The prompt is still dismissible if browser storage is unavailable.
+    }
+  }
 
   useEffect(() => {
     setPage(1)
@@ -313,7 +340,15 @@ export default function JobsClient() {
   }
 
   return (
-    <main className="min-h-screen bg-cream-50 text-ink-900">
+    <>
+      <PostApplyModal
+        open={showSignupPrompt}
+        onClose={closeSignupPrompt}
+        heading="Sign up now for tailored roles"
+        description="Create a free profile and get jobs ranked around your experience, skills, and career goals."
+        ctaLabel="Sign up for tailored roles"
+      />
+      <main className="min-h-screen bg-cream-50 text-ink-900">
       <header className="border-b border-ink-900/10 bg-forest-700 text-cream-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <Link href="/" className="text-lg font-semibold tracking-tight">
@@ -500,6 +535,7 @@ export default function JobsClient() {
           </Link>
         </aside>
       </section>
-    </main>
+      </main>
+    </>
   )
 }
