@@ -162,6 +162,12 @@ export default function HomePage() {
                 Browse jobs
               </Link>
               <Link
+                href="/remote-jobs"
+                className="text-cream-100/70 hover:text-cream-100 transition-colors"
+              >
+                Remote jobs
+              </Link>
+              <Link
                 href="#how"
                 className="text-cream-100/70 hover:text-cream-100 transition-colors"
               >
@@ -221,6 +227,7 @@ export default function HomePage() {
             <div className="md:hidden border-t border-cream-100/10 py-4 space-y-2 text-sm">
               {[
                 ['Browse jobs', '/jobs'],
+                ['Remote jobs', '/remote-jobs'],
                 ['How it works', '#how'],
                 ['Features', '#features'],
                 ['FAQ', '#faq'],

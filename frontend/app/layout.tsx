@@ -16,9 +16,12 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.org'),
-  title: 'VeloxaHire — AI that finds the job that fits you',
+  title: 'AI Job Search & Personalized Job Matching | VeloxaHire',
   description:
-    'VeloxaHire reads your profile and CV, understands your intent, and surfaces the roles most worth your time. Part of the Veloxa family.',
+    'Browse remote and recruiter-posted jobs, then use your CV and profile to find the roles most worth your time with VeloxaHire.',
+  alternates: {
+    canonical: '/',
+  },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
@@ -32,7 +35,7 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'VeloxaRecruit — AI-Powered Recruitment',
+        alt: 'VeloxaHire — AI job search and personalized job matching',
       },
     ],
   },

@@ -112,12 +112,14 @@ Sidebar:
 
 Public:
   Browse Jobs       → /jobs                          (anonymous browse/search/filter)
+  Remote Jobs       → /remote-jobs                    (SEO landing page with current remote roles)
   Job Detail        → /jobs/[id]                     (anonymous SEO-indexed detail + public apply link)
 ```
 
 ### Key page decisions
 - **Job Match** shows only tier1 (Highly recommended) and tier2 (Likely a fit) — tier3 "All roles" was removed 2026-05-20
 - **Public Jobs** lives at `/jobs` and `/jobs/[id]` — anonymous users can browse, view details, and open public apply links
+- **Remote Jobs** lives at `/remote-jobs` — server-rendered search-intent page with current eligible remote listings and application guidance
 - **All Jobs** under `/dashboard/jobs` remains the authenticated dashboard browse surface
 - **Apply for anonymous users** opens the public recruiter/source apply link; signup prompts sell recommendations/tracking after intent
 - **Recommendations** (Job Match) remain behind auth — AI matching requires a profile
@@ -126,9 +128,10 @@ Public:
 
 ## 7. Anonymous / Public Access
 
-As of 2026-06-20:
+As of 2026-07-20:
 - `/jobs` is the public browse-first job board. Anonymous visitors can search, filter, and view jobs.
-- `/jobs/[id]` is the public job detail route with per-job metadata and `JobPosting` JSON-LD.
+- `/remote-jobs` is a public SEO landing page with current remote job links and guidance that remote does not always mean worldwide.
+- `/jobs/[id]` is the public job detail route with per-job metadata; only processed, complete jobs with a posting date and apply URL are indexable and emit `JobPosting` JSON-LD.
 - Backend `GET /api/v1/jobs/` uses **optional auth** (`get_optional_user`) — no token = jobs still returned.
 - Backend `GET /api/v1/jobs/{job_id}` is public for non-archived jobs, so public detail pages work without login.
 - Public Apply links remain open. Candidates can leave to the recruiter/source application page without creating an account.
@@ -151,6 +154,9 @@ As of 2026-06-20:
 | Sidebar nav | `frontend/components/layout/DashboardLayout.tsx` |
 | Public jobs list | `frontend/app/jobs/page.tsx`, `frontend/app/jobs/JobsClient.tsx` |
 | Public job detail | `frontend/app/jobs/[id]/page.tsx` |
+| Remote jobs SEO page | `frontend/app/remote-jobs/page.tsx` |
+| SEO crawl controls | `frontend/app/robots.ts`, `frontend/app/sitemap.ts` |
+| Public sitemap projection | `backend/app/api/v1/endpoints/jobs.py::get_job_sitemap` |
 | Job Match page | `frontend/app/dashboard/recommendations/page.tsx` |
 | All Jobs page | `frontend/app/dashboard/jobs/page.tsx` |
 | Job card | `frontend/components/jobs/JobCard.tsx` |
@@ -186,6 +192,7 @@ As of 2026-06-20:
 | Recruiter job posting from inside VeloxaHire (native) | Deferred (plan exists in docs/RECRUITER_JOB_POSTINGS_PLAN.md) |
 | "Add job by URL" → tailored CV/cover letter (`source='external'`) | **Retired 2026-07-13** — Evans confirmed it is not coming back. Endpoints unmounted + deleted, orphan rows purged. `external_job_parser.py` service is now dead code (kept only because `test_production_hardening.py` exercises its SSRF guards) — safe to delete with those tests if desired |
 | Job retention: "nothing older than 7 days" is not literally true | By design. `cleanup_old_jobs` skips (a) `source='recruiter'` (ATS-owned lifecycle) and (b) any job with an application (protects user history). 3 aged scraped rows currently persist in browse for reason (b) — Evans chose 2026-07-13 to keep this behaviour rather than hide them from browse |
+| SEO launch verification | Open: deploy and verify `robots.txt`, `sitemap.xml`, canonical URLs, Search Console indexing, and JobPosting enhancements on production |
 | CLAUDE.md §10 "production readiness" P0 list is stale | Lists SSRF + public tailored-CV URLs as open blockers; both were closed 2026-06-02 (see rows above). Misleads fresh agent sessions — needs a rewrite against current code |
 
 ---
@@ -241,3 +248,5 @@ As of 2026-06-20:
 | 2026-07-13 | **Scraping overhaul: 4 working sources → 13 scheduled sources incl. Ghana/Africa boards + non-tech roles.** Evans asked for "as many job sources as possible — Ghana, Africa, the world" and non-IT coverage. First diagnosed why 3 of 4 scheduled free sources yielded zero: Remotive's API host moved (`remotive.io` → Cloudflare 526; fixed to `remotive.com`), RemoteOK's `date` field is ISO-8601 but the parser expected a unix epoch (`posted_date` → NULL → discarded by the freshness filter; now parses `epoch` with ISO fallback + formats `salary_min/max`), Joinrise's entire site+API are dead (503) — removed from the schedule (scraper still registered, fails gracefully). **New scrapers** (all free, no key): `jobicy_scraper.py`, `himalayas_scraper.py`, `themuse_scraper.py` (strong non-tech), `workingnomads_scraper.py` (JSON APIs); `weworkremotely_scraper.py`, `jobwebghana_scraper.py`, `myjobmag_scraper.py` (RSS/XML via shared `feed_utils.py` — RFC-822 dates, mojibake fix for MyJobMag's double-encoded latin-1). MyJobMag is parametrized per country: `myjobmag` (Ghana — **feed currently stale**, newest item Feb 2026, kept because it auto-recovers), `myjobmag_ng` (Nigeria), `myjobmag_ke` (Kenya), `myjobmag_za` (South Africa) — NG/KE/ZA feeds are fresh to the hour. **Keywords**: new `app/constants/general_keywords.py` (customer support, digital marketing, sales, finance, HR, admin, logistics, healthcare, education, hospitality, non-software engineering…); scheduled scrape now uses `ALL_JOB_KEYWORDS` (tech + general). **Ingest window widened 3d → 7d** to match the 7-day retention (3d yielded 193 jobs across sources, 7d yields 293; also the 3-day window starved slower boards). All new date parsers return **naive UTC** (the service freshness filter compares `datetime.utcnow()`; tz-aware values would raise). Live end-to-end run of `scheduler.scrape_recent_jobs` against prod: **509 found, 429 stored, 80 duplicates** — index went 116 → 547 jobs (arbeitnow 96, jobicy 94, myjobmag_ke 77, myjobmag_ng 76, myjobmag_za 56, recruiter 42, remoteok 28, weworkremotely 19, himalayas 19, remotive 14, jobwebghana 10, serpapi 8, workingnomads 5, themuse 3). Embeddings couldn't queue from local (no broker) so ran `scripts/maintenance/backfill_embeddings.py --jobs-only` for the 469 missing — **blocked: Gemini prepay credits depleted (HTTP 429 RESOURCE_EXHAUSTED) and no OpenAI fallback key locally; prod droplet uses the same Gemini key so new-job embeddings are failing there too. Evans must top up Gemini (or fund OpenAI + flip AI_EMBEDDING_PROVIDER) then re-run the idempotent backfill on the droplet.** Docs: rewrote "Current Sources" in `docs/features/jobs/JOB_SCRAPING_GUIDE.md`. Tests: hardening/recs/privacy/sanitizer suites pass; only failure is the documented flaky `test_ai_router` env-key leak (CLAUDE.md §8). Frontend untouched (`type-check` clean) — it only special-cases `source==='recruiter'`. | Evans wanted Ghana + Africa + worldwide sources and all role types (IT, customer support, digital marketing, etc.) built in and verified working; the prior index was 76 scraped jobs from effectively 2 sources |
 | 2026-07-13 | **Embedding backfill completed after Gemini top-up; healed a split-brain model mix.** Evans topped up Gemini prepay credits (took effect immediately — verified with a live `embed_one` call). Ran `scripts/maintenance/backfill_embeddings.py --jobs-only`: 469 embedded, 0 failed → all 547 jobs have embeddings. Found 75 rows tagged `text-embedding-3-small`: while Gemini credits were depleted, the **droplet worker's OpenAI write-path fallback** embedded newly scraped jobs under the OpenAI tag, and since the matcher only compares vectors with the same model tag as the user's embedding (`recommendation_engine_v2.py:704`, users are all `gemini-embedding-001`), those 75 jobs were invisible to recommendations. The backfill skips them (source_hash unchanged), so they were force re-embedded individually via `upsert_job_embedding(force=True)` → **all 547 job embeddings + 1 user embedding now uniformly `gemini-embedding-001`**. **Recurring gotcha:** any future Gemini quota outage will silently re-create mixed tags via the fallback — after restoring Gemini, always check `select model, count(*) from job_embeddings group by model` and force re-embed the minority tag. | Gemini credits ran out (discovered during the scraping overhaul); Evans paid, asked to complete the embedding side so the 429 new jobs participate in recommendations |
 | 2026-07-20 | Added a top-level “Save all changes” action to the guided profile setup, and added a five-second, session-dismissible signup modal on the anonymous jobs page with tailored-role benefits. Extended the shared signup modal to support contextual headings, descriptions, and CTA labels. Files: `frontend/components/profile/ProfileForm.tsx`, `frontend/app/jobs/JobsClient.tsx`, `frontend/components/jobs/PostApplyModal.tsx` | Let candidates save the complete profile from any setup step and convert public job browsing into signup intent without blocking anonymous access |
+| 2026-07-20 | Started the Google Search SEO foundation. Added `frontend/app/robots.ts`, dynamic `frontend/app/sitemap.ts`, backend `get_job_sitemap` projection and rate limit, canonical metadata, improved root search title/description, and conditional `JobPosting` JSON-LD/noindex rules for incomplete jobs. Added `docs/audits/SEO_AUDIT_2026_07_20.md`; frontend type-check/build passed and backend files compiled. | Make public job pages discoverable while keeping stale, incomplete, or non-applyable listings out of the index-quality path |
+| 2026-07-20 | Added the first search-intent SEO page at `/remote-jobs`. It server-renders eligible remote listings from the public jobs API, links to job detail pages, explains location/time-zone eligibility, adds sitemap coverage, and is linked from the homepage and `/jobs`. Frontend type-check/build passed. | Create a useful landing page for remote-job searches instead of relying only on dynamic job detail URLs |

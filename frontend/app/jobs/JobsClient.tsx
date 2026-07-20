@@ -375,6 +375,10 @@ export default function JobsClient() {
               <p className="mt-4 text-cream-100/75 text-lg max-w-2xl leading-relaxed">
                 Search recruiter-posted roles and curated listings before creating an account. Sign up when you want AI recommendations, saved jobs, and application tracking.
               </p>
+              <Link href="/remote-jobs" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ember-300 hover:text-cream-100">
+                Explore remote jobs
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
             <div className="rounded-2xl border border-cream-100/15 bg-cream-100/10 p-4">
               <div className="flex items-start gap-3">
