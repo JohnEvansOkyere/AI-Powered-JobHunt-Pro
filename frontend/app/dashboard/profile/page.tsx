@@ -24,7 +24,7 @@ import {
   X,
   Plus,
   Trash2,
-  Sparkles,
+  Bot,
 } from 'lucide-react'
 
 type SectionKey =
@@ -188,7 +188,7 @@ function CompletionCard({ percentage }: { percentage: number }) {
         </div>
         <div className="flex items-center gap-1.5">
           {isDone && (
-            <Sparkles className="w-3.5 h-3.5 text-brand-turquoise-600" />
+            <Check className="w-3.5 h-3.5 text-brand-turquoise-600" />
           )}
           <span className="text-lg font-semibold text-neutral-900 tabular-nums">
             {percentage}%
@@ -874,7 +874,7 @@ function AIPreferencesSection({
 
   return (
     <EditableSection
-      icon={<Sparkles className="h-4 w-4" />}
+      icon={<Bot className="h-4 w-4" />}
       title="AI preferences"
       empty={isEmpty}
       isEditing={isEditing}

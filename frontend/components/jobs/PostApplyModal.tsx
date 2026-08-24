@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { X, Sparkles, Bell, BarChart2, BookmarkCheck } from 'lucide-react'
+import { X, Target, Bell, BarChart2, BookmarkCheck } from 'lucide-react'
 
 interface PostApplyModalProps {
   open: boolean
@@ -14,7 +14,7 @@ interface PostApplyModalProps {
 
 const VALUE_PROPS = [
   {
-    icon: Sparkles,
+    icon: Target,
     title: 'AI-matched roles, just for you',
     body: 'Our AI reads your profile and ranks every job by how well it fits — no more scrolling through irrelevant listings.',
   },
