@@ -21,6 +21,7 @@ celery_app = Celery(
         "app.tasks.periodic_tasks",
         "app.tasks.embeddings",
         "app.tasks.whatsapp_digest",
+        "app.tasks.email_digest",
     ],
 )
 
@@ -66,6 +67,12 @@ celery_app.conf.beat_schedule = {
     "dispatch-whatsapp-digests-hourly": {
         "task": "notifications.dispatch_whatsapp_digests",
         "schedule": crontab(minute=0),
+    },
+    # Send recommendation digests to opted-in email subscribers. Offset from
+    # the WhatsApp sweep so the two dispatchers don't contend for the pool.
+    "dispatch-email-digests-hourly": {
+        "task": "notifications.dispatch_email_digests",
+        "schedule": crontab(minute=30),
     },
     # Daily cleanups — staggered so they don't all hit SessionLocal at once
     "cleanup-expired-saved-jobs-daily": {

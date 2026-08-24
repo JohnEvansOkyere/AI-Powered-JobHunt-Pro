@@ -463,9 +463,10 @@ CREATE INDEX IF NOT EXISTS idx_user_embeddings_model
     ON user_embeddings(model);
 
 -- =====================================================
--- PART 9: WHATSAPP NOTIFICATIONS
+-- PART 9: NOTIFICATIONS (WHATSAPP + EMAIL)
 -- =====================================================
--- Stores opt-in preferences and WhatsApp delivery audit records.
+-- Stores per-channel opt-in preferences and delivery audit records.
+-- Mirrors migrations/009_add_whatsapp.sql and 018_add_email_digests.sql.
 
 CREATE TABLE IF NOT EXISTS notification_preferences (
     user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
@@ -483,6 +484,28 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
     whatsapp_timezone TEXT NOT NULL DEFAULT 'UTC',
     whatsapp_opted_out_at TIMESTAMP WITH TIME ZONE,
     whatsapp_paused_until TIMESTAMP WITH TIME ZONE,
+    -- Email channel (migration 018).
+    email_opted_in BOOLEAN NOT NULL DEFAULT FALSE,
+    email_opted_in_at TIMESTAMP WITH TIME ZONE,
+    email_opt_in_source TEXT
+        CHECK (
+            email_opt_in_source IS NULL
+            OR email_opt_in_source IN ('signup', 'profile_page', 'admin')
+        ),
+    email_address TEXT,
+    email_verified_at TIMESTAMP WITH TIME ZONE,
+    email_digest_time_local TEXT NOT NULL DEFAULT '07:00'
+        CHECK (email_digest_time_local ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+    email_timezone TEXT NOT NULL DEFAULT 'UTC',
+    email_locale TEXT NOT NULL DEFAULT 'en'
+        CHECK (email_locale IN ('en', 'twi')),
+    email_digest_frequency TEXT NOT NULL DEFAULT 'daily'
+        CHECK (email_digest_frequency IN ('daily', 'weekly')),
+    email_digest_weekday SMALLINT NOT NULL DEFAULT 1
+        CHECK (email_digest_weekday BETWEEN 0 AND 6),
+    email_opted_out_at TIMESTAMP WITH TIME ZONE,
+    email_paused_until TIMESTAMP WITH TIME ZONE,
+    email_unsubscribe_token TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -493,6 +516,12 @@ CREATE INDEX IF NOT EXISTS idx_notification_preferences_opted_in
 CREATE INDEX IF NOT EXISTS idx_notification_preferences_phone
     ON notification_preferences(whatsapp_phone_e164)
     WHERE whatsapp_phone_e164 IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_email_opted_in
+    ON notification_preferences(email_opted_in)
+    WHERE email_opted_in = TRUE;
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_email_address
+    ON notification_preferences(LOWER(email_address))
+    WHERE email_address IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -538,6 +567,48 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_incoming_events_user
     WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_whatsapp_incoming_events_received_at
     ON whatsapp_incoming_events(received_at DESC);
+
+CREATE TABLE IF NOT EXISTS email_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    email_address TEXT NOT NULL,
+    template_name TEXT NOT NULL,
+    locale TEXT NOT NULL DEFAULT 'en',
+    subject TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    idempotency_key TEXT UNIQUE,
+    provider_message_id TEXT,
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN (
+            'queued', 'sent', 'delivered', 'opened', 'clicked',
+            'bounced', 'complained', 'failed', 'rate_limited', 'opt_out_blocked'
+        )),
+    job_count INTEGER NOT NULL DEFAULT 0,
+    error_code TEXT,
+    error_message TEXT,
+    sent_at TIMESTAMP WITH TIME ZONE,
+    delivered_at TIMESTAMP WITH TIME ZONE,
+    opened_at TIMESTAMP WITH TIME ZONE,
+    clicked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_messages_user_id ON email_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_messages_status ON email_messages(status);
+CREATE INDEX IF NOT EXISTS idx_email_messages_created_at ON email_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_messages_provider_id ON email_messages(provider_message_id)
+    WHERE provider_message_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_email_messages_addr_created
+    ON email_messages(LOWER(email_address), created_at DESC);
+
+-- Addresses we must never mail again. Checked before every send.
+CREATE TABLE IF NOT EXISTS email_suppressions (
+    email_address TEXT PRIMARY KEY,
+    reason TEXT NOT NULL
+        CHECK (reason IN ('hard_bounce', 'complaint', 'manual', 'invalid')),
+    detail TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
 -- =====================================================
 -- PART 9B: FIRST-PARTY PRODUCT ANALYTICS
@@ -644,6 +715,8 @@ ALTER TABLE user_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE whatsapp_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE whatsapp_incoming_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_suppressions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scraping_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_sessions ENABLE ROW LEVEL SECURITY;
@@ -776,6 +849,13 @@ DROP POLICY IF EXISTS "Users can view own WhatsApp incoming events" ON whatsapp_
 CREATE POLICY "Users can view own WhatsApp incoming events"
     ON whatsapp_incoming_events FOR SELECT
     USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can view own email messages" ON email_messages;
+CREATE POLICY "Users can view own email messages"
+    ON email_messages FOR SELECT
+    USING (auth.uid() = user_id);
+
+-- email_suppressions has RLS on and no policy: service-role access only.
 
 -- Scraping Jobs Policies
 DROP POLICY IF EXISTS "Users can view own scraping jobs" ON scraping_jobs;

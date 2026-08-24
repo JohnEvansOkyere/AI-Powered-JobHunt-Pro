@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     applications,
     recommendations,
     whatsapp,
+    email_notifications,
     ops,
     analytics,
     admin,
@@ -44,3 +45,11 @@ api_router.include_router(
     whatsapp.router_notifications, prefix="/notifications", tags=["notifications"]
 )
 api_router.include_router(whatsapp.router_webhooks, prefix="/webhooks", tags=["webhooks"])
+api_router.include_router(
+    email_notifications.router_notifications,
+    prefix="/notifications",
+    tags=["notifications"],
+)
+api_router.include_router(
+    email_notifications.router_webhooks, prefix="/webhooks", tags=["webhooks"]
+)

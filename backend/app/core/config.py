@@ -334,6 +334,89 @@ class Settings(BaseSettings):
         description="If True, log OTP codes at WARNING (local dev only; never enable in production).",
     )
 
+    # ---- Email digests via Resend (docs/features/EMAIL_JOB_DIGEST.md) ----
+    # Same safety shape as WhatsApp: EMAIL_ENABLED is the master switch and
+    # EMAIL_SEND_MODE="dry_run" logs the payload instead of calling Resend, so
+    # CI and local dev exercise the whole path without touching the network.
+    EMAIL_ENABLED: bool = Field(
+        default=False,
+        description="Master switch. Set True only once the sending domain is verified.",
+    )
+    EMAIL_SEND_MODE: str = Field(
+        default="dry_run",
+        description="Send mode: 'live' (call Resend) or 'dry_run' (log + skip).",
+    )
+    RESEND_API_KEY: str = Field(
+        default="",
+        description="Resend API key (re_...). Required when EMAIL_SEND_MODE='live'.",
+    )
+    RESEND_WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Svix signing secret (whsec_...) for Resend delivery/bounce webhooks.",
+    )
+    EMAIL_FROM_ADDRESS: str = Field(
+        default="jobs@veloxahire.com",
+        description="Envelope + header From address. Must be on a Resend-verified domain.",
+    )
+    EMAIL_FROM_NAME: str = Field(
+        default="VeloxaHire Jobs",
+        description="Display name shown in the recipient's inbox.",
+    )
+    EMAIL_REPLY_TO: str = Field(
+        default="",
+        description="Optional Reply-To. Empty means replies go to EMAIL_FROM_ADDRESS.",
+    )
+    API_PUBLIC_URL: str = Field(
+        default="http://localhost:8000",
+        description="Public backend URL. Backs one-click unsubscribe links in emails.",
+    )
+    EMAIL_POSTAL_ADDRESS: str = Field(
+        default="",
+        description="Physical mailing address shown in the footer (CAN-SPAM requirement).",
+    )
+
+    # Guardrails — mirror the WhatsApp caps.
+    EMAIL_MAX_SENDS_PER_DAY: int = Field(
+        default=10000,
+        description="Global daily circuit breaker across all users.",
+    )
+    EMAIL_MAX_SENDS_PER_USER_PER_DAY: int = Field(
+        default=1,
+        description="Per-user cap. Stops a re-run bug from spamming a candidate.",
+    )
+    EMAIL_PROVIDER_RPS: int = Field(
+        default=8,
+        description="Client-side rate limit (requests/sec) against the Resend API.",
+    )
+    EMAIL_DIGEST_MAX_JOBS: int = Field(
+        default=6,
+        description="Maximum recommended jobs included in one digest email.",
+    )
+    EMAIL_DIGEST_MIN_JOBS: int = Field(
+        default=2,
+        description="Below this many matches we skip the send rather than mail a thin digest.",
+    )
+    EMAIL_DEFAULT_LOCALE: str = Field(
+        default="en",
+        description="Language pack used when a user has no explicit choice: en | twi.",
+    )
+
+    @field_validator("EMAIL_SEND_MODE", mode="before")
+    @classmethod
+    def _validate_email_send_mode(cls, v) -> str:
+        allowed = {"live", "dry_run"}
+        if isinstance(v, str) and v.strip().lower() in allowed:
+            return v.strip().lower()
+        return "dry_run"
+
+    @field_validator("EMAIL_DEFAULT_LOCALE", mode="before")
+    @classmethod
+    def _validate_email_locale(cls, v) -> str:
+        allowed = {"en", "twi"}
+        if isinstance(v, str) and v.strip().lower() in allowed:
+            return v.strip().lower()
+        return "en"
+
     @field_validator("WHATSAPP_SEND_MODE", mode="before")
     @classmethod
     def _validate_send_mode(cls, v) -> str:
