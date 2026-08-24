@@ -18,6 +18,7 @@ export interface Job {
   source_url?: string | null  // New field for external jobs
   posted_date: string | null
   scraped_at: string
+  application_deadline?: string | null  // Closing date for ALX digest imports
   added_by_user_id?: string | null  // User who added external job
   normalized_title: string | null
   normalized_location: string | null
@@ -42,6 +43,7 @@ export interface Job {
 export interface JobSearchParams {
   q?: string
   source?: string
+  scope?: 'local'  // 'local' = Ghana-local jobs (recruiter + ALX digest)
   location?: string
   job_type?: string
   remote_type?: string
@@ -101,6 +103,7 @@ export async function searchJobs(params: JobSearchParams = {}): Promise<JobSearc
   
   if (params.q) queryParams.append('q', params.q)
   if (params.source) queryParams.append('source', params.source)
+  if (params.scope) queryParams.append('scope', params.scope)
   if (params.location) queryParams.append('location', params.location)
   if (params.job_type) queryParams.append('job_type', params.job_type)
   if (params.remote_type) queryParams.append('remote_type', params.remote_type)

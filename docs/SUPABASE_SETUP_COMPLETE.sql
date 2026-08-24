@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     source_url TEXT, -- Original URL for external/user-added jobs
     posted_date TIMESTAMP WITH TIME ZONE,
     scraped_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    application_deadline TIMESTAMP WITH TIME ZONE, -- Closing date (ALX digest imports)
     added_by_user_id UUID,
 
     -- Upstream origin (for recruiter jobs mirrored from ATS)
@@ -245,6 +246,8 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS publication_status TEXT;
 -- Indexes for jobs
 CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted_date ON jobs(posted_date DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_application_deadline ON jobs(application_deadline) WHERE application_deadline IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_jobs_source_posted_date ON jobs(source, posted_date DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_processing_status ON jobs(processing_status);
 DROP INDEX IF EXISTS idx_jobs_title_company;
 CREATE INDEX IF NOT EXISTS idx_jobs_title_trgm ON jobs USING gin(title gin_trgm_ops);

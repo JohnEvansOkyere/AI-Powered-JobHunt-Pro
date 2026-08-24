@@ -33,6 +33,7 @@ class Job(Base):
     source_url = Column(Text, nullable=True)  # Original URL for external jobs
     posted_date = Column(TIMESTAMP(timezone=True), nullable=True, index=True)
     scraped_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    application_deadline = Column(TIMESTAMP(timezone=True), nullable=True, index=True)
     added_by_user_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # User who added external job
 
     # Upstream origin (for recruiter jobs mirrored from the ATS)

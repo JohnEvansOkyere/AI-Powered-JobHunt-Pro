@@ -64,6 +64,11 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
                 Direct role
               </span>
             )}
+            {job.source === 'alx' && (
+              <span className="inline-flex items-center text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100 rounded-md px-1.5 py-0.5">
+                Ghana
+              </span>
+            )}
           </div>
           <h3 className="text-base font-semibold text-neutral-900 leading-snug">
             {job.title}

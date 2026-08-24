@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from app.core.database import get_db
@@ -28,9 +28,14 @@ from app.models.scraping_job import ScrapingJob
 from app.services.job_scraper_service import JobScraperService
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, Field, field_serializer
+from app.services.alx_job_importer import ALX_SOURCE
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+# The Local Jobs board serves Ghana-local listings from both sources.
+LOCAL_JOB_SOURCES = ("recruiter", ALX_SOURCE)
+LOCAL_JOB_SCOPES = {"local"}
 scraper_service = JobScraperService()
 
 
@@ -143,6 +148,10 @@ async def search_jobs(
     request: Request,
     q: Optional[str] = Query(None, description="Search query (title, company, description)"),
     source: Optional[str] = Query(None, description="Filter by source"),
+    scope: Optional[str] = Query(
+        None,
+        description="Job scope. 'local' returns Ghana-local jobs (recruiter + ALX digest).",
+    ),
     location: Optional[str] = Query(None, description="Filter by location"),
     job_type: Optional[str] = Query(None, description="Filter by job type"),
     remote_type: Optional[str] = Query(None, description="Filter by remote type"),
@@ -179,6 +188,23 @@ async def search_jobs(
     # Source filter
     if source:
         query = query.filter(Job.source == source.lower())
+
+    # Scope filter: the Local Jobs board serves Ghana-local listings, which are
+    # recruiter jobs mirrored from the ATS plus jobs imported from the weekly
+    # ALX Ghana digest. Expired ALX listings drop off automatically.
+    if scope:
+        normalized_scope = scope.lower()
+        if normalized_scope not in LOCAL_JOB_SCOPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported scope '{scope}'. Supported: {sorted(LOCAL_JOB_SCOPES)}",
+            )
+        query = query.filter(Job.source.in_(LOCAL_JOB_SOURCES)).filter(
+            or_(
+                Job.application_deadline.is_(None),
+                Job.application_deadline >= datetime.now(timezone.utc),
+            )
+        )
     
     # Location filter
     if location:
