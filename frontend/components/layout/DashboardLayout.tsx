@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   BarChart3,
   Users,
+  FileUp,
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -39,6 +40,7 @@ const navigation = [
 const adminNavigation = [
   { name: 'Analytics', href: '/dashboard/admin', icon: BarChart3 },
   { name: 'Users', href: '/dashboard/admin/users', icon: Users },
+  { name: 'Job imports', href: '/dashboard/admin/job-imports', icon: FileUp },
 ]
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {

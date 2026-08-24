@@ -96,3 +96,59 @@ export function revokeAdminUser(userId: string) {
     warning?: string | null
   }>(`/api/v1/admin/users/${userId}`)
 }
+
+export type AlxEntryStatus = 'new' | 'already_imported' | 'duplicate_of_scraped'
+
+export interface AlxDigestEntry {
+  index: number
+  company: string
+  title: string
+  apply_url: string
+  deadline: string | null
+  origin_job_id: string
+  raw_headline: string
+  status: AlxEntryStatus
+  existing_job_id?: string
+  existing_source?: string
+}
+
+export interface AlxDigestPreview {
+  filename: string
+  parsed: number
+  counts: Partial<Record<AlxEntryStatus, number>>
+  entries: AlxDigestEntry[]
+}
+
+export interface AlxImportResult {
+  stats: {
+    parsed: number
+    created: number
+    updated: number
+    skipped_duplicate: number
+    skipped_expired: number
+    enrichment_failed: number
+    errors: string[]
+  }
+  jobs: Array<{ job_id: string; title: string; company: string; created: boolean }>
+}
+
+export function previewAlxDigest(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiClient.post<AlxDigestPreview>('/api/v1/admin/job-imports/alx/preview', form)
+}
+
+export function commitAlxDigest(entries: AlxDigestEntry[], enrich = true) {
+  const payload = {
+    enrich,
+    entries: entries.map((entry) => ({
+      index: entry.index,
+      company: entry.company,
+      title: entry.title,
+      apply_url: entry.apply_url,
+      deadline: entry.deadline,
+      raw_headline: entry.raw_headline,
+    })),
+  }
+  return apiClient.post<AlxImportResult>('/api/v1/admin/job-imports/alx/commit', payload)
+}

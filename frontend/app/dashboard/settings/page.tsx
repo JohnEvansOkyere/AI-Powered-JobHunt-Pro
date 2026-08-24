@@ -2,6 +2,7 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { EmailDigestSettings } from '@/components/settings/EmailDigestSettings'
 import {
   getWhatsappStatus,
   optOutWhatsapp,
@@ -349,6 +350,9 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+
+            {/* Job match emails */}
+            <EmailDigestSettings />
 
             {/* Privacy & Security */}
             <div className="card p-6">

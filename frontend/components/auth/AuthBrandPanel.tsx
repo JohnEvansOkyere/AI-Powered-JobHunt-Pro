@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Sparkles } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 
 const POINTS = [
   'Get a shortlist ranked against your CV — skip the endless scrolling.',
@@ -72,7 +72,7 @@ export default function AuthBrandPanel({ variant }: { variant: 'signup' | 'login
       <div className="relative z-10 flex h-full flex-col justify-center px-14 py-16 xl:px-20">
         {/* Logo */}
         <Link href="/" className="group mb-12 inline-flex w-fit items-center gap-3">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-cream-100/15 bg-cream-100/10 backdrop-blur-md transition-all group-hover:scale-105 group-hover:bg-cream-100/15">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-cream-100 transition-all group-hover:scale-105">
             <Image src="/logo.png" alt="VeloxaHire" width={26} height={26} className="object-contain" priority />
           </div>
           <span className="font-display text-xl font-semibold tracking-tight">
@@ -82,7 +82,6 @@ export default function AuthBrandPanel({ variant }: { variant: 'signup' | 'login
 
         {/* Eyebrow */}
         <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-cream-100/15 bg-cream-100/5 px-4 py-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-ember-400" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ember-400">
             AI job matching for candidates
           </span>

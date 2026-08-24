@@ -10,6 +10,8 @@ from app.models.application import Application
 from app.models.scraping_job import ScrapingJob
 from app.models.embeddings import JobEmbedding, UserEmbedding
 from app.models.notification import (
+    EmailMessage,
+    EmailSuppression,
     NotificationPreferences,
     WhatsappIncomingEvent,
     WhatsappMessage,
@@ -28,6 +30,8 @@ __all__ = [
     "JobEmbedding",
     "UserEmbedding",
     "NotificationPreferences",
+    "EmailMessage",
+    "EmailSuppression",
     "WhatsappMessage",
     "WhatsappIncomingEvent",
     "AnalyticsEvent",

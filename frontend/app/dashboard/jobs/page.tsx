@@ -165,7 +165,7 @@ function JobsPageContent() {
       } else {
         // Search mode: server-side filtering.
         const params: JobSearchParams = { page, page_size: PAGE_SIZE }
-        if (isJobBoard) params.source = 'recruiter'
+        if (isJobBoard) params.scope = 'local'
         if (filters.jobTitle) params.q = filters.jobTitle
         else if (appliedSearchQuery) params.q = appliedSearchQuery
         if (filters.location) params.location = filters.location
@@ -268,7 +268,7 @@ function JobsPageContent() {
   const pageDescription = activeTier
     ? TIER_META[activeTier].description
     : isJobBoard
-      ? 'Direct roles posted by recruiters in our ecosystem.'
+      ? 'Roles based in Ghana — posted directly by recruiters or curated from the ALX Ghana community digest.'
       : 'Browse the full index, including scraped opportunities.'
 
   const hasActiveFilters = useMemo(() => {

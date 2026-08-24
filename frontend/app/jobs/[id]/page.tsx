@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Bookmark, Briefcase, Building2, Clock, MapPin, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Briefcase, Building2, Clock, MapPin } from 'lucide-react'
 import type { Job } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
 
@@ -132,12 +133,16 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       )}
       <header className="border-b border-ink-900/10 bg-forest-700 text-cream-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
-            Veloxa<span className="text-ember-300">Hire</span>
+          <Link href="/" className="inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-cream-100">
+              <Image src="/logo.png" alt="" width={20} height={20} priority className="object-contain" />
+            </span>
+            <span>
+              Veloxa<span className="text-ember-300">Hire</span>
+            </span>
           </Link>
           <Link href="/auth/signup" className="inline-flex items-center gap-1.5 rounded-full bg-cream-100 px-4 py-2 text-sm font-semibold text-ink-900 hover:bg-cream-50">
             Get recommendations
-            <Sparkles className="h-3.5 w-3.5" />
           </Link>
         </div>
       </header>

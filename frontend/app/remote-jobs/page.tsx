@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Briefcase, Globe2, MapPin, Sparkles } from 'lucide-react'
+import { ArrowRight, Briefcase, Globe2, MapPin } from 'lucide-react'
 import type { Job, JobSearchResponse } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
 
@@ -120,8 +121,13 @@ export default async function RemoteJobsPage() {
     <main className="min-h-screen bg-cream-50 text-ink-900">
       <header className="bg-forest-700 text-cream-100">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
-            Veloxa<span className="text-ember-300">Hire</span>
+          <Link href="/" className="inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-cream-100">
+              <Image src="/logo.png" alt="" width={20} height={20} priority className="object-contain" />
+            </span>
+            <span>
+              Veloxa<span className="text-ember-300">Hire</span>
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/jobs" className="text-sm text-cream-100/75 hover:text-cream-100">
@@ -132,7 +138,6 @@ export default async function RemoteJobsPage() {
               className="inline-flex items-center gap-1.5 rounded-full bg-cream-100 px-4 py-2 text-sm font-semibold text-ink-900 hover:bg-cream-50"
             >
               Get recommendations
-              <Sparkles className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
