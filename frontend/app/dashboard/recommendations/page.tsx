@@ -10,6 +10,7 @@ import {
   type Tier,
 } from '@/lib/api/recommendations'
 import { saveJob, markJobApplied } from '@/lib/api/applications'
+import { createCVGeneration } from '@/lib/api/cv-generations'
 import {
   Star,
   Zap,
@@ -24,8 +25,10 @@ import {
   ArrowRight,
   BadgeCheck,
   ChevronRight,
+  FilePenLine,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -117,9 +120,11 @@ interface RecCardProps {
   savedSet: Set<string>
   onSave: (jobId: string) => void
   onApply: (jobId: string) => void
+  onTailor: (jobId: string) => void
+  tailoring: boolean
 }
 
-function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
+function RecCard({ item, savedSet, onSave, onApply, onTailor, tailoring }: RecCardProps) {
   const job = item.job
   const url = applyUrl(item)
   const isSaved = savedSet.has(item.job_id)
@@ -192,6 +197,14 @@ function RecCard({ item, savedSet, onSave, onApply }: RecCardProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={() => onTailor(item.job_id)}
+          disabled={tailoring}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 border border-neutral-200 hover:border-brand-turquoise-300 hover:bg-brand-turquoise-50 text-neutral-700 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+        >
+          <FilePenLine className="w-3.5 h-3.5" />
+          {tailoring ? 'Preparing…' : 'Tailor CV'}
+        </button>
         {url ? (
           <a
             href={url}
@@ -279,6 +292,7 @@ function EmptyGeneric({ tier }: { tier: Tier }) {
 // ---- Main page -----------------------------------------------------------
 
 export default function RecommendationsPage() {
+  const router = useRouter()
   const { isAuthenticated, loading: authLoading } = useAuth()
   const [tierStates, setTierStates] = useState<Record<Tier, TierState>>({
     tier1: { ...INITIAL_TIER_STATE },
@@ -288,6 +302,7 @@ export default function RecommendationsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('tier1')
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set())
   const [regenerating, setRegenerating] = useState(false)
+  const [tailoringJobId, setTailoringJobId] = useState<string | null>(null)
 
   const loadedRef = useRef<Set<Tier>>(new Set())
 
@@ -378,24 +393,37 @@ export default function RecommendationsPage() {
     }
   }
 
+  const handleTailor = async (jobId: string) => {
+    setTailoringJobId(jobId)
+    try {
+      const generation = await createCVGeneration(jobId)
+      router.push(`/dashboard/cv-editor/${generation.id}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not tailor your CV.')
+    } finally {
+      setTailoringJobId(null)
+    }
+  }
+
   const activeCfg = TIER_CONFIG.find((t) => t.id === activeTab)!
 
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
+        <div className="ws-page ws-recommendations max-w-4xl mx-auto">
           {/* Page header */}
           <div className="flex items-start justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
-                Recommendations
+                Your job matches
               </h1>
               <p className="text-sm text-neutral-500 mt-0.5">
-                Updated every 12 hours · ranked by AI
+                A shortlist built around your skills and experience.
               </p>
             </div>
             <button
               onClick={handleRegenerate}
+              aria-label="Refresh matches"
               disabled={regenerating}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-md disabled:opacity-50 cursor-pointer"
             >
@@ -459,6 +487,8 @@ export default function RecommendationsPage() {
                   savedSet={savedSet}
                   onSave={handleSave}
                   onApply={handleApply}
+                  onTailor={handleTailor}
+                  tailoringJobId={tailoringJobId}
                 />
               </AnimatePresence>
             </div>
@@ -500,6 +530,8 @@ export default function RecommendationsPage() {
                         savedSet={savedSet}
                         onSave={handleSave}
                         onApply={handleApply}
+                        onTailor={handleTailor}
+                        tailoringJobId={tailoringJobId}
                       />
                     </AnimatePresence>
 
@@ -531,9 +563,11 @@ interface ColumnProps {
   savedSet: Set<string>
   onSave: (id: string) => void
   onApply: (id: string) => void
+  onTailor: (id: string) => void
+  tailoringJobId: string | null
 }
 
-function ColumnContent({ tier, state, savedSet, onSave, onApply }: ColumnProps) {
+function ColumnContent({ tier, state, savedSet, onSave, onApply, onTailor, tailoringJobId }: ColumnProps) {
   if (state.loading) {
     return (
       <>
@@ -557,13 +591,21 @@ function ColumnContent({ tier, state, savedSet, onSave, onApply }: ColumnProps) 
   return (
     <>
       {state.items.map((item) => (
-        <RecCard key={item.id} item={item} savedSet={savedSet} onSave={onSave} onApply={onApply} />
+        <RecCard
+          key={item.id}
+          item={item}
+          savedSet={savedSet}
+          onSave={onSave}
+          onApply={onApply}
+          onTailor={onTailor}
+          tailoring={tailoringJobId === item.job_id}
+        />
       ))}
     </>
   )
 }
 
-function MobileColumn({ tier, state, savedSet, onSave, onApply }: ColumnProps) {
+function MobileColumn({ tier, state, savedSet, onSave, onApply, onTailor, tailoringJobId }: ColumnProps) {
   return (
     <motion.div
       key={tier}
@@ -573,7 +615,15 @@ function MobileColumn({ tier, state, savedSet, onSave, onApply }: ColumnProps) {
       transition={{ duration: 0.15 }}
       className="space-y-3"
     >
-      <ColumnContent tier={tier} state={state} savedSet={savedSet} onSave={onSave} onApply={onApply} />
+      <ColumnContent
+        tier={tier}
+        state={state}
+        savedSet={savedSet}
+        onSave={onSave}
+        onApply={onApply}
+        onTailor={onTailor}
+        tailoringJobId={tailoringJobId}
+      />
     </motion.div>
   )
 }

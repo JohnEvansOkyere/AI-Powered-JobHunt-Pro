@@ -45,6 +45,15 @@ def phone_e164_to_whatsapp_digits(e164: str) -> str:
     return "".join(c for c in e164 if c.isdigit())
 
 
+def sandbox_recipient_digits(raw: str) -> set[str]:
+    """Return the explicit recipient allowlist for sandbox sends."""
+    return {
+        digits
+        for value in (raw or "").split(",")
+        if (digits := phone_e164_to_whatsapp_digits(value.strip()))
+    }
+
+
 class WhatsappCloudClient:
     """Thin async wrapper around ``POST /{phone_number_id}/messages``."""
 
@@ -74,6 +83,9 @@ class WhatsappCloudClient:
         template_name: str,
         language_code: str = "en",
         body_parameters: Optional[List[str]] = None,
+        button_parameters: Optional[List[str]] = None,
+        button_sub_type: str = "url",
+        button_index: str = "0",
     ) -> Dict[str, Any]:
         """
         Send a pre-approved Cloud API template.
@@ -90,13 +102,27 @@ class WhatsappCloudClient:
             "name": template_name,
             "language": {"code": language_code},
         }
+        components: List[Dict[str, Any]] = []
         if body_parameters:
-            template["components"] = [
+            components.append(
                 {
                     "type": "body",
                     "parameters": [{"type": "text", "text": str(p)} for p in body_parameters],
                 }
-            ]
+            )
+        if button_parameters:
+            components.append(
+                {
+                    "type": "button",
+                    "sub_type": button_sub_type,
+                    "index": button_index,
+                    "parameters": [
+                        {"type": "text", "text": str(p)} for p in button_parameters
+                    ],
+                }
+            )
+        if components:
+            template["components"] = components
 
         payload: Dict[str, Any] = {
             "messaging_product": "whatsapp",
@@ -120,6 +146,14 @@ class WhatsappCloudClient:
                 "WHATSAPP_ENABLED=false blocks live/sandbox sends. "
                 "Use WHATSAPP_SEND_MODE=dry_run for no-network tests."
             )
+
+        if mode == "sandbox":
+            allowed = sandbox_recipient_digits(settings.WHATSAPP_SANDBOX_RECIPIENTS)
+            if to_digits not in allowed:
+                raise RuntimeError(
+                    "Sandbox send blocked: destination is not listed in "
+                    "WHATSAPP_SANDBOX_RECIPIENTS."
+                )
 
         token = (settings.WHATSAPP_ACCESS_TOKEN or "").strip()
         if not token or not (settings.WHATSAPP_PHONE_NUMBER_ID or "").strip():

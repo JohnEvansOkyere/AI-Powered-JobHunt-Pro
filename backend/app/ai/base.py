@@ -10,17 +10,14 @@ from enum import Enum
 
 
 class TaskType(Enum):
-    """Types of AI tasks.
-
-    CV_TAILORING and COVER_LETTER were removed in v2
-    (see docs/RECOMMENDATIONS_V2_PLAN.md §4).
-    """
+    """Types of AI tasks."""
 
     JOB_MATCHING = "job_matching"
     EMAIL_DRAFTING = "email_drafting"
     JOB_ANALYSIS = "job_analysis"
     FAST_SUMMARY = "fast_summary"
     CV_PARSING = "cv_parsing"
+    CV_TAILORING = "cv_tailoring"
     EMBEDDING = "embedding"
     RERANK = "rerank"
 
@@ -107,4 +104,3 @@ class AIProvider(ABC):
     def supports_streaming(self) -> bool:
         """Whether the provider supports streaming."""
         pass
-

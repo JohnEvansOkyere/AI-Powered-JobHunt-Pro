@@ -240,6 +240,7 @@ export function EmailDigestSettings() {
                 How often
               </label>
               <select
+                aria-label="Email digest frequency"
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as EmailFrequency)}
                 className={`${inputClass} cursor-pointer`}
@@ -254,6 +255,7 @@ export function EmailDigestSettings() {
                   Which day
                 </label>
                 <select
+                  aria-label="Email digest weekday"
                   value={weekday}
                   onChange={(e) => setWeekday(Number(e.target.value))}
                   className={`${inputClass} cursor-pointer`}
@@ -276,11 +278,13 @@ export function EmailDigestSettings() {
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 type="time"
+                aria-label="Email digest time"
                 value={digestTime}
                 onChange={(e) => setDigestTime(e.target.value)}
                 className={inputClass}
               />
               <select
+                aria-label="Email digest timezone"
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
                 className={`${inputClass} cursor-pointer`}

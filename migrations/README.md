@@ -24,6 +24,10 @@ order against the production database (and any staging/dev copy).
 | `014_add_acquisition_attribution.sql` | **Apply** | Persists UTM and inferred referrer source/medium/campaign data per analytics session |
 | `015_add_user_admin_flag.sql` | **Apply** | Adds `public.users.is_admin` and promotes the existing owner account |
 | `016_enforce_user_account_status.sql` | **Apply** | Normalizes `public.users.is_active`; backend suspension/revocation controls are enforced on authenticated requests |
+| `017_add_alx_job_imports.sql` | **Apply** | Adds application deadlines and indexes for imported ALX roles |
+| `018_add_email_digests.sql` | **Apply** | Adds opt-in email digest preferences, delivery audit, and suppression records |
+| `019_add_editable_cv_generations.sql` | **Apply** | Adds private job-specific CV drafts and append-only revision history with owner RLS |
+| `020_add_phone_auth_identity.sql` | **Apply** | Adds phone identity/verification fields and updates the `auth.users` sync trigger for passwordless candidate accounts |
 
 All migrations are wrapped in `BEGIN/COMMIT` and use `IF [NOT] EXISTS`, so
 re-running them is safe.
@@ -45,12 +49,43 @@ psql "$DATABASE_URL" -f migrations/013_add_first_party_analytics.sql
 psql "$DATABASE_URL" -f migrations/014_add_acquisition_attribution.sql
 psql "$DATABASE_URL" -f migrations/015_add_user_admin_flag.sql
 psql "$DATABASE_URL" -f migrations/016_enforce_user_account_status.sql
+psql "$DATABASE_URL" -f migrations/017_add_alx_job_imports.sql
+psql "$DATABASE_URL" -f migrations/018_add_email_digests.sql
+psql "$DATABASE_URL" -f migrations/019_add_editable_cv_generations.sql
+psql "$DATABASE_URL" -f migrations/020_add_phone_auth_identity.sql
 ```
+
+## Automatic production migrations
+
+The DigitalOcean backend workflow runs
+`backend/scripts/ops/apply_migrations.py` before restarting the API, worker,
+and Beat services. Pipeline tracking starts at migration `019`; older
+migrations remain the historical/manual baseline and are not blindly replayed.
+
+For every new migration:
+
+- use the next contiguous migration number (currently `021`);
+- keep exactly one outer `BEGIN;` / `COMMIT;` pair;
+- never edit an applied migration—add a new one;
+- run `cd backend && venv/bin/python scripts/ops/apply_migrations.py --check`.
+
+The runner records SHA-256 checksums in `public.schema_migrations`, takes an
+advisory lock to prevent concurrent deploys from racing, and fails deployment
+before service restart if SQL cannot be applied.
 
 Configure Meta to call your API **callback URL**
 `https://<your-api-host>/api/v1/webhooks/whatsapp` (GET for verify, POST for
 events). Set `WHATSAPP_VERIFY_TOKEN` to match the verify token you enter in
 Meta, and `WHATSAPP_APP_SECRET` for `X-Hub-Signature-256` verification.
+The POST endpoint fails closed when `WHATSAPP_APP_SECRET` is absent. Follow
+`docs/features/WHATSAPP_JOB_ALERTS.md` for template setup and safe sender
+cutover.
+
+For passwordless candidate registration, enable Supabase Phone Auth and point
+its signed Send SMS HTTP hook to
+`https://<your-api-host>/api/v1/auth/hooks/send-sms`. Follow
+`docs/features/PHONE_AUTH_ARKESEL.md`; adding Arkesel values to `.env` without
+enabling this Supabase hook will not send or verify registration codes.
 
 ```bash
 # 2. Clean up orphaned tailored-CV files from Supabase Storage

@@ -345,10 +345,18 @@ curl https://api.veloxahire.org/api/v1/ops/ats-sync/status -H "X-Cron-Secret: <C
 ## 10. CI/CD — auto-deploy on push to main
 
 `.github/workflows/deploy-backend.yml` triggers on push to `main`. It re-runs
-the backend test suite as a deploy gate (PR/push testing is already handled by
-`ci.yml`), and if tests pass and `backend/` changed, SSHes into the Droplet to
-`git pull`, reinstall dependencies, and restart all three systemd services,
-then health-checks `https://api.veloxahire.org/health`.
+the backend test suite and validates migration files as deploy gates (PR/push
+testing is already handled by `ci.yml`). If tests pass and `backend/`,
+`migrations/`, or this workflow changed, it SSHes into the Droplet to `git
+pull`, reinstalls dependencies, runs `python scripts/ops/apply_migrations.py`,
+and only then restarts all three systemd services and health-checks
+`https://api.veloxahire.org/health`.
+
+The runner tracks migrations from `019` onward in
+`public.schema_migrations`. SQL execution and the ledger insert commit in one
+transaction under a PostgreSQL advisory lock. A failed migration stops the
+deployment before service restart. Migrations `003`–`018` predate this runner
+and are deliberately not replayed automatically against production.
 
 **One-time setup — GitHub Secrets** (repo → Settings → Secrets and variables → Actions):
 

@@ -39,11 +39,13 @@ class UserResponse(BaseModel):
     """User response model."""
     id: str
     email: Optional[str] = None
+    phone: Optional[str] = None
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool = True
     is_admin: bool = False
     email_verified: bool = False
+    phone_verified: bool = False
     last_login_at: Optional[str] = None
     user_metadata: Optional[Dict[str, Any]] = {}
     created_at: str
@@ -186,8 +188,10 @@ async def get_my_user_info(
         return UserResponse(
             id=current_user.get("id", ""),
             email=current_user.get("email"),
+            phone=current_user.get("phone"),
             full_name=current_user.get("user_metadata", {}).get("full_name"),
             email_verified=current_user.get("email_confirmed_at") is not None,
+            phone_verified=current_user.get("phone_confirmed_at") is not None,
             is_admin=False,
             user_metadata=current_user.get("user_metadata", {}),
             created_at=current_user.get("created_at", ""),
@@ -197,11 +201,13 @@ async def get_my_user_info(
     return UserResponse(
         id=str(user.id),
         email=user.email,
+        phone=user.phone_e164,
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         is_active=user.is_active,
         is_admin=bool(user.is_admin),
         email_verified=user.email_verified,
+        phone_verified=user.phone_verified,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
         user_metadata=user.user_metadata or {},
         created_at=user.created_at.isoformat() if user.created_at else "",
@@ -260,10 +266,12 @@ async def update_my_user_info(
     return UserResponse(
         id=str(user.id),
         email=user.email,
+        phone=user.phone_e164,
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         is_active=user.is_active,
         email_verified=user.email_verified,
+        phone_verified=user.phone_verified,
         is_admin=bool(user.is_admin),
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
         user_metadata=user.user_metadata or {},

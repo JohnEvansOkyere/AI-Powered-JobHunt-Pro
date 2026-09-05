@@ -60,7 +60,7 @@ function UserRow({
     <div className="grid gap-4 border-b border-neutral-100 px-5 py-5 last:border-0 lg:grid-cols-[minmax(0,1.7fr)_minmax(150px,0.8fr)_minmax(120px,0.7fr)_minmax(230px,1fr)] lg:items-center">
       <div className="min-w-0">
         <p className="truncate font-semibold text-neutral-900">{user.full_name || 'Unnamed user'}</p>
-        <p className="mt-1 truncate text-sm text-neutral-500">{user.email || 'No email address'}</p>
+        <p className="mt-1 truncate text-sm text-neutral-500">{user.phone || user.email || 'No contact'}</p>
         <p className="mt-1 text-xs text-neutral-400">Joined {formatWhen(user.created_at)}</p>
       </div>
       <div><StatusBadge active={user.is_active} /></div>
@@ -138,13 +138,13 @@ export default function AdminUsersPage() {
   }
 
   const handleToggleStatus = async (target: AdminUser) => {
-    if (target.is_active && !window.confirm(`Suspend ${target.email || 'this user'}? They will be blocked from authenticated platform features immediately.`)) return
+    if (target.is_active && !window.confirm(`Suspend ${target.phone || target.email || 'this user'}? They will be blocked from authenticated platform features immediately.`)) return
     setBusyUserId(target.id)
     setError('')
     setNotice('')
     try {
       await updateAdminUserStatus(target.id, !target.is_active)
-      setNotice(`${target.email || 'User'} is now ${target.is_active ? 'suspended' : 'active'}.`)
+      setNotice(`${target.phone || target.email || 'User'} is now ${target.is_active ? 'suspended' : 'active'}.`)
       await loadUsers()
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Could not update this user.'))
@@ -154,14 +154,14 @@ export default function AdminUsersPage() {
   }
 
   const handleRevoke = async (target: AdminUser) => {
-    const confirmation = window.prompt(`Type REVOKE to permanently delete ${target.email || 'this user'} and their platform data.`)
+    const confirmation = window.prompt(`Type REVOKE to permanently delete ${target.phone || target.email || 'this user'} and their platform data.`)
     if (confirmation !== 'REVOKE') return
     setBusyUserId(target.id)
     setError('')
     setNotice('')
     try {
       const result = await revokeAdminUser(target.id)
-      setNotice(result.warning ? `${target.email || 'User'} was removed locally. ${result.warning}` : `${target.email || 'User'} was permanently revoked.`)
+      setNotice(result.warning ? `${target.phone || target.email || 'User'} was removed locally. ${result.warning}` : `${target.phone || target.email || 'User'} was permanently revoked.`)
       await loadUsers()
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Could not revoke this user.'))
@@ -181,7 +181,7 @@ export default function AdminUsersPage() {
             <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise-300">VeloxaHire Admin</p><h1 className="mt-1 text-xl font-semibold">User control</h1></div>
           </div>
           <div className="flex items-center gap-2 text-sm text-white/60">
-            <span className="hidden sm:inline">{user.email}</span>
+            <span className="hidden sm:inline">{user.phone || user.email}</span>
             <button onClick={() => signOut().then(() => router.replace('/auth/login'))} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-white hover:bg-white/10"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function AdminUsersPage() {
         <section className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-neutral-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <form onSubmit={handleSearch} className="flex flex-1 gap-2 sm:max-w-xl">
-              <label className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-neutral-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or email" className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-100" /></label>
+              <label className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-neutral-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, phone or email" className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-100" /></label>
               <button type="submit" className="rounded-xl bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-200">Search</button>
             </form>
             <select value={filter} onChange={(event) => setFilter(event.target.value as UserFilter)} className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 outline-none focus:border-brand-turquoise-500"><option value="all">All statuses</option><option value="active">Active only</option><option value="suspended">Suspended only</option></select>

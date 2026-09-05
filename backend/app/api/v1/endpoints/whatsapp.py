@@ -171,8 +171,9 @@ async def whatsapp_opt_in(
         await client.send_template(
             to_e164=phone,
             template_name=settings.WHATSAPP_TEMPLATE_OTP,
-            language_code="en",
+            language_code=settings.WHATSAPP_TEMPLATE_OTP_LANGUAGE,
             body_parameters=[code],
+            button_parameters=[code],
         )
     except httpx.HTTPStatusError as exc:
         logger.warning("whatsapp_opt_in_send_failed", status=exc.response.status_code)
@@ -350,11 +351,14 @@ async def whatsapp_webhook_events(
     body = await request.body()
     sig = request.headers.get("X-Hub-Signature-256")
     app_secret = (settings.WHATSAPP_APP_SECRET or "").strip()
-    if app_secret:
-        if not verify_webhook_signature(body, sig, app_secret=app_secret):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bad signature")
-    else:
-        logger.warning("whatsapp_webhook_no_app_secret_hmac_skipped")
+    if not app_secret:
+        logger.error("whatsapp_webhook_app_secret_missing")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="WhatsApp webhook is not configured.",
+        )
+    if not verify_webhook_signature(body, sig, app_secret=app_secret):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bad signature")
 
     try:
         payload: Dict[str, Any] = json.loads(body.decode("utf-8") or "{}")
@@ -402,7 +406,7 @@ async def _process_whatsapp_value(db: Session, value: Dict[str, Any]) -> None:
         phone = _normalize_wa_phone(phone_digits) if phone_digits else "+0"
         ev = WhatsappIncomingEvent(
             phone_e164=phone,
-            user_id=None,
+            user_id=row.user_id if row else None,
             event_type="status_update",
             body=json.dumps(st)[:2000],
             raw=st,

@@ -61,6 +61,8 @@ def _verify_supabase_jwt_locally(token: str) -> dict | None:
     return {
         "id": user_id,
         "email": payload.get("email"),
+        "phone": payload.get("phone"),
+        "phone_confirmed_at": payload.get("phone_confirmed_at"),
         "email_confirmed_at": payload.get("email_confirmed_at") or payload.get("confirmed_at"),
         "user_metadata": payload.get("user_metadata", {}),
         "created_at": payload.get("created_at", ""),
@@ -119,6 +121,8 @@ async def get_current_user(
                 user_data = {
                     "id": auth_user.get("id"),
                     "email": auth_user.get("email"),
+                    "phone": auth_user.get("phone"),
+                    "phone_confirmed_at": auth_user.get("phone_confirmed_at"),
                     "email_confirmed_at": auth_user.get("email_confirmed_at"),
                     "user_metadata": auth_user.get("user_metadata", {}),
                     "created_at": auth_user.get("created_at", ""),

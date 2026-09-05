@@ -10,6 +10,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: veloxahire-backend-production
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -41,6 +45,8 @@ jobs:
       - name: Run tests
         # Integration tests need live DB/Redis/Supabase (not available in CI).
         run: python -m pytest -q -m "not integration"
+      - name: Validate pipeline-managed migrations
+        run: python scripts/ops/apply_migrations.py --check
 
   deploy:
     runs-on: ubuntu-latest
@@ -49,11 +55,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Check for backend changes
         id: changes
         run: |
-          git diff --name-only HEAD~1 HEAD | grep -qE '^backend/|^\.github/workflows/deploy-backend' \
+          BEFORE_SHA="${{ github.event.before }}"
+          if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            BEFORE_SHA="$(git rev-list --max-parents=0 HEAD)"
+          fi
+          git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -qE '^backend/|^migrations/|^\.github/workflows/deploy-backend\.yml$' \
             && echo "deploy=true" >> $GITHUB_OUTPUT \
             || echo "deploy=false" >> $GITHUB_OUTPUT
       - name: Deploy to Droplet via SSH
@@ -64,8 +74,9 @@ jobs:
           username: ${{ secrets.DO_DEPLOY_USER }}
           key: ${{ secrets.DO_DEPLOY_SSH_KEY }}
           script: |
-            cd /var/www/veloxahire && git pull
+            cd /var/www/veloxahire && git pull --ff-only origin main
             cd backend && source venv/bin/activate && pip install -r requirements.txt
+            python scripts/ops/apply_migrations.py
             systemctl restart veloxahire veloxahire-worker veloxahire-beat
             echo "Waiting for service to be healthy..."
             for i in $(seq 1 12); do

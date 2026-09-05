@@ -61,6 +61,7 @@ class ModelRouter:
         TaskType.FAST_SUMMARY: "groq",
         TaskType.JOB_MATCHING: "gemini",
         TaskType.CV_PARSING: "openai",  # structured extraction still favors OpenAI
+        TaskType.CV_TAILORING: "gemini",
         TaskType.EMBEDDING: "gemini",
         TaskType.RERANK: "gemini",
     }

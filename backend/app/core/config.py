@@ -58,6 +58,29 @@ class Settings(BaseSettings):
         description="Canonical Supabase Auth JWT secret. Falls back to SUPABASE_JWT_SECRET.",
     )
 
+    # Passwordless candidate authentication. Supabase owns OTP generation,
+    # verification, and sessions; its signed Send SMS Hook delegates delivery
+    # to the regional Arkesel provider.
+    ARKESEL_SMS_ENABLED: bool = Field(
+        default=False,
+        alias="ARKESEL_SMS_ENABLED",
+        description="Allow the Supabase Send SMS Hook to deliver OTPs through Arkesel.",
+    )
+    ARKESEL_API_KEY: str = Field(
+        default="",
+        alias="ARKESEL_API_KEY",
+        description="Arkesel Main API key used by SMS API v2.",
+    )
+    ARKESEL_SENDER_ID: str = Field(
+        default="VeloxaHire",
+        alias="ARKESEL_SENDER_ID",
+        description="Approved Arkesel SMS sender ID (maximum 11 characters).",
+    )
+    SUPABASE_SEND_SMS_HOOK_SECRETS: str = Field(
+        default="",
+        description="Supabase Auth Hook secret(s), including v1,whsec_ prefix; separate rotations with |.",
+    )
+
     @property
     def auth_supabase_url(self) -> str:
         return self.AUTH_SUPABASE_URL or self.SUPABASE_URL
@@ -284,16 +307,28 @@ class Settings(BaseSettings):
         description="Arbitrary shared secret used in Meta's webhook verification handshake.",
     )
     WHATSAPP_GRAPH_API_VERSION: str = Field(
-        default="v20.0",
+        default="v26.0",
         description="Meta Graph API version; bump when Meta deprecates the current one.",
+    )
+    WHATSAPP_SANDBOX_RECIPIENTS: str = Field(
+        default="",
+        description="Comma-separated E.164 test numbers allowed when WHATSAPP_SEND_MODE=sandbox.",
     )
     WHATSAPP_TEMPLATE_OTP: str = Field(
         default="otp_verification",
         description="Pre-approved Cloud API template name for phone verification (AUTH category).",
     )
+    WHATSAPP_TEMPLATE_OTP_LANGUAGE: str = Field(
+        default="en_US",
+        description="Exact approved language code for the OTP template.",
+    )
     WHATSAPP_TEMPLATE_DIGEST: str = Field(
         default="daily_job_digest",
         description="Pre-approved template for Tier-1 digest (MARKETING category).",
+    )
+    WHATSAPP_TEMPLATE_DIGEST_LANGUAGE: str = Field(
+        default="en_US",
+        description="Exact approved language code for the Tier-1 digest template.",
     )
     WHATSAPP_TEMPLATE_UNSUBSCRIBE: str = Field(
         default="unsubscribe_confirmation",
@@ -409,6 +444,14 @@ class Settings(BaseSettings):
             return v.strip().lower()
         return "dry_run"
 
+    @field_validator("ARKESEL_SENDER_ID", mode="before")
+    @classmethod
+    def _validate_arkesel_sender_id(cls, value) -> str:
+        sender_id = str(value or "").strip()
+        if len(sender_id) > 11:
+            raise ValueError("ARKESEL_SENDER_ID cannot exceed 11 characters")
+        return sender_id
+
     @field_validator("EMAIL_DEFAULT_LOCALE", mode="before")
     @classmethod
     def _validate_email_locale(cls, v) -> str:
@@ -497,6 +540,31 @@ class Settings(BaseSettings):
             errors.append("CORS_ORIGINS must be explicitly set to production origins")
         if self.EXTERNAL_URL_ALLOW_HTTP:
             errors.append("EXTERNAL_URL_ALLOW_HTTP must be False when ENVIRONMENT=production")
+        if self.WHATSAPP_ENABLED:
+            required_whatsapp = {
+                "WHATSAPP_APP_SECRET": self.WHATSAPP_APP_SECRET,
+                "WHATSAPP_PHONE_NUMBER_ID": self.WHATSAPP_PHONE_NUMBER_ID,
+                "WHATSAPP_ACCESS_TOKEN": self.WHATSAPP_ACCESS_TOKEN,
+                "WHATSAPP_VERIFY_TOKEN": self.WHATSAPP_VERIFY_TOKEN,
+            }
+            missing = [name for name, value in required_whatsapp.items() if not value.strip()]
+            if missing:
+                errors.append(
+                    "WhatsApp is enabled but required settings are missing: "
+                    + ", ".join(missing)
+                )
+        if self.ARKESEL_SMS_ENABLED:
+            required_arkesel = {
+                "ARKESEL_API_KEY": self.ARKESEL_API_KEY,
+                "ARKESEL_SENDER_ID": self.ARKESEL_SENDER_ID,
+                "SUPABASE_SEND_SMS_HOOK_SECRETS": self.SUPABASE_SEND_SMS_HOOK_SECRETS,
+            }
+            missing = [name for name, value in required_arkesel.items() if not value.strip()]
+            if missing:
+                errors.append(
+                    "Arkesel phone auth is enabled but required settings are missing: "
+                    + ", ".join(missing)
+                )
 
         if errors:
             raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
