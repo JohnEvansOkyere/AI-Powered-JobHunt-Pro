@@ -1,952 +1,370 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
-import { motion, useReducedMotion } from 'framer-motion'
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import {
   ArrowRight,
-  Target,
-  ShieldCheck,
-  CheckCircle2,
+  Search,
+  Check,
+  Plus,
   FileText,
-  Layers,
-  Crosshair,
-  LineChart,
-  Quote,
-  Mail,
-  Phone,
-  MapPin,
-  Linkedin,
-  Menu,
-  X,
-  ChevronDown,
-} from 'lucide-react'
-import { BackgroundPaths } from '@/components/ui/background-paths'
+  ArrowUpRight,
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import PublicHeader, { recruiterUrl } from "@/components/layout/PublicHeader";
 
-// Full destination URL comes straight from the env var — this is just a nav link to
-// VeloxaRecruit. Set NEXT_PUBLIC_VELOXARECRUIT_URL to the complete URL (incl. /register) in Vercel.
-const VELOXARECRUIT_START_URL = process.env.NEXT_PUBLIC_VELOXARECRUIT_URL || 'https://www.veloxarecruit.com/register'
-
-// ---------------------------------------------------------------------------
-// Small building blocks
-// ---------------------------------------------------------------------------
-
-function WordMark({ className = '' }: { className?: string }) {
-  return (
-    <span className={`font-display font-semibold tracking-tight ${className}`}>
-      Veloxa<span className="italic font-light">Hire</span>
-    </span>
-  )
-}
-
-function Logo({ size = 32 }: { size?: number }) {
-  return (
-    <Image
-      src="/logo.png"
-      alt="VeloxaHire"
-      width={size}
-      height={size}
-      priority
-      className="object-contain"
-    />
-  )
-}
-
-// Minimal "live match" tile shown inside the demo card.
-function MatchTile({
-  title,
-  company,
-  location,
-  score,
-  highlight,
-  delay = 0,
-  reduceMotion,
-}: {
-  title: string
-  company: string
-  location: string
-  score: number
-  highlight?: boolean
-  delay?: number
-  reduceMotion?: boolean | null
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={reduceMotion ? undefined : { y: -3 }}
-      transition={{ duration: 0.5, delay }}
-      className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-4 ${
-        highlight
-          ? 'border-brand-turquoise-400/40 bg-forest-700/35'
-          : 'border-cream-100/10 bg-ink-800'
-      }`}
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
-              highlight
-                ? 'bg-brand-turquoise-500 text-ink-900 border-brand-turquoise-500'
-                : 'bg-ink-700 text-cream-100/75 border-cream-100/10'
-            }`}
-          >
-            {score}% match
-          </span>
-          {highlight && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-ember-700 bg-ember-500/15 border border-ember-500/30 rounded-md px-2 py-0.5 font-semibold uppercase tracking-wider">
-              Top pick
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-semibold text-cream-100 mt-1.5 truncate">{title}</p>
-        <p className="text-xs text-cream-100/60 truncate">
-          {company} · {location}
-        </p>
-      </div>
-      <ArrowRight className="w-4 h-4 text-brand-turquoise-300 flex-shrink-0" />
-    </motion.div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+const categories = [
+  "Engineering",
+  "Finance",
+  "Marketing",
+  "Customer Service",
+  "Operations",
+  "Human Resources",
+  "Sales",
+  "Data Analysis",
+];
+const examples = [
+  {
+    role: "Data Analyst",
+    skills: ["Excel", "SQL", "Communication"],
+    location: "Accra · Hybrid",
+  },
+  {
+    role: "Operations Coordinator",
+    skills: ["Excel", "Organisation", "Communication"],
+    location: "Accra · On-site",
+  },
+  {
+    role: "Customer Success Associate",
+    skills: ["Communication", "Problem solving", "Organisation"],
+    location: "Remote",
+  },
+];
+const skills = [
+  "Excel",
+  "SQL",
+  "Communication",
+  "Organisation",
+  "Problem solving",
+];
 
 export default function HomePage() {
-  const { isAuthenticated, loading } = useAuth()
-  const router = useRouter()
-  const reduceMotion = useReducedMotion()
-  const [navOpen, setNavOpen] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+  const hero = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: hero,
+    offset: ["start start", "end start"],
+  });
+  const photoY = useTransform(scrollYProgress, [0, 1], [0, 45]);
+  const captionY = useTransform(scrollYProgress, [0, 1], [0, -28]);
+  const [selected, setSelected] = useState(["Excel", "Communication"]);
+  const ranked = examples
+    .map((job) => ({
+      ...job,
+      matched: job.skills.filter((skill) => selected.includes(skill)),
+    }))
+    .sort((a, b) => b.matched.length - a.matched.length);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) router.push('/dashboard')
-  }, [isAuthenticated, loading, router])
-
-  if (loading) {
-    return (
-    <main className="min-h-screen flex items-center justify-center bg-ink-900">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-forest-600" />
-      </main>
-    )
-  }
-
-  const fadeUp = reduceMotion
-    ? {}
-    : {
-        initial: { opacity: 0, y: 16 },
-        whileInView: { opacity: 1, y: 0 },
-        viewport: { once: true, margin: '-80px' },
-        transition: { duration: 0.5, ease: 'easeOut' },
-      }
+    if (!loading && isAuthenticated) router.replace("/dashboard");
+  }, [loading, isAuthenticated, router]);
 
   return (
-    <div className="min-h-screen bg-ink-900 text-cream-100 selection:bg-brand-turquoise-500/30 selection:text-brand-turquoise-200">
-      {/* ================================================================ */}
-      {/* Nav — dark-glass so it reads over the ink hero and the cream body */}
-      {/* ================================================================ */}
-      <nav className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-ink-900/70 border-b border-cream-100/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <Logo size={30} />
-              <WordMark className="text-base text-cream-100 group-hover:text-ember-400 transition-colors" />
-            </Link>
-
-            <div className="hidden md:flex items-center gap-8 text-sm">
-              <Link
-                href="/jobs"
-                className="text-cream-100/70 hover:text-cream-100 transition-colors"
-              >
-                Browse jobs
-              </Link>
-              <Link
-                href="#how"
-                className="text-cream-100/70 hover:text-cream-100 transition-colors"
-              >
-                How it works
-              </Link>
-              <Link
-                href="#features"
-                className="text-cream-100/70 hover:text-cream-100 transition-colors"
-              >
-                Features
-              </Link>
-              <Link
-                href="#faq"
-                className="text-cream-100/70 hover:text-cream-100 transition-colors"
-              >
-                FAQ
-              </Link>
-              <Link
-                href="#contact"
-                className="text-cream-100/70 hover:text-cream-100 transition-colors"
-              >
-                Contact
-              </Link>
-            </div>
-
-            <div className="hidden md:flex items-center gap-2">
-              <Link
-                href={VELOXARECRUIT_START_URL}
-                className="px-4 py-2 text-sm font-medium text-cream-100/80 hover:text-cream-100 transition-colors rounded-lg"
-              >
-                Create job for free
-              </Link>
-              <Link
-                href="/auth/login"
-                className="px-4 py-2 text-sm font-medium text-cream-100/80 hover:text-cream-100 transition-colors rounded-lg"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/auth/signup"
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-ink-900 bg-cream-100 hover:bg-cream-50 rounded-full shadow-sm transition-colors"
-              >
-                Get started
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            <button
-              onClick={() => setNavOpen((v) => !v)}
-              className="md:hidden p-2 -mr-2 text-cream-100"
-              aria-label="Toggle menu"
-            >
-              {navOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+    <div className="vh-site">
+      <PublicHeader />
+      <main id="main-content">
+        <section ref={hero} className="vh-wrap vh-hero" data-sc-act="flow">
+          <div className="vh-hero-copy">
+            <p className="vh-eyebrow">YOUR NEXT CHAPTER</p>
+            <h1>
+              Good work.
+              <br />A better fit.
+            </h1>
+            <p className="vh-lead">
+              Find opportunities that suit your experience, your ambitions, and
+              the life you want to build.
+            </p>
+            <form action="/jobs" className="vh-hero-search" role="search">
+              <label>
+                <Search size={20} />
+                <span className="sr-only">Job title or keyword</span>
+                <input name="q" placeholder="What work are you looking for?" />
+              </label>
+              <button type="submit" className="vh-button">
+                Browse jobs <ArrowRight size={17} />
+              </button>
+            </form>
+            <p className="vh-hero-note">
+              Free to browse. Your next step is yours to choose.
+            </p>
           </div>
-          {navOpen && (
-            <div className="md:hidden border-t border-cream-100/10 py-4 space-y-2 text-sm">
-              {[
-                ['Browse jobs', '/jobs'],
-                ['How it works', '#how'],
-                ['Features', '#features'],
-                ['FAQ', '#faq'],
-                ['Contact', '#contact'],
-              ].map(([label, href]) => (
+          <div className="vh-hero-scene">
+            <div className="vh-photo-ground" aria-hidden="true" />
+            <motion.div
+              className="vh-hero-photo"
+              style={{ y: reduce ? 0 : photoY }}
+            >
+              <Image
+                src="/landing/candidate-at-work.jpg"
+                alt="A professional exploring opportunities at her laptop"
+                width={1200}
+                height={675}
+                priority
+                sizes="(max-width: 760px) 100vw, 48vw"
+              />
+            </motion.div>
+            <motion.div
+              className="vh-photo-caption"
+              style={{ y: reduce ? 0 : captionY }}
+            >
+              <span className="vh-caption-icon">
+                <ArrowUpRight size={22} />
+              </span>
+              <div>
+                <strong>A career that moves with you.</strong>
+                <span>Local opportunities. Remote possibilities.</span>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="vh-directory" data-sc-act="flow">
+          <div className="vh-wrap vh-directory-grid">
+            <div>
+              <h2>
+                Where would you
+                <br />
+                like to go next?
+              </h2>
+              <p>
+                Start with the work you know.
+                <br />
+                Explore what comes next.
+              </p>
+            </div>
+            <div className="vh-category-links">
+              {categories.map((category) => (
                 <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setNavOpen(false)}
-                  className="block px-2 py-2 text-cream-100/80"
+                  key={category}
+                  href={"/jobs?q=" + encodeURIComponent(category)}
                 >
-                  {label}
+                  {category}
+                  <ArrowUpRight size={16} />
                 </Link>
               ))}
-              <div className="flex gap-2 pt-2 border-t border-cream-100/10">
-                <Link
-                  href={VELOXARECRUIT_START_URL}
-                  className="flex-1 text-center py-2 border border-cream-100/30 rounded-full font-medium text-cream-100"
-                >
-                  Create job
-                </Link>
-                <Link
-                  href="/auth/login"
-                  className="flex-1 text-center py-2 border border-cream-100/30 rounded-full font-medium text-cream-100"
-                >
-                  Sign in
-                </Link>
-              </div>
-              <div className="flex pt-2">
-                <Link
-                  href="/auth/signup"
-                  className="w-full text-center py-2 bg-cream-100 text-ink-900 rounded-full font-semibold"
-                >
-                  Get started
-                </Link>
-              </div>
             </div>
-          )}
-        </div>
-      </nav>
-
-      {/* ================================================================ */}
-      {/* Hero — dark ink background, off-white serif title                */}
-      {/* ================================================================ */}
-      <BackgroundPaths
-        eyebrow="Built for candidates, not job boards"
-        title="Find the job that fits you"
-        lede="Upload your CV once. We'll read between the lines, learn what you actually want next, and hand you a short, honest shortlist of roles worth your Monday morning."
-        ctaLabel="Browse jobs"
-        ctaHref="/jobs"
-        secondaryCtaLabel="Get my shortlist"
-        secondaryCtaHref="/auth/signup"
-        tertiaryCtaLabel="Create job for free"
-        tertiaryCtaHref={VELOXARECRUIT_START_URL}
-      />
-
-      {/* ================================================================ */}
-      {/* Quiet reassurance bullets — sit below the hero                   */}
-      {/* ================================================================ */}
-      <section className="landing-surface relative py-8 px-4 sm:px-6 lg:px-8 border-b border-cream-100/10">
-        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-cream-100/65">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-brand-turquoise-300" />
-            Free to start
           </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-brand-turquoise-300" />
-            No credit card
-          </div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-ember-400" />
-            Your CV stays private
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ================================================================ */}
-      {/* Live-match demo                                                  */}
-      {/* ================================================================ */}
-      <section className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto text-center mb-14">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-turquoise-300">
-            A peek inside your shortlist
-          </p>
-          <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-cream-100">
-            The jobs worth your time,{' '}
-            <span className="italic font-medium text-brand-turquoise-300">waiting</span> when you log in.
-          </h2>
-          <p className="mt-5 text-base sm:text-lg text-cream-100/65 leading-relaxed">
-            No endless scrolling. No twenty tabs open. Just a short list you can actually read over
-            coffee &mdash; with the best roles already at the top.
-          </p>
-        </div>
-
-        <div className="max-w-2xl mx-auto">
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-          >
-            <div className="relative">
-              <div className="bg-ink-800 rounded-3xl border border-cream-100/15 shadow-xl shadow-black/30 overflow-hidden">
-                <div className="flex items-center gap-2 px-5 py-3 border-b border-cream-100/10 bg-ink-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-ember-400/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-brand-turquoise-400/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-cream-100/50" />
-                  <span className="ml-3 text-xs text-cream-100/60 font-medium">
-                    Your matches · updated just now
-                  </span>
-                </div>
-
-                <div className="p-5 space-y-3 bg-ink-800">
-                  <MatchTile
-                    title="Senior Data Scientist — ML"
-                    company="Northwind Labs"
-                    location="Remote"
-                    score={96}
-                    highlight
-                    delay={0.2}
-                    reduceMotion={reduceMotion}
-                  />
-                  <MatchTile
-                    title="Applied AI Engineer"
-                    company="Lumen AI"
-                    location="Hybrid · London"
-                    score={88}
-                    delay={0.35}
-                    reduceMotion={reduceMotion}
-                  />
-                  <MatchTile
-                    title="Machine Learning Scientist"
-                    company="Wave"
-                    location="Remote"
-                    score={82}
-                    delay={0.5}
-                    reduceMotion={reduceMotion}
-                  />
-
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between text-xs text-cream-100/60 mb-2">
-                      <span>Scanning 8,421 new roles</span>
-                      <span className="font-semibold text-brand-turquoise-300">Live</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-ink-700 overflow-hidden">
-                      <motion.div
-                        initial={{ width: '0%' }}
-                        animate={{ width: ['0%', '100%'] }}
-                        transition={{
-                          duration: 2.4,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                        className="h-full bg-brand-turquoise-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="hidden md:flex absolute -bottom-6 -left-6 bg-ink-800 rounded-2xl border border-cream-100/15 shadow-lg p-4 items-center gap-3"
-              >
-                <div className="w-10 h-10 rounded-xl bg-brand-turquoise-500/15 border border-brand-turquoise-500/30 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-brand-turquoise-300" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-cream-100">3× more interviews</p>
-                  <p className="text-xs text-cream-100/60">Average across early users</p>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Trust strip                                                      */}
-      {/* ================================================================ */}
-      <section className="py-10 border-y border-forest-500/40 bg-forest-700 text-cream-100">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-10 text-xs">
-          <span className="relative z-10 uppercase tracking-[0.22em] font-semibold text-cream-100/70">
-            Trusted across the Veloxa family
-          </span>
-          <div className="relative z-10 flex flex-wrap items-center justify-center gap-5 md:gap-8 font-display font-semibold text-cream-100/85">
-            <Link href={VELOXARECRUIT_START_URL} className="hover:text-ember-400 transition-colors">
-              Create job for free
-            </Link>
-            <span className="w-1 h-1 rounded-full bg-ember-400 hidden md:block" />
-            <span>VeloxaHire</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Candidate visual story                                            */}
-      {/* ================================================================ */}
-      <section className="bg-forest-700 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <motion.div {...fadeUp} className="max-w-2xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-turquoise-300">
-              Built around your next move
-            </p>
-            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-cream-100">
-              A job search that feels more like progress.
-            </h2>
-            <p className="mt-5 text-lg text-cream-100/70 leading-relaxed">
-              Find roles that fit the person you are becoming, then show up with a profile that
-              tells your story clearly.
-            </p>
-          </motion.div>
-
-          <div className="mt-12 grid md:grid-cols-2 gap-6">
-            {[
-              {
-                src: '/landing/candidate-at-work.jpg',
-                alt: 'Candidate working from home on a laptop',
-                label: 'Find work that fits your life',
-                body: 'A focused shortlist, built around your skills, goals, and the way you want to work.',
-              },
-              {
-                src: '/landing/professional-profile.jpg',
-                alt: 'Professional candidate holding a laptop',
-                label: 'Put your best profile forward',
-                body: 'Upload your CV once and let VeloxaHire help you present the experience behind it.',
-              },
-            ].map((story, index) => (
-              <motion.article
-                key={story.src}
-                {...fadeUp}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="landing-card overflow-hidden rounded-2xl border border-cream-100/15 bg-ink-900"
-              >
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <Image
-                    src={story.src}
-                    alt={story.alt}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="font-display text-2xl font-semibold text-cream-100">{story.label}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-cream-100/60">{story.body}</p>
-                </div>
-              </motion.article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* How it works                                                     */}
-      {/* ================================================================ */}
-      <section id="how" className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <motion.div {...fadeUp} className="max-w-2xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-turquoise-300">
-              How it works
-            </p>
-            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-cream-100">
-              Tell us your story once.
-              <span className="block italic font-medium text-brand-turquoise-300">
-                We&rsquo;ll do the hunting forever.
-              </span>
-            </h2>
-            <p className="mt-5 text-cream-100/65 leading-relaxed text-lg">
-              Three small steps on your side. After that we keep watch on every new role posted
-              &mdash; and only tap you on the shoulder when something&rsquo;s genuinely worth it.
-            </p>
-          </motion.div>
-
-          <div className="mt-16 grid md:grid-cols-3 gap-6">
-            {[
-              {
-                n: '01',
-                icon: FileText,
-                title: 'Bring your CV',
-                body:
-                  "Drop it in. We'll turn it into a profile you can tidy, tweak, or add to — no retyping, no forms that go on forever.",
-              },
-              {
-                n: '02',
-                icon: Crosshair,
-                title: 'Tell us what good looks like',
-                body:
-                  "The kind of role, where you'd love to work, remote or office, the salary you're after. The clearer you are, the better we get at finding you the right ones.",
-              },
-              {
-                n: '03',
-                icon: LineChart,
-                title: 'Open your shortlist',
-                body:
-                  "While you get on with life, we're reading thousands of new roles for you — and saving only the ones that actually fit. You open it like opening your inbox, calmly.",
-              },
-            ].map((step, i) => (
-              <motion.div
-                key={step.n}
-                {...fadeUp}
-                transition={{ duration: 0.5, delay: i * 0.08 }}
-                className="landing-card relative rounded-2xl border border-cream-100/10 bg-ink-800 p-8 hover:border-brand-turquoise-500/50"
-              >
-                <span className="font-display text-sm font-semibold tracking-[0.18em] text-ember-600">
-                  {step.n}
-                </span>
-                <div className="mt-5 w-11 h-11 rounded-xl bg-brand-turquoise-500/15 border border-brand-turquoise-500/25 flex items-center justify-center">
-                  <step.icon className="w-5 h-5 text-brand-turquoise-300" />
-                </div>
-                <h3 className="mt-6 font-display font-semibold text-xl text-cream-100">
-                  {step.title}
-                </h3>
-                <p className="mt-2 text-sm text-cream-100/60 leading-relaxed">{step.body}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Features bento                                                   */}
-      {/* ================================================================ */}
-      <section
-        id="features"
-        className="landing-surface py-24 px-4 sm:px-6 lg:px-8 border-y border-cream-100/10"
-      >
-        <div className="max-w-6xl mx-auto">
-          <motion.div {...fadeUp} className="max-w-2xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-turquoise-300">
-              What you get
-            </p>
-            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-cream-100">
-              A calmer,{' '}
-              <span className="italic font-medium text-brand-turquoise-300">kinder</span> way to job-hunt.
-            </h2>
-            <p className="mt-5 text-cream-100/65 leading-relaxed text-lg max-w-xl">
-              You&rsquo;re not looking for a thousand jobs. You&rsquo;re looking for the right one.
-              Here&rsquo;s how VeloxaHire helps you get there without the burnout.
-            </p>
-          </motion.div>
-
-          <div className="mt-16 grid md:grid-cols-6 gap-5">
-            <motion.div
-              {...fadeUp}
-              className="landing-card md:col-span-4 rounded-2xl bg-ink-800 border border-cream-100/10 p-8 flex flex-col justify-between min-h-[280px] hover:border-brand-turquoise-500/50"
-            >
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-brand-turquoise-500/15 border border-brand-turquoise-500/25 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-brand-turquoise-300" />
-                </div>
-                <h3 className="mt-6 font-display font-semibold text-2xl text-cream-100 leading-tight">
-                  We read the job. We don&rsquo;t just match words.
-                </h3>
-                <p className="mt-3 text-cream-100/60 text-sm leading-relaxed max-w-lg">
-                  A good recruiter reads a job spec end to end and thinks &ldquo;would this person
-                  be happy here?&rdquo; We do the same &mdash; quietly, for thousands of roles,
-                  every day. So when something lands at the top of your list, there&rsquo;s a
-                  proper reason.
-                </p>
-              </div>
-              <div className="mt-6 flex flex-wrap gap-2">
-                {[
-                  'Right kind of role',
-                  'Your skills',
-                  'Right level',
-                  'Fresh today',
-                  'Remote-friendly',
-                ].map((t) => (
-                  <span
-                    key={t}
-                    className="text-xs font-medium bg-ink-700 border border-cream-100/10 text-cream-100/65 rounded-full px-2.5 py-1"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              {...fadeUp}
-              transition={{ duration: 0.5, delay: 0.05 }}
-              className="landing-card md:col-span-2 rounded-2xl bg-ink-800 border border-cream-100/10 p-8 min-h-[280px] flex flex-col hover:border-ember-500/40"
-            >
-              <div className="w-11 h-11 rounded-xl bg-brand-turquoise-500/15 border border-brand-turquoise-500/25 flex items-center justify-center">
-                <Layers className="w-5 h-5 text-brand-turquoise-300" />
-              </div>
-              <h3 className="mt-6 font-display font-semibold text-xl text-cream-100">
-                Know where to look first.
-              </h3>
-              <p className="mt-3 text-sm text-cream-100/60 leading-relaxed">
-                Your <strong className="font-semibold text-brand-turquoise-200">Top picks</strong> for busy
-                days, <strong className="font-semibold text-brand-turquoise-200">strong fits</strong> when you
-                want to explore, and a fresh catalogue of everything new &mdash; so you never miss
-                the door you didn&rsquo;t know was open.
-              </p>
-            </motion.div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Testimonial + stats                                              */}
-      {/* ================================================================ */}
-      <section className="landing-surface relative py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-          <motion.div {...fadeUp}>
-            <div className="w-10 h-10 rounded-xl bg-brand-turquoise-500/15 border border-brand-turquoise-500/25 flex items-center justify-center mb-7">
-              <Quote className="w-5 h-5 text-brand-turquoise-300" />
-            </div>
-            <p className="font-display text-3xl sm:text-4xl text-cream-100 leading-[1.15] tracking-tight">
-              <span className="italic text-cream-100/50">&ldquo;</span>
-              I was spending evenings refreshing job boards. VeloxaHire does that for me now, and
-              it picks <em className="text-brand-turquoise-300 not-italic font-medium">better</em> than I do.
-              I stopped guessing which roles were worth my time.
-              <span className="italic text-cream-100/50">&rdquo;</span>
-            </p>
-            <div className="mt-7 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-brand-turquoise-500/15 border border-brand-turquoise-500/25 flex items-center justify-center font-display font-semibold text-brand-turquoise-200">
-                P
-              </div>
-              <div>
-                <p className="font-semibold text-cream-100">Nana Kwasi Agyeman, Senior ML Engineer</p>
-                <p className="text-sm text-cream-100/60">Early-access user</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div {...fadeUp} className="grid grid-cols-2 gap-5">
-            {[
-              { big: '3×', small: 'More interviews worth taking' },
-              { big: '10h', small: 'Hours handed back to your week' },
-              { big: '2×', small: 'Fresh shortlists, every day' },
-              { big: '96%', small: 'Top picks candidates open' },
-            ].map((s) => (
-              <div
-                key={s.small}
-                className="landing-card rounded-2xl border border-cream-100/10 bg-ink-800 p-6 hover:border-brand-turquoise-500/50"
-              >
-                <p className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-brand-turquoise-300">
-                  {s.big}
-                </p>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-cream-100/60">
-                  {s.small}
-                </p>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* FAQ                                                              */}
-      {/* ================================================================ */}
-      <section
-        id="faq"
-        className="landing-surface py-24 px-4 sm:px-6 lg:px-8 border-y border-cream-100/10"
-      >
-        <div className="max-w-3xl mx-auto">
-          <motion.div {...fadeUp} className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-turquoise-300">
-              FAQ
-            </p>
-            <h2 className="mt-4 font-display font-bold text-4xl sm:text-5xl leading-[1.05] tracking-tight text-cream-100">
-              Honest <span className="italic font-medium text-brand-turquoise-300">answers.</span>
-            </h2>
-          </motion.div>
-
-          <div className="mt-14 space-y-3">
-            {[
-              {
-                q: 'Is VeloxaHire really free?',
-                a: "Yes. Signing up, uploading your CV, and getting your shortlist costs nothing. We'll add optional power-user features later, but finding you good jobs will always have a free plan — candidates shouldn't pay to be seen.",
-              },
-              {
-                q: 'Who can see my CV?',
-                a: "Only you. Your CV is locked to your account. No recruiter, no employer, nobody in the \u201cVeloxa family\u201d can peek at it. An employer only sees your profile when you click apply. And if you change your mind, one click deletes the lot.",
-              },
-              {
-                q: 'How is this different from a job board?',
-                a: "Job boards list everything and leave you to sift. We read each role the way a recruiter would, compare it to you, and only put the genuine fits in front of you. Less scrolling, better jobs — every time.",
-              },
-              {
-                q: 'Where do the jobs come from?',
-                a: "From the big job boards, specialist sites, and roles our partners across the Veloxa family are hiring for. You get a full picture of the market — in one calm list, refreshed twice a day.",
-              },
-              {
-                q: 'Will I get spammed?',
-                a: "No. VeloxaHire doesn't share your email with anyone. We'll only email you when there's something genuinely worth your time — and you can dial that down to weekly in one click.",
-              },
-            ].map((f, i) => {
-              const open = openFaq === i
-              return (
-                <motion.div
-                  key={f.q}
-                  {...fadeUp}
-                  transition={{ duration: 0.35, delay: i * 0.05 }}
-                  className={`rounded-xl border bg-ink-800 overflow-hidden transition-colors ${
-                    open ? 'border-brand-turquoise-500/50' : 'border-cream-100/10'
-                  }`}
-                >
-                  <button
-                    onClick={() => setOpenFaq(open ? null : i)}
-                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
-                  >
-                    <span className="font-display font-semibold text-lg text-cream-100">
-                      {f.q}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-cream-100/50 transition-transform flex-shrink-0 ${
-                        open ? 'rotate-180 text-brand-turquoise-300' : ''
-                      }`}
-                    />
-                  </button>
-                  <motion.div
-                    initial={false}
-                    animate={{
-                      height: open ? 'auto' : 0,
-                      opacity: open ? 1 : 0,
-                    }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden"
-                  >
-                    <p className="px-5 pb-5 text-sm text-cream-100/60 leading-relaxed">{f.a}</p>
-                  </motion.div>
-                </motion.div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Final CTA — deep ink + forest gradient, mirrors the hero          */}
-      {/* ================================================================ */}
-      <section className="landing-surface py-24 px-4 sm:px-6 lg:px-8">
-        <motion.div
-          {...fadeUp}
-          className="max-w-5xl mx-auto rounded-3xl bg-forest-700 text-cream-100 px-8 py-16 md:py-20 md:px-16 relative overflow-hidden"
+        <section
+          id="how-it-works"
+          className="vh-wrap vh-match-section"
+          data-sc-act="flow"
         >
-          <div className="relative z-10 max-w-2xl">
-            <h2 className="font-display font-bold text-4xl sm:text-5xl tracking-tight leading-[1.05]">
-              The best job you&rsquo;ll have next year is{' '}
-              <span className="italic font-medium text-ember-400">
-                probably posted this week.
-              </span>
+          <div className="vh-section-intro">
+            <p className="vh-eyebrow">MAKE YOUR EXPERIENCE COUNT</p>
+            <h2>
+              A shortlist with
+              <br />a reason behind it.
             </h2>
-            <p className="mt-6 text-cream-100/75 text-lg max-w-xl leading-relaxed">
-              Browse the market first. When you want the short version, create a profile and let
-              VeloxaHire rank the roles that fit your CV.
+            <p>
+              Your profile helps us connect your experience to the requirements
+              of each role. See what fits, then decide where to focus.
             </p>
-            <div className="mt-10 flex flex-wrap gap-3">
-              <Link
-                href="/jobs"
-                className="inline-flex items-center gap-2 px-7 py-3.5 bg-cream-100 text-ink-900 rounded-full font-semibold hover:bg-cream-50 transition-colors shadow-sm"
-              >
-                Browse jobs
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                href="/auth/signup"
-                className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
-              >
-                Get my shortlist
-              </Link>
-              <Link
-                href={VELOXARECRUIT_START_URL}
-                className="inline-flex items-center gap-2 px-7 py-3.5 border border-cream-100/30 text-cream-100 rounded-full font-semibold hover:bg-cream-100/10 transition-colors"
-              >
-                Create job for free
-              </Link>
-            </div>
+            <Link href="/auth/signup" className="vh-text-link">
+              Create account <ArrowRight size={17} />
+            </Link>
           </div>
-        </motion.div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* Footer — forest-green canvas, cream text, ember accents          */}
-      {/* ================================================================ */}
-      <footer id="contact" className="bg-forest-700 text-cream-100/85">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-10">
-          <div className="grid md:grid-cols-12 gap-12">
-            <div className="md:col-span-5">
-              <Link href="/" className="flex items-center gap-2.5">
-                <Logo size={36} />
-                <WordMark className="text-lg text-cream-100" />
-              </Link>
-              <p className="mt-5 text-sm text-cream-100/70 leading-relaxed max-w-sm">
-                VeloxaHire is the candidate-side platform of the Veloxa family — built with the
-                same hiring specialists behind Veloxa Recruit.
+          <motion.div
+            className="vh-match-demo"
+            initial={reduce ? false : { clipPath: "inset(0 0 8% 0)" }}
+            whileInView={{ clipPath: "inset(0 0 0% 0)" }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="vh-demo-heading">
+              <strong>Find the connection</strong>
+              <span>Interactive example</span>
+            </div>
+            <p className="vh-demo-instruction">
+              Choose a few skills. Watch the shortlist change.
+            </p>
+            <div className="vh-skill-picker" aria-label="Example skills">
+              {skills.map((skill) => (
+                <button
+                  key={skill}
+                  aria-pressed={selected.includes(skill)}
+                  onClick={() =>
+                    setSelected((current) =>
+                      current.includes(skill)
+                        ? current.filter((value) => value !== skill)
+                        : [...current, skill],
+                    )
+                  }
+                >
+                  {selected.includes(skill) ? (
+                    <Check size={14} />
+                  ) : (
+                    <Plus size={14} />
+                  )}
+                  {skill}
+                </button>
+              ))}
+            </div>
+            <div className="vh-demo-results" aria-live="polite">
+              {ranked.map((job, index) => (
+                <motion.article
+                  layout={!reduce}
+                  transition={{ duration: 0.22 }}
+                  key={job.role}
+                  className={
+                    index === 0 && job.matched.length
+                      ? "vh-example-job vh-example-top"
+                      : "vh-example-job"
+                  }
+                >
+                  <div className="vh-example-job-head">
+                    <h3>{job.role}</h3>
+                    <span>
+                      {job.matched.length} of {job.skills.length} skills
+                    </span>
+                  </div>
+                  <p>{job.location}</p>
+                  <div className="vh-example-skills">
+                    {job.skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className={selected.includes(skill) ? "is-matched" : ""}
+                      >
+                        {selected.includes(skill) && <Check size={12} />}
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+            <div className="vh-demo-foot">
+              <p>
+                Illustrative roles, not live vacancies. Your actual matches also
+                consider your CV and experience.
               </p>
-              <div className="mt-7 space-y-3 text-sm">
-                <a
-                  href="mailto:hello@veloxarecruit.com"
-                  className="flex items-center gap-3 text-cream-100/80 hover:text-ember-400 transition-colors"
-                >
-                  <Mail className="w-4 h-4 text-ember-500" />
-                  hello@veloxarecruit.com
-                </a>
-                <div className="flex items-start gap-3 text-cream-100/80">
-                  <Phone className="w-4 h-4 text-ember-500 mt-0.5 flex-shrink-0" />
-                  <span className="flex flex-wrap items-center gap-x-2">
-                    <a
-                      href="tel:+233544954643"
-                      className="hover:text-ember-400 transition-colors"
-                    >
-                      +233 544 954 643
-                    </a>
-                    <span className="text-cream-100/40">/</span>
-                    <a
-                      href="tel:+233556272090"
-                      className="hover:text-ember-400 transition-colors"
-                    >
-                      +233 556 272 090
-                    </a>
-                  </span>
-                </div>
-                <a
-                  href="https://www.linkedin.com/company/veloxa-technology-limited"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-cream-100/80 hover:text-ember-400 transition-colors"
-                >
-                  <Linkedin className="w-4 h-4 text-ember-500" />
-                  Veloxa Technology Limited
-                </a>
-                <div className="flex items-start gap-3 text-cream-100/80">
-                  <MapPin className="w-4 h-4 text-ember-500 mt-0.5 flex-shrink-0" />
-                  <span>Accra, Ghana</span>
-                </div>
-              </div>
+              <Link href={"/jobs?q=" + encodeURIComponent(ranked[0].role)}>
+                Search {ranked[0].role} jobs <ArrowUpRight size={15} />
+              </Link>
             </div>
+          </motion.div>
+        </section>
 
-            <div className="md:col-span-2">
-              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
-                Product
-              </h4>
-              <ul className="space-y-3 text-sm text-cream-100/80">
+        <section className="vh-preparation" data-sc-act="flow">
+          <div className="vh-wrap vh-prep-grid">
+            <motion.div
+              initial={reduce ? false : { y: 16 }}
+              whileInView={{ y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="vh-prep-photo"
+            >
+              <Image
+                src="/landing/jobseekers-smiling.jpg"
+                alt="Two professionals in a shared workplace"
+                width={1600}
+                height={1200}
+                sizes="(max-width: 760px) 100vw, 42vw"
+              />
+            </motion.div>
+            <div>
+              <FileText size={28} strokeWidth={1.4} className="vh-prep-icon" />
+              <h2>
+                Your experience.
+                <br />
+                In your own words.
+              </h2>
+              <p>
+                When you find a role worth applying for, create a tailored CV
+                from your existing one. Review it, make changes, and take a
+                version you are happy to send.
+              </p>
+              <ul className="vh-plain-list">
                 <li>
-                  <Link href="#how" className="hover:text-ember-400 transition-colors">
-                    How it works
-                  </Link>
+                  <Check size={17} /> An editable draft for each role
                 </li>
                 <li>
-                  <Link href="#features" className="hover:text-ember-400 transition-colors">
-                    Features
-                  </Link>
+                  <Check size={17} /> Your original CV stays intact
                 </li>
                 <li>
-                  <Link href="#faq" className="hover:text-ember-400 transition-colors">
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/auth/signup" className="hover:text-ember-400 transition-colors">
-                    Create account
-                  </Link>
+                  <Check size={17} /> Review and download when you are ready
                 </li>
               </ul>
-            </div>
-
-            <div className="md:col-span-2">
-              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
-                Family
-              </h4>
-              <ul className="space-y-3 text-sm text-cream-100/80">
-                <li>
-                  <a
-                    href="https://veloxarecruit.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-ember-400 transition-colors"
-                  >
-                    Veloxa Recruit
-                  </a>
-                </li>
-                <li>
-                  <Link href="/" className="hover:text-ember-400 transition-colors">
-                    VeloxaHire
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="md:col-span-3">
-              <h4 className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-ember-400 mb-5">
-                Legal
-              </h4>
-              <ul className="space-y-3 text-sm text-cream-100/80">
-                <li>
-                  <Link href="#" className="hover:text-ember-400 transition-colors">
-                    Privacy policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-ember-400 transition-colors">
-                    Terms of service
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-ember-400 transition-colors">
-                    Cookie policy
-                  </Link>
-                </li>
-              </ul>
+              <Link href="/auth/signup" className="vh-text-link">
+                Create account <ArrowRight size={17} />
+              </Link>
             </div>
           </div>
+        </section>
 
-          <div className="mt-16 pt-6 border-t border-cream-100/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-cream-100/55">
-              &copy; {new Date().getFullYear()} VeloxaHire. Part of the Veloxa family. All rights
-              reserved.
-            </p>
-            <p className="text-xs text-cream-100/45 font-display italic">
-              Built in Accra · for candidates, not recruiters.
-            </p>
+        <section className="vh-wrap vh-help">
+          <h2>A few things to know.</h2>
+          <div>
+            {[
+              [
+                "Do I need an account to apply?",
+                "No. You can browse jobs and follow the application link without an account. Create a profile for recommendations, saved jobs, and tailored CVs.",
+              ],
+              [
+                "Where do the jobs come from?",
+                "VeloxaHire brings together roles posted by recruiters and listings from external job boards. Each role links to its application destination.",
+              ],
+              [
+                "Will you apply for me?",
+                "You choose which roles to pursue. Review the job and your CV, then follow the application link to the employer or source site.",
+              ],
+            ].map(([question, answer]) => (
+              <details key={question}>
+                <summary>
+                  {question}
+                  <Plus size={18} />
+                </summary>
+                <p>{answer}</p>
+              </details>
+            ))}
           </div>
-        </div>
+        </section>
+
+        <section className="vh-close" data-sc-act="flow">
+          <div className="vh-wrap">
+            <div>
+              <h2>There is more ahead of you.</h2>
+              <p>Find the work you want to do next.</p>
+            </div>
+            <Link href="/jobs" className="vh-button">
+              Browse jobs <ArrowRight size={18} />
+            </Link>
+          </div>
+        </section>
+      </main>
+      <footer className="vh-wrap vh-footer">
+        <Link href="/" className="vh-logo">
+          VeloxaHire.
+        </Link>
+        <p>Work worth finding.</p>
+        <nav aria-label="Footer">
+          <a href={recruiterUrl}>For employers</a>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </nav>
+        <span>© {new Date().getFullYear()} VeloxaHire</span>
       </footer>
     </div>
-  )
+  );
 }

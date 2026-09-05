@@ -49,7 +49,7 @@ export function JobCard({ job, onApply, onSave, isSaved = false }: JobCardProps)
   const hasExternalLink = Boolean(job.url)
 
   return (
-    <article className="card-interactive p-5">
+    <article className="rounded-lg border border-neutral-200 bg-white p-5 transition-colors hover:border-forest-500">
       {/* Header */}
       <header className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0 flex-1">

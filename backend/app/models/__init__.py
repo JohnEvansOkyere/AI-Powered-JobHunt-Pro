@@ -3,6 +3,7 @@
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.models.cv import CV
+from app.models.cv_generation import CVGeneration, CVGenerationRevision
 from app.models.job import Job
 from app.models.job_match import JobMatch
 from app.models.job_recommendation import JobRecommendation
@@ -22,6 +23,8 @@ __all__ = [
     "User",
     "UserProfile",
     "CV",
+    "CVGeneration",
+    "CVGenerationRevision",
     "Job",
     "JobMatch",
     "JobRecommendation",

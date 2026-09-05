@@ -13,7 +13,11 @@ from fastapi.testclient import TestClient
 from app.api.v1.endpoints import whatsapp as wa_module
 from app.core.config import settings
 from app.core.database import get_db
-from app.integrations.whatsapp import verify_webhook_signature, WhatsappCloudClient
+from app.integrations.whatsapp import (
+    WhatsappCloudClient,
+    sandbox_recipient_digits,
+    verify_webhook_signature,
+)
 from app.main import app
 
 
@@ -42,6 +46,27 @@ async def test_send_template_dry_run_no_network(monkeypatch):
         body_parameters=["123456"],
     )
     assert out["messages"][0]["id"] == "dry-run"
+
+
+def test_sandbox_recipient_allowlist_normalizes_numbers():
+    assert sandbox_recipient_digits("+233 24 123 4567, +44-7700-900123") == {
+        "233241234567",
+        "447700900123",
+    }
+
+
+@pytest.mark.asyncio
+async def test_sandbox_blocks_recipient_outside_allowlist(monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_SEND_MODE", "sandbox")
+    monkeypatch.setattr(settings, "WHATSAPP_ENABLED", True)
+    monkeypatch.setattr(settings, "WHATSAPP_SANDBOX_RECIPIENTS", "+233241111111")
+    client = WhatsappCloudClient()
+
+    with pytest.raises(RuntimeError, match="Sandbox send blocked"):
+        await client.send_template(
+            to_e164="+233242222222",
+            template_name="daily_job_digest",
+        )
 
 
 def test_map_meta_status():
@@ -91,6 +116,16 @@ def test_webhook_post_rejects_bad_hmac(monkeypatch):
         headers={"X-Hub-Signature-256": "sha256=invalid"},
     )
     assert r.status_code == 403
+
+
+def test_webhook_post_fails_closed_without_app_secret(monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_APP_SECRET", "")
+    c = TestClient(app)
+    r = c.post(
+        "/api/v1/webhooks/whatsapp",
+        json={"object": "whatsapp_business_account", "entry": []},
+    )
+    assert r.status_code == 503
 
 
 def test_webhook_post_accepts_good_hmac(monkeypatch):

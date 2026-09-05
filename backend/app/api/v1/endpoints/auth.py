@@ -7,8 +7,10 @@ provide session validation and user info retrieval.
 """
 
 from datetime import datetime, timezone
+import json
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -18,6 +20,7 @@ from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.rate_limit import HANDOFF_VERIFY_RATE_LIMIT, enforce_rate_limit
 from app.core.redis_client import get_async_redis
+from app.integrations.arkesel import arkesel_sms, verify_supabase_hook_signature
 from supabase import Client
 
 logger = get_logger(__name__)
@@ -34,6 +37,8 @@ class UserResponse(BaseModel):
     id: str
     email: Optional[str] = None
     email_verified: bool = False
+    phone: Optional[str] = None
+    phone_verified: bool = False
     user_metadata: dict = {}
     created_at: str
 
@@ -119,6 +124,64 @@ async def verify_handoff_token(request: Request, payload: HandoffVerifyRequest):
         return HandoffVerifyResponse(valid=False)
 
 
+@router.post("/hooks/send-sms", include_in_schema=False)
+async def send_phone_auth_sms(request: Request):
+    """Deliver a Supabase-generated phone OTP through Arkesel.
+
+    No user JWT exists yet, so this endpoint authenticates the caller using
+    Supabase's Standard Webhooks signature over the raw request body.
+    """
+    body = await request.body()
+    if len(body) > 20_000:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+    verified = verify_supabase_hook_signature(
+        body,
+        webhook_id=request.headers.get("webhook-id"),
+        webhook_timestamp=request.headers.get("webhook-timestamp"),
+        webhook_signature=request.headers.get("webhook-signature"),
+        secrets=settings.SUPABASE_SEND_SMS_HOOK_SECRETS,
+    )
+    if not verified:
+        logger.warning("supabase_send_sms_hook_signature_invalid")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid hook signature",
+        )
+
+    try:
+        event = json.loads(body)
+        phone = str(event["user"]["phone"])
+        otp = str(event["sms"]["otp"])
+        await arkesel_sms.send_auth_code(phone_e164=phone, otp=otp)
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={
+                "error": {
+                    "http_code": 422,
+                    "message": "Invalid phone authentication payload.",
+                }
+            },
+        )
+    except Exception as exc:
+        logger.error(
+            "supabase_send_sms_hook_delivery_failed",
+            error_type=type(exc).__name__,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={
+                "error": {
+                    "http_code": 502,
+                    "message": "Could not send the verification code.",
+                }
+            },
+        )
+
+    return Response(status_code=status.HTTP_200_OK)
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     current_user: dict = Depends(get_current_user),
@@ -134,6 +197,8 @@ async def get_current_user_info(
             id=current_user.get("id"),
             email=current_user.get("email"),
             email_verified=current_user.get("email_confirmed_at") is not None,
+            phone=current_user.get("phone"),
+            phone_verified=current_user.get("phone_confirmed_at") is not None,
             user_metadata=current_user.get("user_metadata", {}),
             created_at=current_user.get("created_at", ""),
         )
@@ -162,6 +227,8 @@ async def validate_session(
                 id=current_user.get("id"),
                 email=current_user.get("email"),
                 email_verified=current_user.get("email_confirmed_at") is not None,
+                phone=current_user.get("phone"),
+                phone_verified=current_user.get("phone_confirmed_at") is not None,
                 user_metadata=current_user.get("user_metadata", {}),
                 created_at=current_user.get("created_at", ""),
             ),

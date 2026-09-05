@@ -181,14 +181,14 @@ export default function SettingsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
+        <div className="ws-page ws-settings max-w-4xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight mb-1.5">
               Settings
             </h1>
             <p className="text-sm text-neutral-500 leading-relaxed">
-              Manage your account settings and notification preferences
+              Your account. Your alerts. Your preferences.
             </p>
           </div>
 
@@ -254,7 +254,7 @@ export default function SettingsPage() {
                         <div className="text-xs text-neutral-500 mt-0.5">
                           {status?.whatsapp_opted_in
                             ? `Active for ${status.phone_masked ?? 'your verified number'}`
-                            : 'Get daily job digests delivered to your WhatsApp'}
+                            : 'Get new top job matches in a daily WhatsApp digest'}
                         </div>
                       </div>
                     </div>
@@ -313,11 +313,13 @@ export default function SettingsPage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <input
                         type="time"
+                        aria-label="WhatsApp digest time"
                         value={digestTime}
                         onChange={(e) => setDigestTime(e.target.value)}
                         className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-brand-turquoise-500 focus:outline-none focus:ring-2 focus:ring-brand-turquoise-100 transition-all duration-150 bg-white"
                       />
                       <select
+                        aria-label="WhatsApp digest timezone"
                         value={timezone}
                         onChange={(e) => setTimezone(e.target.value)}
                         className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-brand-turquoise-500 focus:outline-none focus:ring-2 focus:ring-brand-turquoise-100 transition-all duration-150 bg-white cursor-pointer"

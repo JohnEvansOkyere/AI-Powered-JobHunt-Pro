@@ -35,10 +35,12 @@ def _user_payload(user: User) -> dict:
     return {
         "id": str(user.id),
         "email": user.email,
+        "phone": user.phone_e164,
         "full_name": user.full_name,
         "is_active": bool(user.is_active),
         "is_admin": bool(user.is_admin),
         "email_verified": bool(user.email_verified),
+        "phone_verified": bool(user.phone_verified),
         "last_login_at": _iso(user.last_login_at),
         "created_at": _iso(user.created_at),
         "updated_at": _iso(user.updated_at),
@@ -73,7 +75,13 @@ async def admin_users(
     query = db.query(User)
     if search.strip():
         term = f"%{search.strip()}%"
-        query = query.filter(or_(User.email.ilike(term), User.full_name.ilike(term)))
+        query = query.filter(
+            or_(
+                User.email.ilike(term),
+                User.phone_e164.ilike(term),
+                User.full_name.ilike(term),
+            )
+        )
     if status_filter == "active":
         query = query.filter(User.is_active.is_(True))
     elif status_filter == "suspended":

@@ -23,6 +23,7 @@ class User(Base):
     
     # User Information
     email = Column(Text, nullable=True, index=True)
+    phone_e164 = Column(Text, nullable=True, index=True)
     full_name = Column(Text, nullable=True)
     avatar_url = Column(Text, nullable=True)
     
@@ -30,6 +31,7 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="true", index=True)
     is_admin = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
     email_verified = Column(Boolean, default=False)
+    phone_verified = Column(Boolean, nullable=False, default=False, server_default="false")
     
     # Metadata
     last_login_at = Column(TIMESTAMP(timezone=True), nullable=True)

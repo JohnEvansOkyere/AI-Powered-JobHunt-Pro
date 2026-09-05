@@ -115,3 +115,29 @@ def test_send_mode_validator_clamps_unknown_values(raw, expected, monkeypatch):
 
     s = Settings(WHATSAPP_SEND_MODE=raw)
     assert s.WHATSAPP_SEND_MODE == expected
+
+
+def test_production_whatsapp_config_fails_closed_when_secrets_are_missing():
+    from app.core.config import Settings
+
+    s = Settings(
+        _env_file=None,
+        SECRET_KEY="test-secret",
+        SUPABASE_URL="https://example.supabase.co",
+        SUPABASE_KEY="test-anon",
+        SUPABASE_SERVICE_KEY="test-service",
+        DATABASE_URL="postgresql://user:pass@localhost/test",
+        ENVIRONMENT="production",
+        DEBUG=False,
+        CRON_SECRET="test-cron",
+        ALLOWED_HOSTS=["api.example.com"],
+        CORS_ORIGINS=["https://app.example.com"],
+        WHATSAPP_ENABLED=True,
+        WHATSAPP_APP_SECRET="",
+        WHATSAPP_PHONE_NUMBER_ID="",
+        WHATSAPP_ACCESS_TOKEN="",
+        WHATSAPP_VERIFY_TOKEN="",
+    )
+
+    with pytest.raises(RuntimeError, match="WhatsApp is enabled"):
+        s.validate_runtime_safety()

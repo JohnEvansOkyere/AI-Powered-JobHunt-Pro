@@ -52,10 +52,12 @@ export interface AdminOverview {
 export interface AdminUser {
   id: string
   email: string | null
+  phone: string | null
   full_name: string | null
   is_active: boolean
   is_admin: boolean
   email_verified: boolean
+  phone_verified: boolean
   last_login_at: string | null
   created_at: string | null
   updated_at: string | null

@@ -52,6 +52,8 @@ users whose local digest time is due and queues
 `notifications.send_whatsapp_digest`. The send task pulls up to
 `WHATSAPP_DIGEST_MAX_JOBS` Tier-1 recommendations, writes an idempotent audit
 row to `whatsapp_messages`, then sends the `WHATSAPP_TEMPLATE_DIGEST` template.
+An unchanged job list is skipped, so a still-valid recommendation set is not
+repeated every day. Suspended accounts are also blocked at send time.
 
 Required production settings:
 
@@ -61,6 +63,12 @@ Required production settings:
 - `WHATSAPP_ACCESS_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
 - Approved `WHATSAPP_TEMPLATE_DIGEST` template.
+
+Use `WHATSAPP_SEND_MODE=sandbox` with `WHATSAPP_SANDBOX_RECIPIENTS` during the
+cutover; sandbox sends fail closed for every destination outside that explicit
+comma-separated allowlist. See `docs/features/WHATSAPP_JOB_ALERTS.md` for the
+food-ordering-number credential mapping, required OTP/digest templates, webhook
+cutover, and end-to-end acceptance checklist.
 
 `WHATSAPP_SEND_MODE=dry_run` exercises the whole task path without calling
 Meta, which is useful in staging and local verification.

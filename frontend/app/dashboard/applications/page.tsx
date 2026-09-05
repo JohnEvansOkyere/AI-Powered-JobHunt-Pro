@@ -152,13 +152,13 @@ export default function ApplicationsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="ws-page ws-applications max-w-6xl mx-auto space-y-6">
           <header className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
               Applications
             </h1>
             <p className="text-sm text-neutral-500 max-w-2xl">
-              Save interesting roles, mark the ones you applied to, and archive the rest.
+              From your first shortlist to your next offer. Keep it all here.
             </p>
           </header>
 
@@ -169,6 +169,7 @@ export default function ApplicationsPage() {
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
+                  aria-pressed={active}
                   className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     active
                       ? 'bg-white text-neutral-900 shadow-sm'

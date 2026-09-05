@@ -153,6 +153,10 @@ class DataSanitizer:
                     str(cv_data["personal_info"].get("linkedin", "")),
                     max_length=200
                 ),
+                "github": self.sanitize_text(
+                    str(cv_data["personal_info"].get("github", "")),
+                    max_length=200
+                ),
                 "website": self.sanitize_text(
                     str(cv_data["personal_info"].get("website", "")),
                     max_length=200

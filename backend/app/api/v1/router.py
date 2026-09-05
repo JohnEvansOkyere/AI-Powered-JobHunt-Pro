@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     analytics,
     admin,
     job_imports,
+    cv_generations,
 )
 
 api_router = APIRouter()
@@ -31,6 +32,9 @@ api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
 api_router.include_router(cvs.router, prefix="/cvs", tags=["cvs"])
+api_router.include_router(
+    cv_generations.router, prefix="/cv-generations", tags=["cv-generations"]
+)
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(applications.router, prefix="/applications", tags=["applications"])

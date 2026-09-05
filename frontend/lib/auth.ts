@@ -22,6 +22,58 @@ export interface SignInData {
   remember?: boolean
 }
 
+export interface PhoneOtpData {
+  phone: string
+  shouldCreateUser: boolean
+  metadata?: {
+    full_name?: string
+    handoff_email?: string
+    source?: string
+    ats_job_id?: string
+  }
+}
+
+/** Normalize Ghana local numbers and accept already-international E.164. */
+export function normalizePhoneNumber(value: string): string {
+  const compact = value.trim().replace(/[\s()-]/g, '')
+  let normalized = compact
+  if (/^0\d{9}$/.test(compact)) normalized = `+233${compact.slice(1)}`
+  else if (/^233\d{9}$/.test(compact)) normalized = `+${compact}`
+  else if (/^\d{9}$/.test(compact)) normalized = `+233${compact}`
+
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
+    throw new Error('Enter a valid phone number, for example 024 123 4567.')
+  }
+  return normalized
+}
+
+/** Ask Supabase Auth to generate an OTP; its signed hook delivers via Arkesel. */
+export async function requestPhoneOtp(data: PhoneOtpData) {
+  const supabase = createClient()
+  const phone = normalizePhoneNumber(data.phone)
+  const { data: authData, error } = await supabase.auth.signInWithOtp({
+    phone,
+    options: {
+      shouldCreateUser: data.shouldCreateUser,
+      data: data.metadata,
+    },
+  })
+  if (error) throw error
+  return { authData, phone }
+}
+
+/** Verify a Supabase phone OTP and establish the normal persisted session. */
+export async function verifyPhoneOtp(phone: string, token: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: normalizePhoneNumber(phone),
+    token: token.trim(),
+    type: 'sms',
+  })
+  if (error) throw error
+  return data
+}
+
 /**
  * Sign up a new user
  */

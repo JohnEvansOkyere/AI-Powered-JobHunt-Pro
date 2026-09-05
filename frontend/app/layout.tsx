@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter, Fraunces } from 'next/font/google'
 import './globals.css'
+import './product.css'
+import './dashboard.css'
 import { Toaster } from 'react-hot-toast'
 import { Suspense } from 'react'
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker'

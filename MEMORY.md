@@ -19,12 +19,12 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 
 ## 2. VeloxaHire — What It Does
 
-- Authenticates candidates via Supabase Auth
+- Authenticates new candidates with passwordless Supabase phone OTP delivered through a signed Arkesel SMS hook; legacy email/password sign-in remains temporarily available for existing accounts
 - Stores rich career profiles and CVs (parsed into structured JSON)
 - Scrapes jobs from ~12 public sources (Adzuna, Remotive, RemoteOK, Jooble, etc.)
 - Mirrors recruiter-posted jobs from VeloxaRecruit ATS via a scheduled sync
 - Runs AI recommendation engine (OpenAI embeddings + title boosting) every 12 hours
-- Generates tailored CVs and cover letters per application
+- Generates private, editable job-specific CV drafts for registered candidates; cover-letter generation is not currently implemented
 - Tracks saved jobs and application lifecycle
 
 ---
@@ -37,9 +37,9 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 | Database | Supabase (PostgreSQL) — RLS **not** relied on server-side; enforce in app code |
 | Cache / Queue | Redis, Celery (worker + beat), APScheduler (in-process, legacy) |
 | Frontend | Next.js App Router (React 18, TypeScript), Tailwind CSS, Framer Motion |
-| Auth | Supabase Auth — bearer token validated per request via `/auth/v1/user` call |
+| Auth | Supabase Auth phone OTP + Arkesel SMS delivery; bearer token validated per request via `/auth/v1/user`; legacy email/password login retained for existing users |
 | AI | OpenAI (embeddings + GPT-4o), Grok, Gemini, Groq as fallbacks |
-| Storage | Supabase bucket `cvs` for original CVs; `tailored-cvs/{user_id}/...` for generated |
+| Storage | Supabase bucket `cvs` for original uploads; tailored CV drafts are private JSONB and DOCX is rendered in memory |
 | Hosting | Backend: Render. Frontend: Vercel |
 | Design tokens | `brand-turquoise-*` (primary), `neutral-*` (text/bg), amber (tier1 match) |
 
@@ -99,6 +99,8 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 
 ## 6. Frontend Navigation Structure (current)
 
+Public design refreshed 2026-09-05: the shared header links to Find a job, How it works, For employers, Sign in and Create account. Landing search/category links carry `q` into `/jobs`; public results use a desktop list/detail workspace and a single-column phone list. Saving triggers signup by intent; the five-second public signup timer has been removed.
+
 ```
 Sidebar:
   Dashboard         → /dashboard
@@ -109,6 +111,7 @@ Sidebar:
   Applications      → /dashboard/applications
   Profile           → /dashboard/profile
   Settings          → /dashboard/settings
+  CV Editor         → /dashboard/cv-editor/[id]     (protected deep link opened from Job Match)
   Administration (shown to users.public.users.is_admin=true; backend-enforced)
     └─ Analytics     → /dashboard/admin
     └─ Users         → /dashboard/admin/users (suspend/reactivate or permanently revoke accounts)
@@ -140,6 +143,8 @@ As of 2026-07-20:
 - Backend `GET /api/v1/jobs/{job_id}` is public for non-archived jobs, so public detail pages work without login.
 - Public Apply links remain open. Candidates can leave to the recruiter/source application page without creating an account.
 - Signup is the upgrade path for recommendations, saved jobs, match scoring, CV/profile setup, alerts, and application tracking.
+- New candidate registration is passwordless phone verification: the form collects and normalizes the candidate's telephone number, Supabase generates/verifies the OTP and owns the session, and its signed Send SMS HTTP hook delivers the code through Arkesel. Source implementation exists; live operation still requires migration `020`, deployed secrets, Phone Auth enabled, and the hook configured in Supabase.
+- Tailored CV generation, editing, revision history, preview, and export are registered-user features. The backend requires an active Supabase-authenticated owner of the source CV and generated draft; phone OTP produces the same Supabase JWT used by these ownership checks. The normal public external Apply link remains open.
 - `/dashboard/jobs` remains the authenticated dashboard job browser.
 
 ---
@@ -151,21 +156,27 @@ As of 2026-07-20:
 | FastAPI entrypoint | `backend/app/main.py` |
 | Auth dependency (required) | `backend/app/api/v1/dependencies.py::get_current_user` |
 | Auth dependency (optional) | `backend/app/api/v1/dependencies.py::get_optional_user` |
+| Phone OTP UI and client | `frontend/app/auth/signup/page.tsx`, `frontend/app/auth/login/page.tsx`, `frontend/lib/auth.ts` |
+| Arkesel auth delivery hook | `backend/app/api/v1/endpoints/auth.py::send_phone_auth_sms`, `backend/app/integrations/arkesel.py` |
 | Jobs search endpoint | `backend/app/api/v1/endpoints/jobs.py::search_jobs` |
 | ATS sync service | `backend/app/services/ats_job_sync_service.py` |
 | Celery periodic tasks | `backend/app/tasks/periodic_tasks.py` |
 | Recommendation generator | `backend/app/services/recommendation_generator.py` |
 | Sidebar nav | `frontend/components/layout/DashboardLayout.tsx` |
+| Signed-in workspace styling and overview | `frontend/app/dashboard.css`, `frontend/app/dashboard/page.tsx` |
 | Public jobs list | `frontend/app/jobs/page.tsx`, `frontend/app/jobs/JobsClient.tsx` |
+| Public product design and shared header | `frontend/app/product.css`, `frontend/components/layout/PublicHeader.tsx`, `docs/features/PRODUCT_DESIGN_2026-09.md` |
 | Public job detail | `frontend/app/jobs/[id]/page.tsx` |
 | Remote jobs SEO page | `frontend/app/remote-jobs/page.tsx` |
 | SEO crawl controls | `frontend/app/robots.ts`, `frontend/app/sitemap.ts` |
 | Public sitemap projection | `backend/app/api/v1/endpoints/jobs.py::get_job_sitemap` |
 | Job Match page | `frontend/app/dashboard/recommendations/page.tsx` |
+| Tailored CV API and safety service | `backend/app/api/v1/endpoints/cv_generations.py`, `backend/app/services/cv_tailoring.py` |
+| Tailored CV editor | `frontend/app/dashboard/cv-editor/[id]/page.tsx` |
 | All Jobs page | `frontend/app/dashboard/jobs/page.tsx` |
 | Job card | `frontend/components/jobs/JobCard.tsx` |
 | Post-apply signup modal | `frontend/components/jobs/PostApplyModal.tsx` |
-| DB migrations | `migrations/` (latest: `010_add_ats_job_mirroring.sql`) |
+| DB migrations | `migrations/` (latest: `020_add_phone_auth_identity.sql`) |
 
 ---
 
@@ -176,8 +187,10 @@ As of 2026-07-20:
 - Apply without account (external link)
 - After applying, invite to register — **don't block apply with a gate**
 - Profile completion is required for AI recommendations, not for browsing or applying
+- Candidate registration/login should be passwordless: collect a telephone number and verify possession with an Arkesel SMS code
 - Recruiter jobs (source='recruiter') show "Recruiter" emerald badge on cards
 - Recommendations mix scraped + recruiter jobs (if they match the profile)
+- Signed-in navigation uses Overview, Job matches, Explore jobs, Applications, Profile and Settings; existing route URLs are unchanged. The overview prioritizes actual matched roles and application counts, with restrained forest-green styling and explicit request-failure states.
 
 ---
 
@@ -185,6 +198,7 @@ As of 2026-07-20:
 
 | Item | Status |
 |---|---|
+| Replace candidate email/password auth with Arkesel phone OTP | Implemented in source 2026-09-05 using Supabase phone OTP/session ownership plus a signed HTTP Send SMS Hook to Arkesel. New registration is phone-only; login defaults to phone OTP and retains a legacy email option for existing accounts. Production remains incomplete until migration `020` is applied, the backend is deployed with Arkesel and hook secrets, Phone Auth is enabled without auto-confirm, the hook URL is configured in Supabase, CAPTCHA is enabled, and a real SMS/verification/session smoke test passes. |
 | Post-apply profile CTA for logged-in users | Not built — only anonymous modal exists |
 | Sync observability dashboard (last sync, jobs imported/updated/archived) | Backend ops endpoint implemented 2026-06-20; broader visual admin dashboard now built at `/dashboard/admin`, ATS sync detail remains a follow-up |
 | Historical behavioral analytics before 2026-07-20 | Not available because first-party event collection starts after migration `013_add_first_party_analytics.sql` is applied |
@@ -193,7 +207,7 @@ As of 2026-07-20:
 | Webhook events from ATS (job.published, job.updated, job.closed) | Deferred |
 | Shared SSO / identity across both products | Deferred |
 | SSRF guard in external_job_parser.py | Implemented 2026-06-02 — HTTPS-only default, DNS/IP blocking, redirect revalidation, response byte cap, regression tests |
-| Public tailored CV URLs (should be signed) | Verified non-runtime 2026-06-02 — CV tailoring service/columns removed; active CV downloads use signed URLs |
+| Public tailored CV URLs (should be signed) | Closed — the rebuilt tailored-CV feature stores private JSONB and renders authenticated DOCX responses in memory; it creates no public generated-file URL |
 | Production hardening docs follow-up | Remaining: full pre-release gate, staging verification of Supabase Auth admin deletion, counsel review of legal copy |
 | Recruiter job posting from inside VeloxaHire (native) | Deferred (plan exists in docs/RECRUITER_JOB_POSTINGS_PLAN.md) |
 | "Add job by URL" → tailored CV/cover letter (`source='external'`) | **Retired 2026-07-13** — Evans confirmed it is not coming back. Endpoints unmounted + deleted, orphan rows purged. `external_job_parser.py` service is now dead code (kept only because `test_production_hardening.py` exercises its SSRF guards) — safe to delete with those tests if desired |
@@ -204,6 +218,8 @@ As of 2026-07-20:
 | Email digest locale is user-selected only | Not inferred from `user_profiles.local_job_market` or signup country; new users default to `EMAIL_DEFAULT_LOCALE` (`en`, Ghanaian-register English). Only `en` and `twi` exist — see the 2026-08-24 pidgin-removal row |
 | Twi email pack review | **Closed 2026-08-24** — Evans reviewed and approved the `twi` pack in `email_copy.py`. Cleared for live sends. Re-review if the Twi strings are edited |
 | Email engagement cooling | A subscriber who never opens keeps receiving. `email_messages.opened_at` is populated by the Resend webhook; no pause-after-N-unopened rule exists yet |
+| WhatsApp top-match alerts live activation | Code path is hardened and test-covered. The dormant food-ordering sender token/phone ID still authenticate and Meta reports GREEN quality (checked 2026-09-05), but live delivery remains unverified until `otp_verification` and `daily_job_digest` are approved in the same WABA, production secrets are mapped, the webhook is moved, and a sandbox end-to-end send reaches `delivered`/`read`. See `docs/features/WHATSAPP_JOB_ALERTS.md`. |
+| Tailored CV generation and editor | Implemented in source 2026-09-05. Registered active users with a parsed, owned CV can generate from Job Match, edit/add/remove structured content with autosave, preview, restore/reset revisions, and privately export DOCX or browser PDF. Backend ownership and optimistic revision checks are enforced; the original CV remains unchanged. Production still requires migration `019` and an authenticated live AI/editor smoke test. |
 
 ---
 
@@ -289,3 +305,23 @@ As of 2026-07-20:
 | 2026-08-24 | Built automated dialect-aware email marketing: opted-in candidates now receive a digest of their matching jobs by email, in English, Ghanaian Pidgin or Twi. New `backend/app/services/email_copy.py` (hand-written phrase packs per locale, 3 rotating variants of every subject/greeting/intro/sign-off, picked from `sha256(user_id)+date` so copy varies per user per day; all scraped job text HTML-escaped), `backend/app/services/email_digest.py` (dispatcher mirroring the WhatsApp one: local-timezone send windows, daily/weekly cadence, per-user-per-local-date idempotency, global + per-user daily caps, Tier-1 with Tier-2 top-up, skip when under `EMAIL_DIGEST_MIN_JOBS` or when the job list is unchanged since the last send), `backend/app/integrations/email.py` (Resend client with `dry_run` mode + Svix webhook HMAC verification), `backend/app/tasks/email_digest.py` + Beat entry `dispatch-email-digests-hourly` at minute :30, `backend/app/api/v1/endpoints/email_notifications.py` (opt-in/opt-out/status/preferences/test-send, token-authorised one-click unsubscribe, Resend webhook feeding a hard `email_suppressions` blocklist). Schema `migrations/018_add_email_digests.sql` (email_* columns on `notification_preferences`, `email_messages`, `email_suppressions`) + `docs/SUPABASE_SETUP_COMPLETE.sql` Part 9. Frontend `components/settings/EmailDigestSettings.tsx` + `lib/api/email-digest.ts`, mounted on `/dashboard/settings`. Docs `docs/features/EMAIL_JOB_DIGEST.md`, `backend/.env.example`. 20 new tests in `backend/tests/test_email_digest.py` pass; frontend type-check and build pass. Ships disabled (`EMAIL_ENABLED=false`, `EMAIL_SEND_MODE=dry_run`) — needs a Resend key and a verified sending domain to go live. | Recommendations were only reaching users via WhatsApp; email reaches every signup, and local-dialect copy is what the Ghanaian candidate base actually responds to |
 | 2026-08-24 | Removed the Ghanaian Pidgin email pack — Evans flagged that the copy I wrote was actually **Nigerian** Pidgin (`how body`, `wey`, `sabi`, `we don check am`, `chaley`) and would land badly with Ghanaian candidates. Locales are now `en` + `twi` only. The `en` pack was rewritten in a Ghanaian professional register — warm and courteous, no slang ("Do well to apply early — some of these close quickly", "All the best with your applications", "We hope you are doing well"). Added `test_english_pack_carries_no_pidgin_markers`, which fails the build if pidgin markers reappear in the English pack. `migrations/018_add_email_digests.sql` was edited **in place** (CHECK now `('en','twi')`) rather than stacked with a 019 — 018 was written the same day and had not been applied to any database; if it was already run somewhere, re-run it or ALTER the constraint by hand. Also updated `docs/SUPABASE_SETUP_COMPLETE.sql`, `config.py` validator, `notification.py` CHECK, `email_notifications.py`, `email-digest.ts` (`EmailLocale`), `EmailDigestSettings.tsx` (2-column locale picker), `docs/features/EMAIL_JOB_DIGEST.md`, `backend/.env.example`. 39 tests pass; type-check and build pass. | The dialect was inauthentic — pidgin is country-specific and Nigerian phrasing reads as foreign to Ghanaians, which is worse than plain English |
 | 2026-08-24 | Evans reviewed and approved the Twi email digest pack (`twi` locale in `backend/app/services/email_copy.py`). Closed the "Twi email pack unreviewed" open item in §10 and removed the matching caveat from `docs/features/EMAIL_JOB_DIGEST.md` §8. No code changed — copy is unchanged and now cleared for live sends. | The pack was written by an agent and held back pending native-speaker review after the Nigerian-Pidgin mistake; that review is now done |
+| 2026-09-05 | Hardened and prepared WhatsApp top-match alerts for reuse of the dormant food-ordering sender. Files: `backend/app/integrations/whatsapp.py`, `backend/app/api/v1/endpoints/whatsapp.py`, `backend/app/services/whatsapp_digest.py`, `backend/app/core/config.py`, `backend/.env.example`, WhatsApp tests, Settings copy, deployment/migration docs, and new `docs/features/WHATSAPP_JOB_ALERTS.md`. Added OTP copy-code button parameters, explicit template locales, sandbox recipient enforcement, fail-closed webhook signatures and production configuration, inactive-user blocking, unchanged-digest suppression, Graph API v26 default, credential mapping, and a safe Meta cutover checklist. Read-only Meta check confirmed the old token/phone ID authenticate, verified name is Veloxa Technology Ltd, and quality is GREEN; no live message was sent and template approval remains unverified. | Reuse the unused food-ordering WhatsApp number for consent-based candidate alerts when new Tier-1 job matches are available, without duplicate spam or unsafe production activation. |
+| 2026-09-05 | Recorded the tailored-CV editor requirement in §10. No runtime code changed. Generated CVs must be editable in a structured browser workspace with autosave, revision history, preview, and private exports rather than being download-only files. | Preserve the owner's requirement that candidates can correct and personalize AI-generated CVs before applying. |
+| 2026-09-05 | Defined tailored CV generation/editing as a registered-user-only capability in §7 and §10. Backend authorization must require an authenticated active account, a successfully parsed user-owned source CV, and ownership of every generated draft; anonymous users retain normal browse/apply access and return to the selected job after signup/login. No runtime code changed. | Keep private CV generation behind real backend authentication without weakening the platform's browse-first public job flow. |
+| 2026-09-05 | Recorded the target candidate identity decision in §7, §9, and §10: registration will collect a telephone number and use an Arkesel SMS one-time code for passwordless verification/session access. Clarified that the checked-in runtime still uses Supabase email/password and that the OTP/session, provisioning, recovery, admin, and existing-user cutover remain unimplemented. No runtime code changed. | Preserve the owner's correction that candidate access should use Arkesel phone verification rather than email/password signup and avoid describing the desired flow as already live. |
+| 2026-09-05 | Located the active environment files: backend secrets belong in `backend/.env` and browser-safe frontend variables belong in `frontend/.env.local`. Confirmed there are no Arkesel variables or template entries yet, so no Arkesel credential should be added until the integration defines the required backend-only names. No runtime code changed. | Tell the owner exactly which environment files to fill without exposing secrets or placing the Arkesel API key in the frontend. |
+| 2026-09-05 | Clarified that a proposed `ARKESEL_SMS_ENABLED=false` value is only a safe pre-launch default: it prevents accidental paid SMS while the integration is incomplete or under test, and should be changed to `true` only when OTP sending, limits, credentials, and delivery have been verified. The variable is not implemented yet. | Avoid interpreting the suggested feature flag as a requirement to keep Arkesel SMS disabled in production. |
+| 2026-09-05 | Built registered-user-only editable tailored CVs. Added owner-scoped generation/revision models and API, migration `019`, sanitized and fact-locked AI shaping, numeric-claim warnings, five-per-hour generation limiting, optimistic autosave conflicts, live structured editor/preview, add/remove controls, revision restore/reset, private in-memory DOCX and browser PDF export, Job Match entry point, tests, and `docs/features/EDITABLE_TAILORED_CVS.md`. The uploaded source CV is never overwritten and public Apply remains unchanged. Focused CV/WhatsApp tests (35), frontend type-check, and production build passed. Full backend: 229 passed, with the same 13 legacy failures and 21 missing-fixture errors in auth/CV/jobs/profile tests. | Let candidates create, review, correct, version, and privately export a role-specific CV before applying, while restricting all CV data operations to registered active owners. |
+| 2026-09-05 | Added automatic production migrations to the DigitalOcean backend pipeline. New `backend/scripts/ops/apply_migrations.py` manages migrations from `019` onward with contiguous-version validation, checksum drift detection, a PostgreSQL advisory lock, and atomic SQL-plus-ledger commits. CI validates migration structure; deployment now triggers for `migrations/` changes, applies pending migrations after dependency installation, and stops before service restart on failure. Updated deployment/script/migration docs and added nine runner tests. | Ensure schema migration `019` and future migrations are applied automatically and safely before code requiring them starts. |
+| 2026-09-05 | Diagnosed repeated local `rate_limit_backend_unavailable` messages during signup-page activity. Redis was not listening on `localhost:6379`, so the analytics limiter used its development in-memory fallback; analytics inserts committed and returned 202. The supplied logs contained only background analytics events, not the browser-to-Supabase signup request, so they do not establish an account-creation failure. No runtime code changed. | Separate a noisy local Redis warning from the actual signup path and avoid fixing a successful analytics request as though it were failed authentication. |
+| 2026-09-05 | Clarified the local analytics warning semantics: `rate_limit_backend_unavailable` means the Redis counter could not be reached, not that the visitor exceeded a limit. An actual limit rejection would return HTTP 429 with `Rate limit exceeded`; the observed requests returned 202 through the development in-memory fallback. No runtime code changed. | Prevent the Redis backend warning from being mistaken for user throttling. |
+| 2026-09-05 | Redesigned the post-apply signup prompt in `frontend/components/jobs/PostApplyModal.tsx` and shortened its public-jobs copy in `frontend/app/jobs/JobsClient.tsx`. The mobile bottom sheet is now a compact, viewport-centered dialog with full rounded corners, stronger depth, one concise benefit statement, and a shorter CTA; close and signup behavior are unchanged. | Make the signup prompt feel like a deliberate popup and remove the excessive promotional detail shown after a public job action. |
+| 2026-09-05 | Implemented passwordless candidate phone authentication in source. Registration now collects full name and telephone, normalizes Ghana numbers to E.164, requests a Supabase OTP, and requires the six-digit code before establishing the existing Supabase session; login defaults to the same phone flow while retaining legacy email/password access for existing accounts. Added a Standard Webhooks-verified Supabase Send SMS hook and Arkesel SMS v2 client, fail-closed production config, phone identity fields/trigger migration `020`, phone-aware admin/user responses, provider/security tests, and `docs/features/PHONE_AUTH_ARKESEL.md`. Seven focused backend tests, frontend type-check, and the production frontend build passed; live SMS was not sent. | Make registration actually request and verify the candidate's telephone number through Arkesel without replacing the platform's working JWT authorization and ownership model. |
+| 2026-09-05 | Corrected the hosted Supabase activation order for Arkesel phone authentication: configure and enable the HTTP Send SMS Auth Hook before enabling the Phone provider, so the custom hook replaces the built-in Twilio/MessageBird/Textlocal/Vonage sender fields. Noted the known Supabase dashboard validation issue and rejected fake provider credentials as a production workaround. No runtime code changed. | Avoid creating an unintended dependency on a built-in SMS provider when Arkesel is the selected regional delivery service. |
+| 2026-09-05 | Verified the production activation boundary for custom Arkesel authentication. `https://api.veloxahire.org/health` returned 200, but `https://api.veloxahire.org/api/v1/auth/hooks/send-sms` returned 404, confirming that the locally implemented HTTP hook is not deployed yet. No live SMS was sent and no production configuration was changed. | Establish why Supabase cannot currently route phone OTP delivery through Arkesel and identify deployment as the next required step. |
+| 2026-09-05 | Updated `docs/features/PHONE_AUTH_ARKESEL.md` with the actual DigitalOcean environment path and a fail-closed activation sequence: store the Arkesel key/sender with SMS disabled, deploy the hook, configure the Supabase hook and shared secret, then enable Arkesel and Phone confirmations. | Prevent a production startup failure or partially activated phone flow while the owner is adding Arkesel secrets to the DigitalOcean server. |
+| 2026-09-05 | Rebuilt the candidate-facing design across landing, login/signup, public job list/detail, shared navigation, dashboard shell, job cards and signup dialog. Added scoped `product.css`, `PublicHeader.tsx`, scroll-craft brief/evidence, and `docs/features/PRODUCT_DESIGN_2026-09.md`. Introduced actual landing search/category links, an explicitly illustrative skill-matching interaction, a desktop result/detail workspace, phone-friendly single-column results, intent-based signup, and keyboard-safe centered dialogs. Preserved existing phone/email auth and ownership behavior. Type-check and isolated production build passed; desktop/390px/360px browser interactions and reduced-motion checks passed, with no runtime errors and no final Axe WCAG A/AA findings across four public/auth routes. Provider/job responses were mocked only for UI tests; no live SMS or deployment. | Replace the generic, promotional appearance with the professional hierarchy and human tone requested through LinkedIn/BambooHR references and the scroll-craft landing-page skill. |
+| 2026-09-05 | Added independent desktop scroll areas to public job results and the selected description in `frontend/app/product.css`; made the results region keyboard-focusable in `JobsClient.tsx` and documented the behavior. Phone layouts retain normal page scrolling. | Keep the selected role visible while browsing further down the job list. |
+| 2026-09-05 | Reviewed remaining work against source and feature release notes. Priorities: explicitly stop the SSH deployment script on migration failure (it currently has no `set -e` or checked exit before restart), rerun the exact CI test gate, verify hosted phone authentication, activate and test WhatsApp delivery, exercise the authenticated CV lifecycle, then complete remaining dashboard polish. No runtime code changed or external production state verified. | Give a concrete next-work sequence and distinguish implemented UI/source from proven production operation. |
+| 2026-09-05 | Redesigned the signed-in candidate workspace: new scoped dashboard.css, rebuilt overview with live API recommendation previews and application counts, phone-aware greeting, profile progress, CV/alert entry points and explicit error/retry state. Updated shared shell/navigation, matches, application rows/tabs, profile and settings styling; added alert-field accessible names. Updated design docs and sections 8-9. Type-check and isolated 24-route production build passed. Browser fixtures passed all five pages at 1440/390/360px with no overflow, runtime errors or Axe WCAG A/AA findings; mobile navigation, application tabs, profile edit/cancel and overview retry passed. No production deployment or live authenticated writes. | Extend the professional LinkedIn/BambooHR-inspired design to the post-login experience while preserving candidate workflows and authorization. |
+| 2026-09-05 | Prepared all pending platform changes for commit and push to feat/ecosystem-unification at the owner's explicit request, including the redesign, phone authentication, WhatsApp alerts, editable CVs and migration pipeline. Frontend type-check, 51 targeted backend tests, migration-file validation and diff whitespace checks passed; a credential-pattern scan found no matches. Actual environment files are excluded. Existing live-activation and deployment-hardening caveats remain; no main-branch merge or production activation is part of this operation. | Publish the complete pending implementation together on the existing feature branch. |

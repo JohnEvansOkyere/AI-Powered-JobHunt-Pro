@@ -44,6 +44,9 @@ jobs:
         # Run the unit suite; integration tests are tracked test debt.
         run: python -m pytest -q -m "not integration"
 
+      - name: Validate pipeline-managed migrations
+        run: python scripts/ops/apply_migrations.py --check
+
   frontend:
     name: Frontend Build
     runs-on: ubuntu-latest

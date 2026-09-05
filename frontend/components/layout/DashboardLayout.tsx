@@ -29,9 +29,9 @@ interface DashboardLayoutProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Job Match', href: '/dashboard/recommendations', icon: Star },
-  { name: 'All Jobs', href: '/dashboard/jobs', icon: Briefcase },
+  { name: 'Overview', href: '/dashboard', icon: Home },
+  { name: 'Job matches', href: '/dashboard/recommendations', icon: Star },
+  { name: 'Explore jobs', href: '/dashboard/jobs', icon: Briefcase },
   { name: 'Applications', href: '/dashboard/applications', icon: FileText },
   { name: 'Profile', href: '/dashboard/profile', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -86,7 +86,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     .toUpperCase() || 'U'
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="vh-dashboard min-h-screen bg-neutral-50">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -97,7 +97,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/95 backdrop-blur-sm border-r border-neutral-200/80 shadow-lg transform transition-transform duration-200 ease-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-neutral-200 transform transition-transform duration-200 ease-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -130,7 +130,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="px-4 py-5 border-b border-neutral-100">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-turquoise-400 to-brand-turquoise-600 p-[2px]">
+                <div className="w-10 h-10 rounded-full bg-forest-600 p-[2px]">
                   <div className="w-full h-full rounded-full bg-white flex items-center justify-center font-semibold text-sm text-brand-turquoise-700">
                     {initials}
                   </div>
@@ -138,10 +138,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-neutral-900 truncate">
-                  {profile?.primary_job_title || 'Job seeker'}
+                  {candidateName}
                 </p>
                 <p className="text-xs text-neutral-500 truncate">
-                  {candidateName}
+                  {profile?.primary_job_title || 'Job seeker'}
                 </p>
               </div>
             </div>
@@ -153,7 +153,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-brand-turquoise-400 to-brand-turquoise-600 h-full rounded-full transition-all duration-700 ease-out"
+                  className="bg-forest-600 h-full rounded-full"
                   style={{ width: `${completionPercentage}%` }}
                 />
               </div>
@@ -161,7 +161,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          <nav aria-label="Workspace" className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive =
@@ -172,10 +172,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Link
                   key={item.name}
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setSidebarOpen(false)}
                   className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ease-out ${
                     isActive
-                      ? 'bg-brand-turquoise-50 text-brand-turquoise-700 shadow-sm'
+                      ? 'bg-forest-50 text-forest-700'
                       : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   }`}
                 >
@@ -236,7 +237,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div className="lg:pl-72">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-neutral-100/80">
+        <header className="sticky top-0 z-30 bg-white border-b border-neutral-200">
           <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -245,12 +246,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex-1" />
+            <p className="flex-1 text-sm font-medium text-neutral-600 pl-3 lg:pl-0">{navigation.find(item => item.href === pathname)?.name || 'Your workspace'}</p>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-neutral-500">
                 {candidateName}
               </span>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-turquoise-400 to-brand-turquoise-600 p-[1.5px]">
+              <div className="w-8 h-8 rounded-full bg-forest-600 p-[1.5px]">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center font-semibold text-xs text-brand-turquoise-700">
                   {initials}
                 </div>

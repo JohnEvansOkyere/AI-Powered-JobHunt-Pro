@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 
     -- User Information
     email TEXT,
+    phone_e164 TEXT,
     full_name TEXT,
     avatar_url TEXT,
 
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     is_active BOOLEAN NOT NULL DEFAULT true,
     is_admin BOOLEAN NOT NULL DEFAULT false,
     email_verified BOOLEAN DEFAULT false,
+    phone_verified BOOLEAN NOT NULL DEFAULT false,
 
     -- Metadata
     last_login_at TIMESTAMP WITH TIME ZONE,
@@ -49,15 +51,20 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- Indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_e164_unique
+    ON public.users(phone_e164) WHERE phone_e164 IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON public.users(is_active);
 CREATE INDEX IF NOT EXISTS idx_users_is_admin ON public.users(is_admin);
 
 -- Sync existing Supabase Auth users early so later public.users FKs can validate.
-INSERT INTO public.users (id, email, email_verified, metadata)
+INSERT INTO public.users (id, email, phone_e164, email_verified, phone_verified, full_name, metadata)
 SELECT
     id,
     email,
+    phone,
     COALESCE(email_confirmed_at IS NOT NULL, false) as email_verified,
+    COALESCE(phone_confirmed_at IS NOT NULL, false) as phone_verified,
+    NULLIF(raw_user_meta_data->>'full_name', ''),
     COALESCE(raw_user_meta_data, '{}'::jsonb) as metadata
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM public.users)
@@ -355,6 +362,40 @@ CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_applications_job_id ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_applications_expires_at ON applications(expires_at);
+
+-- Private, job-specific CV copies. Uploaded source CV rows remain unchanged.
+CREATE TABLE IF NOT EXISTS cv_generations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    source_cv_id UUID NOT NULL REFERENCES cvs(id) ON DELETE CASCADE,
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    content JSONB NOT NULL,
+    ai_content JSONB NOT NULL,
+    source_content_hash TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+    ai_provider TEXT,
+    prompt_version TEXT NOT NULL DEFAULT 'cv-tailor-v1',
+    validation_warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_cv_generations_user_id ON cv_generations(user_id);
+CREATE INDEX IF NOT EXISTS idx_cv_generations_source_cv_id ON cv_generations(source_cv_id);
+CREATE INDEX IF NOT EXISTS idx_cv_generations_job_id ON cv_generations(job_id);
+CREATE INDEX IF NOT EXISTS idx_cv_generations_user_updated
+    ON cv_generations(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS cv_generation_revisions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    generation_id UUID NOT NULL REFERENCES cv_generations(id) ON DELETE CASCADE,
+    revision INTEGER NOT NULL,
+    content JSONB NOT NULL,
+    change_source TEXT NOT NULL CHECK (change_source IN ('ai', 'user', 'reset', 'restore')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_cv_generation_revision UNIQUE (generation_id, revision)
+);
+CREATE INDEX IF NOT EXISTS idx_cv_generation_revisions_generation_id
+    ON cv_generation_revisions(generation_id);
 
 -- =====================================================
 -- PART 8: JOB RECOMMENDATIONS + EMBEDDINGS
@@ -709,6 +750,8 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cvs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cv_generations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cv_generation_revisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_recommendations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_embeddings ENABLE ROW LEVEL SECURITY;
@@ -806,6 +849,34 @@ DROP POLICY IF EXISTS "Users can delete own applications" ON applications;
 CREATE POLICY "Users can delete own applications"
     ON applications FOR DELETE
     USING (auth.uid() = user_id);
+
+-- Generated CV policies. Backend ownership filters remain mandatory because
+-- the FastAPI service uses a direct database connection.
+DROP POLICY IF EXISTS "Users can view own CV generations" ON cv_generations;
+CREATE POLICY "Users can view own CV generations" ON cv_generations FOR SELECT
+    USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own CV generations" ON cv_generations;
+CREATE POLICY "Users can insert own CV generations" ON cv_generations FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own CV generations" ON cv_generations;
+CREATE POLICY "Users can update own CV generations" ON cv_generations FOR UPDATE
+    USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own CV generations" ON cv_generations;
+CREATE POLICY "Users can delete own CV generations" ON cv_generations FOR DELETE
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can view own CV generation revisions" ON cv_generation_revisions;
+CREATE POLICY "Users can view own CV generation revisions" ON cv_generation_revisions FOR SELECT
+    USING (EXISTS (
+        SELECT 1 FROM cv_generations generation
+        WHERE generation.id = generation_id AND generation.user_id = auth.uid()
+    ));
+DROP POLICY IF EXISTS "Users can insert own CV generation revisions" ON cv_generation_revisions;
+CREATE POLICY "Users can insert own CV generation revisions" ON cv_generation_revisions FOR INSERT
+    WITH CHECK (EXISTS (
+        SELECT 1 FROM cv_generations generation
+        WHERE generation.id = generation_id AND generation.user_id = auth.uid()
+    ));
 
 -- Recommendations Policies
 DROP POLICY IF EXISTS "Users can view own recommendations" ON job_recommendations;
@@ -912,6 +983,10 @@ DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_cv_generations_updated_at ON cv_generations;
+CREATE TRIGGER update_cv_generations_updated_at BEFORE UPDATE ON cv_generations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 DROP TRIGGER IF EXISTS update_notification_preferences_updated_at ON notification_preferences;
 CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -942,17 +1017,23 @@ CREATE TRIGGER ensure_single_active_cv_trigger
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.users (id, email, email_verified, metadata)
+    INSERT INTO public.users (id, email, phone_e164, email_verified, phone_verified, full_name, metadata)
     VALUES (
         NEW.id,
         NEW.email,
+        NEW.phone,
         COALESCE(NEW.email_confirmed_at IS NOT NULL, false),
+        COALESCE(NEW.phone_confirmed_at IS NOT NULL, false),
+        NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
         COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)
     )
     ON CONFLICT (id) DO UPDATE
     SET
         email = EXCLUDED.email,
+        phone_e164 = EXCLUDED.phone_e164,
         email_verified = COALESCE(NEW.email_confirmed_at IS NOT NULL, false),
+        phone_verified = COALESCE(NEW.phone_confirmed_at IS NOT NULL, false),
+        full_name = COALESCE(EXCLUDED.full_name, public.users.full_name),
         metadata = COALESCE(NEW.raw_user_meta_data, '{}'::jsonb),
         updated_at = NOW();
     RETURN NEW;
@@ -1041,11 +1122,14 @@ USING (
 -- Run these if you have existing users without profiles/records
 
 -- Sync existing auth.users to public.users
-INSERT INTO public.users (id, email, email_verified, metadata)
+INSERT INTO public.users (id, email, phone_e164, email_verified, phone_verified, full_name, metadata)
 SELECT
     id,
     email,
+    phone,
     COALESCE(email_confirmed_at IS NOT NULL, false) as email_verified,
+    COALESCE(phone_confirmed_at IS NOT NULL, false) as phone_verified,
+    NULLIF(raw_user_meta_data->>'full_name', ''),
     COALESCE(raw_user_meta_data, '{}'::jsonb) as metadata
 FROM auth.users
 WHERE id NOT IN (SELECT id FROM public.users)

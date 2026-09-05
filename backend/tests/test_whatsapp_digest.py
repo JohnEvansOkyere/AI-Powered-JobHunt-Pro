@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from app.core.config import settings
 from app.models.notification import NotificationPreferences
 from app.services.whatsapp_digest import (
+    WhatsappDigestDispatcher,
     digest_cta_url,
     digest_due_for_preferences,
     digest_idempotency_key,
@@ -102,3 +103,17 @@ def test_format_digest_job_list_is_compact():
         "1. Senior Backend Engineer at Acme - Remote\n"
         "2. AI Engineer at Data Co"
     )
+
+
+def test_identical_digest_content_is_not_sent_again():
+    last = SimpleNamespace(payload_hash="same-content")
+    query = SimpleNamespace(
+        filter=lambda *args: SimpleNamespace(
+            order_by=lambda *args: SimpleNamespace(first=lambda: last)
+        )
+    )
+    db = SimpleNamespace(query=lambda *args: query)
+    dispatcher = WhatsappDigestDispatcher(db)
+
+    assert dispatcher._identical_to_last_send(uuid.uuid4(), "same-content") is True
+    assert dispatcher._identical_to_last_send(uuid.uuid4(), "new-content") is False

@@ -32,7 +32,6 @@ logger = get_logger(__name__)
 
 ACTIVE_SEND_STATUSES = ("queued", "sent", "delivered", "read")
 FAILED_RETRYABLE_STATUSES = ("failed", "rate_limited")
-TEMPLATE_LANGUAGE = "en"
 
 
 class WhatsappDigestSendError(RuntimeError):
@@ -211,6 +210,10 @@ class WhatsappDigestDispatcher:
         if self._user_send_budget_exhausted(uid, now):
             return {"status": "skipped", "reason": "user_cap", "user_id": str(uid)}
 
+        user = self.db.get(User, uid)
+        if not user or not user.is_active:
+            return {"status": "skipped", "reason": "inactive_user", "user_id": str(uid)}
+
         recs = self._tier1_recommendations(uid, now)
         if not recs:
             return {"status": "skipped", "reason": "no_tier1", "user_id": str(uid)}
@@ -219,21 +222,27 @@ class WhatsappDigestDispatcher:
         if not job_list:
             return {"status": "skipped", "reason": "no_job_details", "user_id": str(uid)}
 
-        user = self.db.get(User, uid)
         first_name = self._first_name(user)
         params = [first_name, job_list, digest_cta_url()]
         payload = {
             "to": prefs.whatsapp_phone_e164,
             "template": settings.WHATSAPP_TEMPLATE_DIGEST,
-            "language": TEMPLATE_LANGUAGE,
+            "language": settings.WHATSAPP_TEMPLATE_DIGEST_LANGUAGE,
             "body_parameters": params,
         }
+        content_hash = payload_hash(payload)
+        if self._identical_to_last_send(uid, content_hash):
+            return {
+                "status": "skipped",
+                "reason": "unchanged_since_last_send",
+                "user_id": str(uid),
+            }
         audit = existing or WhatsappMessage(
             user_id=uid,
             template_name=settings.WHATSAPP_TEMPLATE_DIGEST,
-            template_language=TEMPLATE_LANGUAGE,
+            template_language=settings.WHATSAPP_TEMPLATE_DIGEST_LANGUAGE,
             phone_e164=prefs.whatsapp_phone_e164,
-            payload_hash=payload_hash(payload),
+            payload_hash=content_hash,
             idempotency_key=idempotency_key,
             status="queued",
         )
@@ -241,7 +250,7 @@ class WhatsappDigestDispatcher:
             audit.status = "queued"
             audit.error_code = None
             audit.error_message = None
-            audit.payload_hash = payload_hash(payload)
+            audit.payload_hash = content_hash
         else:
             self.db.add(audit)
         self.db.commit()
@@ -250,7 +259,7 @@ class WhatsappDigestDispatcher:
             response = await get_whatsapp_client().send_template(
                 to_e164=str(prefs.whatsapp_phone_e164),
                 template_name=settings.WHATSAPP_TEMPLATE_DIGEST,
-                language_code=TEMPLATE_LANGUAGE,
+                language_code=settings.WHATSAPP_TEMPLATE_DIGEST_LANGUAGE,
                 body_parameters=params,
             )
         except Exception as exc:  # noqa: BLE001 - Celery decides retry envelope
@@ -326,6 +335,20 @@ class WhatsappDigestDispatcher:
             .count()
         )
         return int(count or 0) >= int(settings.WHATSAPP_MAX_SENDS_PER_USER_PER_DAY)
+
+    def _identical_to_last_send(self, user_id: uuid.UUID, content_hash: str) -> bool:
+        """Do not repeatedly send the same still-valid Tier-1 job list."""
+        last = (
+            self.db.query(WhatsappMessage)
+            .filter(
+                WhatsappMessage.user_id == user_id,
+                WhatsappMessage.template_name == settings.WHATSAPP_TEMPLATE_DIGEST,
+                WhatsappMessage.status.in_(ACTIVE_SEND_STATUSES),
+            )
+            .order_by(WhatsappMessage.created_at.desc())
+            .first()
+        )
+        return bool(last and last.payload_hash == content_hash)
 
     def _tier1_recommendations(
         self,

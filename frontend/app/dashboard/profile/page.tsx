@@ -95,14 +95,13 @@ export default function ProfilePage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="max-w-4xl mx-auto space-y-5">
+        <div className="ws-page ws-profile max-w-4xl mx-auto space-y-5">
           <header>
             <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
               Your profile
             </h1>
             <p className="text-sm text-neutral-500 mt-0.5">
-              This is what we use to find roles for you. Edit any section below &mdash;
-              changes save on their own.
+              Your experience, skills, and next move. Keep them up to date for better matches.
             </p>
           </header>
 

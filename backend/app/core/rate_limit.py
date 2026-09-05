@@ -90,6 +90,7 @@ SCRAPING_RATE_LIMIT = RateLimit("scraping", settings.SCRAPING_RATE_LIMIT_PER_MIN
 EXTERNAL_URL_PARSE_RATE_LIMIT = RateLimit("external-url-parse", 5, 60)
 EXTERNAL_TEXT_PARSE_RATE_LIMIT = RateLimit("external-text-parse", 10, 60)
 RECOMMENDATION_REGENERATE_RATE_LIMIT = RateLimit("recommendation-regenerate", 2, 3600)
+CV_GENERATION_RATE_LIMIT = RateLimit("cv-generation", 5, 3600)
 CRON_RATE_LIMIT = RateLimit("cron", 10, 60)
 PUBLIC_JOB_SEARCH_RATE_LIMIT = RateLimit("public-job-search", 60, 60)
 PUBLIC_JOB_DETAIL_RATE_LIMIT = RateLimit("public-job-detail", 120, 60)
