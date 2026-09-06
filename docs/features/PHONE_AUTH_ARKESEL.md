@@ -86,10 +86,14 @@ or malformed numbers. Arkesel's v2 API examples require the international
 recipient form with the leading `+`.
 
 Validation failures now log `error_code=invalid_phone_format` or
-`invalid_otp_format`; other delivery failures use `sms_delivery_failed`.
-Phone numbers, OTPs, secrets, and provider response bodies are not included in
-these diagnostics. A signature failure remains `401`, missing payload fields
-remain `422`, and SMS delivery failures remain `502`.
+`invalid_otp_format`. Arkesel failures include a safe `error_code` and a
+bounded, redacted response preview so the actual provider reason is visible:
+`arkesel_credentials_rejected` (401),
+`arkesel_sender_or_account_not_authorized` (403),
+`arkesel_request_rejected` (other 4xx), `arkesel_rate_limited` (429), and
+`arkesel_provider_unavailable` (5xx). Phone numbers, OTPs, API keys, and
+secrets are redacted from the preview. A signature failure remains `401`,
+missing payload fields remain `422`, and SMS delivery failures remain `502`.
 
 Deploy the updated backend before retrying signup; restarting an older checkout
 does not apply this fix. Tests use a mocked Arkesel transport. Actual SMS receipt

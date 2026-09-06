@@ -21,6 +21,7 @@ from app.core.logging import get_logger
 from app.core.rate_limit import HANDOFF_VERIFY_RATE_LIMIT, enforce_rate_limit
 from app.core.redis_client import get_async_redis
 from app.integrations.arkesel import (
+    ArkeselProviderError,
     SMSValidationError,
     arkesel_sms,
     verify_supabase_hook_signature,
@@ -187,7 +188,11 @@ async def send_phone_auth_sms(request: Request):
                 "supabase_send_sms_provider_failed",
                 provider=provider_name,
                 error_type=type(exc).__name__,
-                error_code=(exc.error_code if isinstance(exc, SMSValidationError) else "sms_delivery_failed"),
+                error_code=(
+                    exc.error_code
+                    if isinstance(exc, (SMSValidationError, ArkeselProviderError))
+                    else "sms_delivery_failed"
+                ),
             )
 
     logger.error("supabase_send_sms_hook_delivery_failed", providers=failures or provider_names)
