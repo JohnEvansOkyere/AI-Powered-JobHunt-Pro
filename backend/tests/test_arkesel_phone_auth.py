@@ -106,7 +106,7 @@ async def test_arkesel_sender_uses_v2_contract_without_plus(
     assert captured["url"] == "https://sms.arkesel.com/api/v2/sms/send"
     assert captured["headers"]["api-key"] == "test-main-key"
     assert captured["json"]["sender"] == "VeloxaHire"
-    assert captured["json"]["recipients"] == ["233241234567"]
+    assert captured["json"]["recipients"] == ["+233241234567"]
     assert "123456" in captured["json"]["message"]
 
 
@@ -193,7 +193,7 @@ def test_send_sms_hook_delivers_verified_supabase_otp(
     assert response.status_code == 200
     transport.post.assert_awaited_once()
     sms = transport.post.call_args.kwargs["json"]
-    assert sms["recipients"] == ["233241234567"]
+    assert sms["recipients"] == ["+233241234567"]
     assert "012345" in sms["message"]
 
 

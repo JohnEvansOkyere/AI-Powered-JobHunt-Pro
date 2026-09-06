@@ -107,10 +107,13 @@ class ArkeselSMSClient:
             f"Your VeloxaHire verification code is {code}. "
             "It expires shortly. Do not share this code."
         )
+        # Arkesel's v2 API expects recipients as international numbers. Keep
+        # the leading '+' even when Supabase supplied its digits-only form.
+        recipient = phone if phone.startswith("+") else f"+{phone}"
         payload = {
             "sender": settings.ARKESEL_SENDER_ID.strip(),
             "message": message,
-            "recipients": [phone.removeprefix("+")],
+            "recipients": [recipient],
         }
         async with httpx.AsyncClient(timeout=3.5) as client:
             response = await client.post(
