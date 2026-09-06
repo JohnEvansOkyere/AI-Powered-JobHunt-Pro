@@ -99,6 +99,8 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 
 ## 6. Frontend Navigation Structure (current)
 
+Onboarding (2026-09-06, owner correction): after account verification, the overview and Job matches require profile essentials (target title, seniority, work preference and a skill) AND an active successfully parsed CV. Incomplete accounts open `/profile/setup`, a three-step wizard (career, skills, CV) with persisted progress and a recommendation request on completion. Browse/apply routes remain available. Manual history and advanced preferences are optional; CV upload is required.
+
 Public design refreshed 2026-09-05: the shared header links to Find a job, How it works, For employers, Sign in and Create account. Landing search/category links carry `q` into `/jobs`; public results use a desktop list/detail workspace and a single-column phone list. Saving triggers signup by intent; the five-second public signup timer has been removed.
 
 ```
@@ -169,8 +171,10 @@ As of 2026-07-20:
 | ATS sync service | `backend/app/services/ats_job_sync_service.py` |
 | Celery periodic tasks | `backend/app/tasks/periodic_tasks.py` |
 | Recommendation generator | `backend/app/services/recommendation_generator.py` |
+| Required CV/profile matching and parsed CV evidence | `backend/app/services/matching_readiness.py`, `backend/app/services/embedding_pipeline.py`, `docs/features/CANDIDATE_ONBOARDING.md` |
 | Sidebar nav | `frontend/components/layout/DashboardLayout.tsx` |
 | Signed-in workspace styling and overview | `frontend/app/dashboard.css`, `frontend/app/dashboard/page.tsx` |
+| Guided matching setup and entry check | `frontend/app/profile/setup/page.tsx`, `frontend/components/auth/ProtectedRoute.tsx`, `frontend/lib/profile-utils.ts`; browser regression: `frontend/scripts/verify-onboarding.cjs` |
 | Public jobs list | `frontend/app/jobs/page.tsx`, `frontend/app/jobs/JobsClient.tsx` |
 | Public product design and shared header | `frontend/app/product.css`, `frontend/components/layout/PublicHeader.tsx`, `docs/features/PRODUCT_DESIGN_2026-09.md` |
 | Public job detail | `frontend/app/jobs/[id]/page.tsx` |
@@ -194,6 +198,7 @@ As of 2026-07-20:
 - Apply without account (external link)
 - After applying, invite to register — **don't block apply with a gate**
 - Profile completion is required for AI recommendations, not for browsing or applying
+- First entry to overview/Job matches must offer guided setup when profile essentials or an active parsed CV are missing; save each step and retain progress after refresh. CV upload is required for onboarding and recommendation generation. Manual history and AI settings remain optional.
 - Candidate registration collects name, email and password first, then verifies a phone once on the next page; verified users automatically continue and later sign in with email/password only
 - Forgot-password recovery asks only for the registered phone, verifies an SMS code, then collects a new password. Routine login remains email/password.
 - Customer errors use reviewed action/retry messages. Never display provider configuration, database exceptions, parser diagnostics or raw error objects; failed profile saves retain the editor and consume the rejected promise.
@@ -204,6 +209,8 @@ As of 2026-07-20:
 ---
 
 ## 10. Known Open Items
+
+Guided onboarding with required CV upload and corrected CV/profile matching is implemented locally on 2026-09-06. Deploy both apps and run a real authenticated CV-upload/parse/recommendation-generation smoke test; fixtures cannot prove production storage, providers or job availability. Tailored exports use the system layout, not the exact uploaded formatting; see `docs/features/CANDIDATE_ONBOARDING.md`.
 
 | Item | Status |
 |---|---|
@@ -360,5 +367,8 @@ As of 2026-07-20:
 | 2026-09-06 | Checked password reset in current source: reset-email and update-password helpers exist in frontend/lib/auth.ts, but no reset route, reset request form or login recovery link exists. Recorded the gap in section 10; no runtime changes. | Answer whether password reset is implemented after the email/password auth change. |
 | 2026-09-06 | Implemented phone-only SMS password reset: login recovery link/page/client, three backend recovery endpoints, authoritative verified-phone checks, Redis HMAC codes and single-use grants with atomic expiry/attempt/rate/replay controls, canonical Auth password-only updates, provider reset messages, bounded requests, safe validation logs and no-store responses. Added security/browser tests and fixture, SMS_PASSWORD_RESET.md and current navigation/access notes. All 67 focused tests using isolated Redis, 1440/390/360px browser flows through real routes/Redis with mocked external adapters, type-check and isolated 27-route production build passed. No deployment, live SMS or real account mutation. | Provide production-oriented SMS recovery using only the registered phone, as explicitly corrected by the owner; protect reset ownership and prevent code/grant reuse while keeping routine email/password login. |
 | 2026-09-06 | Prepared the signup/login and SMS password-reset changes for a scoped commit and push on feat/ecosystem-unification. Staged only the verification changes in the shared ProtectedRoute; left the existing profile setup, profile utility, profile-gate and onboarding-script edits outside the commit. Adjusted the auth browser regression to accept authenticated dashboard arrival with or without the independent profile gate. | Push the authorized authentication work while preserving unrelated in-progress onboarding changes. |
+| 2026-09-06 | Added profile readiness checks before overview/Job matches in ProtectedRoute and profile-utils; replaced profile/setup with two persisted steps for career preferences and skills, then requests initial recommendations. Updated dashboard/page to remove its competing timeout redirect on profile read failure, adjusted Profile setup copy, documented behavior and added scripts/verify-onboarding.cjs. TypeScript, diff checks and synthetic browser tests passed for resume, validation, save/read failures, matching success/failure, preserved fields, returning/anonymous users, browsing and 1440/390/360px layouts. No deployment or live account writes. | Ensure newly logged-in candidates receive guided setup for job recommendations instead of an empty dashboard; preserve concurrent auth/error-handling work. |
+| 2026-09-06 | Made CV upload a required third onboarding step; setup and overview/matches now require an active completed CV with structured content. Added CV processing polling, upload/read failure handling, resume and browser coverage. Fixed embedding_pipeline reading nonexistent summary/extracted_text attributes: matching now consumes bounded sanitized parsed CV evidence alongside profile intent, selects the active parsed CV, and includes CV skills in scoring/reranking. Added shared backend readiness checks to manual/scheduled generation and compatibility eligibility. Documented that tailored drafts use uploaded facts but system export layout, not exact source formatting. Type-check, browser fixture regression, whitespace checks and 76 focused matching/tailoring tests passed. No deployment or live upload/provider calls. | Apply the owner's correction that both CV and profile are required, and fix the discovered omission of uploaded CV evidence from matching. |
 | 2026-09-06 | Added frontend/lib/errors.ts and safe error handling across API/download/reset clients, auth, profile/CV, settings and admin screens; caught failed profile saves without closing edits. Backend hides HTTP 5xx and DEBUG exception details, redacts validation and stored parser/import diagnostics, and shares request IDs through CORS. Added error regression scripts/tests and ERROR_HANDLING.md. 90 focused backend tests with isolated Redis, frontend type-check/error tests, isolated production build, auth flows and desktop/mobile failure scenarios passed. Preserved concurrent onboarding/matching edits. No push or deployment. | Stop developer errors appearing to customers while retaining actionable login, verification, reset and retry guidance. |
 | 2026-09-06 | Prepared the customer error-handling fixes for a scoped commit and push on feat/ecosystem-unification. Selected only error-handling changes in shared CVSection, dashboard profile and MEMORY files; retained concurrent onboarding and matching changes in the working tree. | Publish the requested error-handling fix without including unrelated work. |
+| 2026-09-06 | Prepared required CV/profile onboarding and corrected matching for a scoped commit and push to feat/ecosystem-unification. Rechecked 76 focused backend tests, frontend type-check and diff whitespace; all passed. Included the onboarding browser regression and feature documentation. | Publish the onboarding and required-CV matching changes at the owner's request. |

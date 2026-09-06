@@ -28,6 +28,8 @@ from app.core.logging import get_logger
 from app.core.rate_limit import CRON_RATE_LIMIT, RECOMMENDATION_REGENERATE_RATE_LIMIT, enforce_rate_limit
 from app.models.job_recommendation import JobRecommendation
 from app.models.job import Job
+from app.models.user_profile import UserProfile
+from app.services.matching_readiness import active_parsed_cv, matching_ready
 
 logger = get_logger(__name__)
 
@@ -293,6 +295,9 @@ async def regenerate_recommendations(
     shortly after.
     """
     user_id = current_user["id"]
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not matching_ready(profile, active_parsed_cv(db, user_id)):
+        raise HTTPException(status_code=400, detail="Complete your profile and upload a successfully parsed CV before requesting job matches.")
     await enforce_rate_limit(
         request,
         RECOMMENDATION_REGENERATE_RATE_LIMIT,

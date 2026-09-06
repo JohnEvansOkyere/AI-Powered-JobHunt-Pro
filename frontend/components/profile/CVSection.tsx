@@ -1,7 +1,7 @@
 'use client'
 
 import { getUserErrorMessage } from '@/lib/errors'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FileText,
   Upload,
@@ -19,6 +19,7 @@ import {
   getActiveCV,
   deleteCV,
   getCVDownloadURL,
+  isCVReady,
   type CVDetail,
 } from '@/lib/api/cvs'
 
@@ -72,29 +73,39 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function CVSection() {
+export function CVSection({ onReadyChange, disabled = false }: { onReadyChange?: (ready: boolean) => void; disabled?: boolean }) {
   const [cv, setCV] = useState<CVDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  const load = async () => {
+  const load = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       setCV(await getActiveCV())
+      setLoadError(false)
     } catch (err) {
+      setLoadError(true)
       toast.error(getUserErrorMessage(err, 'Could not load your CV. Please try again.'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    onReadyChange?.(!loading && !uploading && !loadError && isCVReady(cv))
+  }, [cv, loading, uploading, loadError, onReadyChange])
+  useEffect(() => {
+    if (!cv || !['pending', 'processing'].includes(cv.parsing_status) || loadError || uploading) return
+    const timer = setTimeout(() => void load(false), 3000)
+    return () => clearTimeout(timer)
+  }, [cv, loadError, uploading, load])
 
   const handleFiles = async (file: File) => {
+    if (uploading || disabled) return
     const error = validateFile(file)
     if (error) {
       toast.error(error)
@@ -102,8 +113,9 @@ export function CVSection() {
     }
     try {
       setUploading(true)
-      await uploadCV(file)
-      toast.success('CV uploaded — parsing in progress')
+      const result = await uploadCV(file)
+      if (result.parsing_status === 'failed') toast.error('We could not read this CV. Please upload a clear PDF or Word document.')
+      else toast.success(result.parsing_status === 'completed' ? 'CV uploaded and ready' : 'CV uploaded — processing in progress')
       await load()
     } catch (err: any) {
       toast.error(getUserErrorMessage(err, 'Failed to upload CV'))
@@ -119,6 +131,7 @@ export function CVSection() {
       await deleteCV(cv.id)
       toast.success('CV removed')
       setCV(null)
+      setLoadError(false)
     } catch (err: any) {
       toast.error(getUserErrorMessage(err, 'Failed to delete CV'))
     }
@@ -141,17 +154,22 @@ export function CVSection() {
         <h2 className="text-sm font-semibold text-neutral-900">CV</h2>
       </header>
       <p className="text-xs text-neutral-500 mb-4">
-        We use your CV to improve job matches. Only the parsed skills and experience are used for ranking.
+        Your CV and profile guide your job matches. Your uploaded CV also supplies the facts for tailored versions.
       </p>
 
       {loading ? (
         <div className="flex items-center justify-center py-6 text-neutral-400">
           <Loader2 className="w-4 h-4 animate-spin" />
         </div>
+      ) : loadError ? (
+        <div className="space-y-3">
+          <p role="alert" className="text-sm">We couldn’t load your CV. Try again before continuing.</p>
+          <button type="button" className="text-sm underline" onClick={() => void load()}>Retry CV check</button>
+        </div>
       ) : cv ? (
         <ActiveCVCard
           cv={cv}
-          uploading={uploading}
+          uploading={uploading || disabled}
           onReplace={() => inputRef.current?.click()}
           onDelete={handleDelete}
           onDownload={handleDownload}
@@ -159,7 +177,7 @@ export function CVSection() {
       ) : (
         <UploadDropzone
           dragActive={dragActive}
-          uploading={uploading}
+          uploading={uploading || disabled}
           onDrop={(e) => {
             e.preventDefault()
             setDragActive(false)
@@ -227,11 +245,14 @@ function ActiveCVCard({
         <StatusBadge status={cv.parsing_status} />
       </div>
 
-      {cv.parsing_status === 'failed' && cv.parsing_error && (
+      {cv.parsing_status === 'failed' && (
         <div className="mb-3 flex items-start gap-2 p-2 bg-rose-50 border border-rose-100 rounded-md text-xs text-rose-700">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           <span>We could not read this CV. Try uploading a clear PDF or Word document.</span>
         </div>
+      )}
+      {cv.parsing_status === 'completed' && !isCVReady(cv) && (
+        <p role="alert" className="mb-3 text-sm text-rose-700">This file has no readable CV content. Replace it with a clear PDF or Word document.</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -261,6 +282,7 @@ function ActiveCVCard({
         </button>
         <button
           onClick={onDelete}
+          disabled={uploading}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-neutral-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors ml-auto"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -323,7 +345,7 @@ function UploadDropzone({
         )}
       </button>
       <p className="text-[11px] text-neutral-400 mt-3">
-        DOCX preserves original formatting. Either format works for matching.
+        Your original file stays unchanged. Tailored exports use an editable layout.
       </p>
     </div>
   )

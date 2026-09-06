@@ -164,7 +164,7 @@ export default function ProfilePage() {
               onClick={() => router.push('/profile/setup')}
               className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
             >
-              Prefer a guided walkthrough? Run the full setup &rarr;
+              Review your matching details with guided setup &rarr;
             </button>
           </div>
         </div>

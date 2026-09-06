@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useProfile } from "@/hooks/useProfile";
@@ -23,18 +22,15 @@ interface Overview {
 }
 
 export default function DashboardPage() {
-  const { profile, loading: profileLoading } = useProfile();
+  return <ProtectedRoute><DashboardContent /></ProtectedRoute>;
+}
+
+function DashboardContent() {
+  const { profile, loading: profileLoading, loadProfile } = useProfile();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const router = useRouter();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || profileLoading || profile) return;
-    const timer = setTimeout(() => router.push("/profile/setup"), 1000);
-    return () => clearTimeout(timer);
-  }, [authLoading, isAuthenticated, profile, profileLoading, router]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -60,15 +56,20 @@ export default function DashboardPage() {
 
   if (authLoading || profileLoading)
     return (
-      <ProtectedRoute>
         <DashboardLayout>
           <div className="ws-loading" role="status">
             Loading your workspace…
           </div>
         </DashboardLayout>
-      </ProtectedRoute>
     );
-  if (!profile) return null;
+  if (!profile) return (
+    <DashboardLayout>
+      <div className="ws-panel p-6 space-y-4">
+        <p role="alert">We couldn’t load your profile. Please try again.</p>
+        <button className="ws-button" onClick={() => void loadProfile()}>Try again</button>
+      </div>
+    </DashboardLayout>
+  );
 
   const name = String(
     user?.user_metadata?.full_name ||
@@ -81,7 +82,6 @@ export default function DashboardPage() {
   const completion = calculateProfileCompletion(profile);
 
   return (
-    <ProtectedRoute>
       <DashboardLayout>
         <div className="ws-page ws-overview">
           <header className="ws-heading">
@@ -257,6 +257,5 @@ export default function DashboardPage() {
           </div>
         </div>
       </DashboardLayout>
-    </ProtectedRoute>
   );
 }

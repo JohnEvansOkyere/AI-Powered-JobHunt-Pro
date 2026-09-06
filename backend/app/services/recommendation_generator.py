@@ -15,15 +15,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
-from app.models.application import Application
 from app.models.cv import CV
 from app.models.job_recommendation import JobRecommendation
 from app.models.user_profile import UserProfile
 from app.services.recommendation_engine_v2 import RecommendationEngineV2
+from app.services.matching_readiness import active_parsed_cv, matching_ready
 
 logger = get_logger(__name__)
 
@@ -36,39 +36,13 @@ class RecommendationGenerator:
         self.engine = RecommendationEngineV2(db)
 
     def user_eligible_for_recommendations(self, user_id: str) -> bool:
-        """User has enough signal for V2: profile, CV, or saved/applied jobs."""
-        cv_exists = (
-            self.db.query(CV.id)
-            .filter(CV.user_id == user_id)
-            .order_by(CV.created_at.desc())
-            .first()
-            is not None
-        )
+        """Matching requires profile essentials and an active, parsed CV."""
         profile = (
             self.db.query(UserProfile)
             .filter(UserProfile.user_id == user_id)
             .first()
         )
-        has_profile_signal = bool(
-            profile
-            and (
-                profile.primary_job_title
-                or profile.secondary_job_titles
-                or profile.technical_skills
-            )
-        )
-        has_interest_signal = (
-            self.db.query(Application.id)
-            .filter(
-                and_(
-                    Application.user_id == user_id,
-                    Application.status.in_(("saved", "applied", "interviewing", "offer")),
-                )
-            )
-            .first()
-            is not None
-        )
-        return cv_exists or has_profile_signal or has_interest_signal
+        return matching_ready(profile, active_parsed_cv(self.db, user_id))
 
     async def generate_recommendations_for_user(self, user_id: str) -> int:
         """Generate V2 recommendations for a single user and return row count."""
@@ -116,7 +90,7 @@ class RecommendationGenerator:
                 .all()
             )
         }
-        eligible = users_with_cvs | users_with_profiles
+        eligible = users_with_cvs & users_with_profiles
         if not eligible:
             return []
 
