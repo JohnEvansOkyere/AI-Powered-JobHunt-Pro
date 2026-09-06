@@ -141,6 +141,28 @@ when the SMS provider accepted the message.
 
 ## Troubleshooting delivery failures
 
+### Existing accounts verifying a phone
+
+The signed hook now selects the OTP destination from `sms.phone`. For older
+payloads without that field, it uses `user.new_phone` when populated, then
+`user.phone` for ordinary phone sign-in. Previously it always read `user.phone`,
+which can be empty or still contain the old number during `updateUser({ phone })`.
+This reproduced a `502` for an existing email account and could send a phone-change
+code to the previous number. Explicit malformed destinations fail closed rather
+than falling back to a different phone. Signature verification remains mandatory.
+
+Contract references: [Supabase OTP destination construction](https://github.com/supabase/auth/blob/master/internal/api/phone.go),
+[SMS hook schema](https://github.com/supabase/auth/blob/master/internal/hooks/v0hooks/v0hooks.go),
+and [pending phone JSON field](https://github.com/supabase/auth/blob/master/internal/models/user.go).
+Regression tests cover empty and previous phone values, current and legacy hook
+payloads, destination precedence, malformed payloads and leading-zero OTPs using
+a mocked SMS transport. The owner's reported generic error is not independently
+confirmed as this failure without the live Auth response or hook logs. Deploy the
+backend fix and verify actual SMS receipt and `phone_change` completion on the same
+account; no account deletion, verification bypass or schema change is required.
+
+### Provider phone-number format
+
 The 2026-09-06 production logs showed a signed hook reaching SMS delivery and
 returning `502` with `error_type=ValueError`. The sender previously required a
 leading `+`, whereas [Supabase Auth normalizes phone numbers by removing it](https://github.com/supabase/auth/blob/master/internal/api/phone.go).

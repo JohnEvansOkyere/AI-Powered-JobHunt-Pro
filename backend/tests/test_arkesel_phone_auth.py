@@ -215,13 +215,22 @@ def test_send_sms_hook_rejects_unsigned_request(client: TestClient):
 
 
 @pytest.mark.auth
-@pytest.mark.parametrize("phone", ["+233241234567", "233241234567"])
+@pytest.mark.parametrize("user,sms_fields", [
+    ({"phone": "+233241234567"}, {}),
+    ({"phone": "233241234567"}, {}),
+    ({"phone": "", "new_phone": "233241234567"}, {"phone": "233241234567"}),
+    ({"phone": "233201234567"}, {"phone": "233241234567"}),
+    ({"phone": "", "new_phone": "233241234567"}, {}),
+    ({"phone": "233201234567", "new_phone": "233241234567"}, {}),
+    ({"phone": "233201234567", "new_phone": "233501234567"}, {"phone": "233241234567"}),
+])
 def test_send_sms_hook_delivers_verified_supabase_otp(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
-    phone: str,
+    user: dict,
+    sms_fields: dict,
 ):
-    payload = {"user": {"phone": phone}, "sms": {"otp": "012345"}}
+    payload = {"user": user, "sms": {"otp": "012345", **sms_fields}}
     body = json.dumps(payload, separators=(",", ":")).encode()
     raw_secret = b"s" * 32
     monkeypatch.setattr(
@@ -256,17 +265,32 @@ def test_send_sms_hook_delivers_verified_supabase_otp(
 
 
 @pytest.mark.auth
+@pytest.mark.parametrize("payload", [
+    {"user": {"phone": "+233241234567"}, "sms": {}},
+    {"user": {"phone": "+233241234567"}, "sms": {"otp": "012345", "phone": None}},
+    {"user": {"phone": "+233241234567"}, "sms": {"otp": "012345", "phone": ""}},
+    {"user": {"phone": "+233241234567"}, "sms": {"otp": "012345", "phone": 233241234567}},
+    {"user": {"phone": "+233241234567"}, "sms": {"otp": 123456}},
+    {"user": {"phone": "+233241234567", "new_phone": []}, "sms": {"otp": "012345"}},
+    {"user": None, "sms": {"otp": "012345"}},
+    {"sms": []},
+    [],
+])
 def test_send_sms_hook_rejects_invalid_payload_after_signature(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    payload,
 ):
-    body = b'{"user":{"phone":"+233241234567"},"sms":{}}'
+    body = json.dumps(payload).encode()
     raw_secret = b"s" * 32
     monkeypatch.setattr(
         settings,
         "SUPABASE_SEND_SMS_HOOK_SECRETS",
         f"v1,whsec_{base64.b64encode(raw_secret).decode()}",
     )
+    sender = AsyncMock()
+    monkeypatch.setattr("app.api.v1.endpoints.auth.arkesel_sms.send_auth_code", sender)
+    monkeypatch.setattr("app.api.v1.endpoints.auth.moolre_sms.send_auth_code", sender)
 
     response = client.post(
         "/api/v1/auth/hooks/send-sms",
@@ -276,6 +300,7 @@ def test_send_sms_hook_rejects_invalid_payload_after_signature(
 
     assert response.status_code == 422
     assert response.json()["error"]["http_code"] == 422
+    sender.assert_not_awaited()
 
 
 @pytest.mark.auth

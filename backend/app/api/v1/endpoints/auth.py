@@ -157,8 +157,26 @@ async def send_phone_auth_sms(request: Request):
 
     try:
         event = json.loads(body)
-        phone = str(event["user"]["phone"])
-        otp = str(event["sms"]["otp"])
+        sms = event["sms"]
+        if not isinstance(sms, dict):
+            raise ValueError("Invalid SMS payload")
+        otp = sms["otp"]
+        if "phone" in sms:
+            # Current Supabase hooks provide the actual OTP destination here.
+            # Do not fall back to a different number if it is malformed.
+            phone = sms["phone"]
+        else:
+            # Older hooks expose pending phone changes as user.new_phone;
+            # user.phone can still be empty or contain the previous number.
+            user = event["user"]
+            if not isinstance(user, dict):
+                raise ValueError("Invalid user payload")
+            pending_phone = user.get("new_phone")
+            phone = user["phone"] if pending_phone in (None, "") else pending_phone
+        if not isinstance(phone, str) or not phone.strip():
+            raise ValueError("Invalid phone payload")
+        if not isinstance(otp, str) or not otp.strip():
+            raise ValueError("Invalid OTP payload")
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
