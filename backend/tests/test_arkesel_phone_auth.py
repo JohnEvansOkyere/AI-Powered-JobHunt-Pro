@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.integrations.arkesel import (
     ArkeselSMSClient,
+    ArkeselProviderError,
     SMSValidationError,
     verify_supabase_hook_signature,
 )
@@ -108,6 +109,42 @@ async def test_arkesel_sender_uses_v2_contract_without_plus(
     assert captured["json"]["sender"] == "VeloxaHire"
     assert captured["json"]["recipients"] == ["+233241234567"]
     assert "123456" in captured["json"]["message"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status_code,error_code",
+    [(401, "arkesel_credentials_rejected"), (403, "arkesel_sender_or_account_not_authorized"), (429, "arkesel_rate_limited")],
+)
+async def test_arkesel_provider_failure_has_safe_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+    status_code: int,
+    error_code: str,
+):
+    response = MagicMock(status_code=status_code)
+    response.json.return_value = {
+        "message": "sender Veloxa is not approved for +233241234567",
+        "otp": "123456",
+    }
+    transport = AsyncMock()
+    transport.__aenter__.return_value = transport
+    transport.post.return_value = response
+    monkeypatch.setattr(settings, "ARKESEL_SMS_ENABLED", True)
+    monkeypatch.setattr(settings, "ARKESEL_API_KEY", "test-main-key")
+    monkeypatch.setattr(settings, "ARKESEL_SENDER_ID", "Veloxa")
+    monkeypatch.setattr("app.integrations.arkesel.httpx.AsyncClient", MagicMock(return_value=transport))
+    log = MagicMock()
+    monkeypatch.setattr("app.integrations.arkesel.logger", log)
+
+    with pytest.raises(ArkeselProviderError) as caught:
+        await ArkeselSMSClient().send_auth_code(phone_e164="+233241234567", otp="123456")
+
+    assert caught.value.error_code == error_code
+    failure = log.error.call_args
+    assert failure.args == ("arkesel_auth_sms_failed",)
+    assert failure.kwargs["error_code"] == error_code
+    assert "[redacted-number]" in failure.kwargs["response_body"]
+    assert "123456" not in failure.kwargs["response_body"]
 
 
 @pytest.mark.asyncio

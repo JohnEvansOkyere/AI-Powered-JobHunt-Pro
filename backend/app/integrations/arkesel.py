@@ -29,6 +29,50 @@ class SMSValidationError(ValueError):
         super().__init__(error_code)
 
 
+class ArkeselProviderError(RuntimeError):
+    """Provider failure carrying a safe diagnostic code for the hook log."""
+
+    def __init__(self, error_code: str, message: str = "Arkesel rejected the SMS request"):
+        self.error_code = error_code
+        super().__init__(message)
+
+
+def _safe_response_preview(response: httpx.Response) -> str:
+    """Return a bounded provider response without exposing phone/OTP values."""
+    try:
+        value = response.json()
+        if isinstance(value, dict):
+            # Provider error payloads are useful for diagnosis, but never log
+            # arbitrary nested data or values that could contain user inputs.
+            value = {
+                str(key): str(item)[:240]
+                for key, item in value.items()
+                if str(key).lower() not in {"phone", "recipient", "recipients", "otp", "api_key"}
+            }
+            preview = str(value)
+        else:
+            preview = str(value)
+    except ValueError:
+        preview = response.text
+    preview = re.sub(r"\b\+?[0-9][0-9\s().-]{7,}\b", "[redacted-number]", preview)
+    preview = re.sub(r"(?<![0-9])[0-9]{4,10}(?![0-9])", "[redacted-code]", preview)
+    return preview[:500]
+
+
+def _arkesel_http_error_code(status_code: int) -> str:
+    if status_code == 401:
+        return "arkesel_credentials_rejected"
+    if status_code == 403:
+        return "arkesel_sender_or_account_not_authorized"
+    if status_code == 429:
+        return "arkesel_rate_limited"
+    if 400 <= status_code < 500:
+        return "arkesel_request_rejected"
+    if status_code >= 500:
+        return "arkesel_provider_unavailable"
+    return "arkesel_http_error"
+
+
 def _hook_secret_values(configured: str) -> list[str]:
     """Return decoded-secret candidates from Supabase's rotation format."""
     values: list[str] = []
@@ -101,7 +145,7 @@ class ArkeselSMSClient:
         if not settings.ARKESEL_SMS_ENABLED:
             raise RuntimeError("Arkesel SMS is disabled")
         if not settings.ARKESEL_API_KEY.strip() or not settings.ARKESEL_SENDER_ID.strip():
-            raise RuntimeError("Arkesel SMS credentials are incomplete")
+            raise ArkeselProviderError("arkesel_credentials_incomplete", "Arkesel SMS credentials are incomplete")
 
         message = (
             f"Your VeloxaHire verification code is {code}. "
@@ -126,19 +170,32 @@ class ArkeselSMSClient:
             )
 
         if response.status_code != 200:
+            error_code = _arkesel_http_error_code(response.status_code)
             logger.error(
                 "arkesel_auth_sms_failed",
                 status_code=response.status_code,
+                error_code=error_code,
+                response_body=_safe_response_preview(response),
             )
-            raise RuntimeError("Arkesel rejected the SMS request")
+            raise ArkeselProviderError(error_code)
 
         try:
             result = response.json()
         except ValueError as exc:
-            raise RuntimeError("Arkesel returned an invalid response") from exc
+            logger.error(
+                "arkesel_auth_sms_invalid_response",
+                status_code=response.status_code,
+                response_body=_safe_response_preview(response),
+            )
+            raise ArkeselProviderError("arkesel_invalid_response", "Arkesel returned an invalid response") from exc
         if str(result.get("status", "")).lower() != "success":
-            logger.error("arkesel_auth_sms_unsuccessful")
-            raise RuntimeError("Arkesel did not accept the SMS request")
+            logger.error(
+                "arkesel_auth_sms_unsuccessful",
+                status_code=response.status_code,
+                provider_status=str(result.get("status", ""))[:80],
+                response_body=_safe_response_preview(response),
+            )
+            raise ArkeselProviderError("arkesel_request_unsuccessful")
 
 
 arkesel_sms = ArkeselSMSClient()
