@@ -69,6 +69,10 @@ Moolre uses `MOOLRE_VAS_KEY`, `MOOLRE_SENDER_ID`, and its `X-API-VASKEY` API
 contract. Configure `MOOLRE_SMS_ENABLED=true` and put `moolre` first when
 Moolre should be the active provider. Keep only providers with verified
 credentials in the chain; a provider with missing credentials is skipped.
+Successful hook responses return an explicit JSON object with
+`Content-Type: application/json`; Supabase rejects a bare `200` response with
+no content type as `Invalid Content-Type: Missing Content-Type header` even
+when the SMS provider accepted the message.
 
 ## Troubleshooting delivery failures
 
