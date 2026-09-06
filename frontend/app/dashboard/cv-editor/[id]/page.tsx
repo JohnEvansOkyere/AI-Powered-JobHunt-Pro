@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -123,7 +124,7 @@ export default function CVEditorPage() {
       revisionRef.current = draft.revision
       lastSaved.current = JSON.stringify(draft.content)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not load this CV.')
+      toast.error(getUserErrorMessage(error, 'Could not load this CV.'))
     } finally {
       setLoading(false)
     }
@@ -148,7 +149,7 @@ export default function CVEditorPage() {
           setRevisions(await getCVRevisions(id))
         } catch (error) {
           setSaveState('error')
-          toast.error(error instanceof Error ? error.message : 'Autosave failed.')
+          toast.error(getUserErrorMessage(error, 'Autosave failed.'))
         }
       }
       saveQueue.current = saveQueue.current.then(save, save)

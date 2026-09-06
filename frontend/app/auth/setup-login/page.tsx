@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
@@ -30,7 +31,7 @@ export default function SetupLoginPage() {
       setPassword('')
       if (!result.user.email || result.user.new_email) { setPending(true); return }
       router.replace(accountDestination(result.user))
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not set up email sign-in.') }
+    } catch (err) { setError(getUserErrorMessage(err, 'Could not set up email sign-in.')) }
     finally { setBusy(false) }
   }
   const checkConfirmation = async () => {
@@ -39,7 +40,7 @@ export default function SetupLoginPage() {
       const current = await getCurrentUser()
       if (!current?.email || current.new_email) throw new Error('Open the confirmation link in your email first.')
       router.replace(accountDestination(current))
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not check your email confirmation.') }
+    } catch (err) { setError(getUserErrorMessage(err, 'Could not check your email confirmation.')) }
     finally { setBusy(false) }
   }
 

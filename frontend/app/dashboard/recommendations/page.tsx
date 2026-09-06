@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -320,7 +321,7 @@ export default function RecommendationsPage() {
         [tier]: { items: data.items, total: data.total, loading: false, error: null },
       }))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load recommendations'
+      const msg = getUserErrorMessage(err, 'Failed to load recommendations')
       setTierStates((prev) => ({
         ...prev,
         [tier]: { items: [], total: 0, loading: false, error: msg },
@@ -399,7 +400,7 @@ export default function RecommendationsPage() {
       const generation = await createCVGeneration(jobId)
       router.push(`/dashboard/cv-editor/${generation.id}`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not tailor your CV.')
+      toast.error(getUserErrorMessage(error, 'Could not tailor your CV.'))
     } finally {
       setTailoringJobId(null)
     }

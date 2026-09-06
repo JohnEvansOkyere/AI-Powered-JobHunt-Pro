@@ -80,8 +80,13 @@ export default function ProfilePage() {
   const completionPercentage = calculateProfileCompletion(profile)
 
   const handleSectionSave = async (data: UserProfileFormData) => {
-    await saveProfile(data)
-    setEditing(null)
+    try {
+      await saveProfile(data)
+      setEditing(null)
+    } catch {
+      // useProfile shows the safe error. Keep edits open for retry, and consume
+      // the rejection so a failed save cannot trigger the runtime error overlay.
+    }
   }
 
   const enterEdit = (key: SectionKey) => {

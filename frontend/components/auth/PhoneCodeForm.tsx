@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { accountButton, accountInput, accountLabel } from './AccountForm'
-
-function verificationError(error: unknown, fallback: string) {
-  if (!(error instanceof Error) || !error.message || error.message === '{}') return fallback
-  if ('status' in error && typeof error.status === 'number' && error.status >= 500) return fallback
-  return error.message
-}
+import { getUserErrorMessage as verificationError } from '@/lib/errors'
 
 export function PhoneCodeForm({ initialPhone = '', onRequest, onVerify }: {
   initialPhone?: string

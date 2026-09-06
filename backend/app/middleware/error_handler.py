@@ -11,6 +11,8 @@ from typing import Callable, Optional
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, OperationalError
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog import get_logger
@@ -19,6 +21,37 @@ from app.core.config import settings
 from app.exceptions import AppException
 
 logger = get_logger(__name__)
+
+SERVICE_UNAVAILABLE = "This service is temporarily unavailable. Please try again later."
+# Keep the recovery guidance for a password update whose outcome is uncertain.
+SAFE_SERVICE_MESSAGES = {
+    "Password reset is temporarily unavailable.",
+    "Could not confirm the reset. Try signing in with your new password, or request a new code.",
+}
+
+
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """HTTPException is handled inside FastAPI, before middleware can catch it."""
+    detail = exc.detail
+    if exc.status_code >= 500:
+        logger.error("http_service_error", status_code=exc.status_code,
+                     path=request.url.path, request_id=getattr(request.state, "request_id", "unknown"))
+        detail = detail if isinstance(detail, str) and detail in SAFE_SERVICE_MESSAGES else SERVICE_UNAVAILABLE
+    headers = dict(exc.headers or {})
+    headers["Cache-Control"] = "no-store"
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail}, headers=headers)
+
+
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Pydantic input/ctx/msg can contain passwords, CVs and exception text.
+    errors = [{"loc": error["loc"], "type": error["type"]} for error in exc.errors()]
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.warning("validation_error", method=request.method, path=request.url.path,
+                   errors=errors, request_id=request_id)
+    return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={
+        "error": {"code": "VALIDATION_ERROR", "message": "Check the details you entered and try again.",
+                  "details": {}, "request_id": request_id},
+    })
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
@@ -45,7 +78,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Generate unique request ID for tracing
-        request_id = str(uuid.uuid4())
+        request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
         request.state.request_id = request_id
 
         try:
@@ -88,8 +121,8 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             content={
                 "error": {
                     "code": exc.error_code,
-                    "message": exc.message,
-                    "details": exc.details if settings.DEBUG else {},
+                    "message": SERVICE_UNAVAILABLE if exc.status_code >= 500 else exc.message,
+                    "details": {},
                     "request_id": request_id,
                 }
             },
@@ -115,15 +148,15 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         if isinstance(exc, IntegrityError):
             status_code = status.HTTP_409_CONFLICT
             error_code = "DATABASE_INTEGRITY_ERROR"
-            message = "Database integrity constraint violated"
+            message = "This change conflicts with an existing record. Refresh and try again."
         elif isinstance(exc, OperationalError):
             status_code = status.HTTP_503_SERVICE_UNAVAILABLE
             error_code = "DATABASE_UNAVAILABLE"
-            message = "Database service unavailable"
+            message = SERVICE_UNAVAILABLE
         else:
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             error_code = "DATABASE_ERROR"
-            message = "Database operation failed"
+            message = SERVICE_UNAVAILABLE
 
         return JSONResponse(
             status_code=status_code,
@@ -131,7 +164,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 "error": {
                     "code": error_code,
                     "message": message,
-                    "details": {"error_type": error_type} if settings.DEBUG else {},
+                    "details": {},
                     "request_id": request_id,
                 }
             },
@@ -154,7 +187,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             content={
                 "error": {
                     "code": "INVALID_VALUE",
-                    "message": str(exc) if settings.DEBUG else "Invalid value provided",
+                    "message": "Check the details you entered and try again.",
                     "details": {},
                     "request_id": request_id,
                 }
@@ -177,24 +210,13 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             traceback=traceback.format_exc(),
         )
 
-        # Never send tracebacks to clients (log only). Avoid leaking internals even in DEBUG.
-        if settings.is_production:
-            message = "An unexpected error occurred. Please contact support."
-            details = {}
-        elif settings.DEBUG:
-            message = f"{error_type}: {str(exc)}"
-            details = {"error_type": error_type}
-        else:
-            message = "An unexpected error occurred. Please contact support."
-            details = {}
-
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": {
                     "code": "INTERNAL_ERROR",
-                    "message": message,
-                    "details": details,
+                    "message": SERVICE_UNAVAILABLE,
+                    "details": {},
                     "request_id": request_id,
                 }
             },

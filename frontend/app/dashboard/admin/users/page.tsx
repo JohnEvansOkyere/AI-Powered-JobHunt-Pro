@@ -1,4 +1,5 @@
 'use client'
+import { getUserErrorMessage } from '@/lib/errors'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -33,7 +34,7 @@ function formatWhen(value: string | null) {
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
+  return getUserErrorMessage(error, fallback)
 }
 
 function StatusBadge({ active }: { active: boolean }) {
@@ -161,7 +162,7 @@ export default function AdminUsersPage() {
     setNotice('')
     try {
       const result = await revokeAdminUser(target.id)
-      setNotice(result.warning ? `${target.phone || target.email || 'User'} was removed locally. ${result.warning}` : `${target.phone || target.email || 'User'} was permanently revoked.`)
+      setNotice(result.warning ? 'Local account data was removed, but account revocation is incomplete. Please try again or contact support.' : `${target.phone || target.email || 'User'} was permanently revoked.`)
       await loadUsers()
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Could not revoke this user.'))

@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -96,7 +97,7 @@ export default function AdminDashboardPage() {
         router.replace('/dashboard')
         return
       }
-      setError(requestError?.message || 'Could not load admin analytics.')
+      setError(getUserErrorMessage(requestError, 'Could not load admin analytics.'))
     } finally {
       setLoading(false)
     }

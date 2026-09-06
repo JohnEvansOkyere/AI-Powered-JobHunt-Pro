@@ -24,12 +24,13 @@ async function fixture(browser, options = {}) {
     const request = route.request()
     const url = new URL(request.url())
     if (url.origin === base) return route.continue()
-    const reply = (json, status = 200) => route.fulfill({ status, json, headers: { 'Access-Control-Allow-Origin': base } })
+    const reply = (json, status = 200) => route.fulfill({ status, json, headers: { 'Access-Control-Allow-Origin': base, 'X-Supabase-Api-Version': '2024-01-01', 'Access-Control-Expose-Headers': 'X-Supabase-Api-Version' } })
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': base, 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' } })
     if (url.hostname === authHost && url.pathname.startsWith('/auth/v1/')) {
       const body = request.postData() ? request.postDataJSON() : {}
       calls.push({ path: url.pathname, method: request.method(), body, grant: url.searchParams.get('grant_type') })
       if (url.pathname.endsWith('/signup')) {
+        if (options.signupError) return reply(options.signupError, 500)
         assert.equal(body.email, 'candidate@example.test')
         assert.equal(body.password, 'Synthetic-password-123')
         assert.equal(body.data.full_name, 'Test Candidate')
@@ -38,6 +39,7 @@ async function fixture(browser, options = {}) {
         return options.emailConfirmation ? reply({ user, session: null }) : reply(session(user))
       }
       if (url.pathname.endsWith('/token')) {
+        if (options.loginError) return reply(options.loginError, 400)
         if (url.searchParams.get('grant_type') === 'password') {
           assert.equal(body.email, 'candidate@example.test')
           assert.equal(body.password, 'Synthetic-password-123')
@@ -58,7 +60,7 @@ async function fixture(browser, options = {}) {
         if (request.method() === 'PUT') {
           assert.ok(request.headers().authorization, 'Phone/credentials update must be authenticated')
           if (body.phone) assert.equal(body.phone, '+233241234567')
-          if (body.phone && options.smsFailure) return reply({ msg: 'Could not send the verification code.' }, 503)
+          if (body.phone && options.smsFailure) return reply({ msg: 'Hook requires authorization token: synthetic-private-detail' }, 503)
           if (body.email) {
             assert.equal(body.password, 'Synthetic-password-123')
             user = options.pendingEmail ? { ...user, new_email: body.email } : { ...user, email: body.email }
@@ -71,7 +73,12 @@ async function fixture(browser, options = {}) {
     }
     if (url.pathname.includes('/api/v1/') || url.pathname === '/auth/handoff/verify') {
       if (url.pathname === '/auth/handoff/verify') return reply({ valid: true, full_name: 'Test Candidate', email: 'candidate@example.test', phone: '024 123 4567', job_id: 'test-job' })
-      if (url.pathname.includes('/profiles/')) return reply({ id: 'profile', user_id: id, created_at: '2026-09-06', updated_at: '2026-09-06' })
+      if (url.pathname.includes('/profiles')) {
+        if (request.method() === 'PUT' && options.profileSaveError) return reply({ error: { message: options.profileSaveError } }, 500)
+        return reply({ id: 'profile', user_id: id, primary_job_title: 'Engineer', technical_skills: [{ skill: 'Testing' }], created_at: '2026-09-06', updated_at: '2026-09-06', ...options.profile })
+      }
+      if (url.pathname.includes('/cvs/active')) return reply(options.cv || null)
+      if (url.pathname.includes('/password-reset/')) return reply({ error: { message: 'Redis connection rejected: synthetic-private-detail' } }, 503)
       if (url.pathname.includes('/admin')) return reply({ is_admin: false })
       if (url.pathname.includes('/applications')) return reply({ applications: [], total: 0 })
       return reply({ items: [], total: 0, page: 1, total_pages: 0 })
@@ -177,7 +184,7 @@ async function main() {
     await failed.page.goto(`${base}/auth/verify-phone`)
     await failed.page.getByLabel('Telephone number').fill('024 123 4567')
     await failed.page.getByRole('button', { name: 'Send verification code' }).click()
-    await failed.page.getByRole('alert').filter({ hasText: 'Could not send' }).waitFor()
+    await failed.page.getByRole('alert').filter({ hasText: 'temporarily unavailable' }).waitFor()
     assert.equal(await failed.page.getByLabel('Six-digit code').count(), 0)
     assert.ok(await failed.page.getByRole('button', { name: /Try again in/ }).isDisabled())
     assert.deepEqual(failed.errors, [])
@@ -198,4 +205,5 @@ async function main() {
     console.log('PASS desktop/390px/360px layouts and no browser runtime errors')
   } finally { await browser.close() }
 }
-main().catch((error) => { console.error(error); process.exitCode = 1 })
+if (require.main === module) main().catch((error) => { console.error(error); process.exitCode = 1 })
+module.exports = { fixture, fillSignup, newUser }

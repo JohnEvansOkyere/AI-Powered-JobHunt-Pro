@@ -1,8 +1,9 @@
 // Recovery grants live only in component memory, never in URLs or storage.
+import { apiError, UserFacingError } from '../errors'
 const base = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
-export class PasswordResetError extends Error {
-  constructor(message: string, public status: number, public retryAfter = 0) { super(message) }
+export class PasswordResetError extends UserFacingError {
+  constructor(message: string, status: number, public retryAfter = 0) { super(message, status) }
 }
 
 async function request<T>(step: string, body: object): Promise<T> {
@@ -16,10 +17,11 @@ async function request<T>(step: string, body: object): Promise<T> {
   } catch {
     throw new PasswordResetError('Could not connect. Please try again.', 0)
   }
-  const data = await response.json().catch(() => ({}))
+  const data = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new PasswordResetError(typeof data.detail === 'string' ? data.detail : 'Could not complete this step. Check your details and try again.', response.status, Number(response.headers.get('Retry-After')) || 60)
+    throw new PasswordResetError(apiError(response, data).message, response.status, Number(response.headers.get('Retry-After')) || 60)
   }
+  if (!data || typeof data !== 'object') throw new PasswordResetError('We could not read the response. Please try again.', response.status)
   return data as T
 }
 

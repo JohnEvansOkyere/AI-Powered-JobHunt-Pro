@@ -277,15 +277,16 @@ def test_client_ip_does_not_trust_forged_forwarded_header():
 
 
 def test_validation_does_not_log_or_echo_passwords_or_codes(client, monkeypatch):
-    import app.main as main
+    from app.middleware import error_handler
     log = MagicMock()
-    monkeypatch.setattr(main, 'logger', log)
+    monkeypatch.setattr(error_handler, 'logger', log)
     response = client.post('/api/v1/auth/password-reset/complete', json={'reset_token': 'private-grant-value', 'password': 'private-secret'})
     assert response.status_code == 422
     assert 'private-grant-value' not in response.text
     assert 'private-secret' not in response.text
-    assert 'private-secret' not in str(log.error.call_args_list)
-    assert 'private-grant-value' not in str(log.error.call_args_list)
+    assert log.warning.called
+    assert 'private-secret' not in str(log.mock_calls)
+    assert 'private-grant-value' not in str(log.mock_calls)
     assert response.headers['cache-control'] == 'no-store'
 
 

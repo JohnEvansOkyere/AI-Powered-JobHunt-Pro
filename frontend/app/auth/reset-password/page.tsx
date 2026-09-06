@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AccountForm, accountButton, accountInput, accountLabel } from '@/components/auth/AccountForm'
@@ -38,7 +39,7 @@ export default function ResetPasswordPage() {
       setRetryAt(Date.now() + result.resend_after * 1000)
       setStep('code')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not request a code.')
+      setError(getUserErrorMessage(err, 'Could not request a code.'))
       if (err instanceof PasswordResetError && err.status === 429) setRetryAt(Date.now() + err.retryAfter * 1000)
     } finally { setBusy(false); submitting.current = false }
   }
@@ -60,7 +61,7 @@ export default function ResetPasswordPage() {
         setStep('done')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not complete this step.')
+      setError(getUserErrorMessage(err, 'Could not complete this step.'))
       if (err instanceof PasswordResetError && err.status === 429) setVerifyRetryAt(Date.now() + err.retryAfter * 1000)
       // An ambiguous completion may have consumed the grant. Never replay it.
       if (step === 'password') { setGrant(''); setPassword(''); setConfirm(''); setExpiresAt(1) }

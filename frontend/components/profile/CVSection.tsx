@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useEffect, useRef, useState } from 'react'
 import {
   FileText,
@@ -87,7 +88,7 @@ export function CVSection() {
       setLoading(true)
       setCV(await getActiveCV())
     } catch (err) {
-      console.error(err)
+      toast.error(getUserErrorMessage(err, 'Could not load your CV. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -105,8 +106,7 @@ export function CVSection() {
       toast.success('CV uploaded — parsing in progress')
       await load()
     } catch (err: any) {
-      console.error(err)
-      toast.error(err?.response?.data?.detail || 'Failed to upload CV')
+      toast.error(getUserErrorMessage(err, 'Failed to upload CV'))
     } finally {
       setUploading(false)
     }
@@ -120,8 +120,7 @@ export function CVSection() {
       toast.success('CV removed')
       setCV(null)
     } catch (err: any) {
-      console.error(err)
-      toast.error(err?.response?.data?.detail || 'Failed to delete CV')
+      toast.error(getUserErrorMessage(err, 'Failed to delete CV'))
     }
   }
 
@@ -131,7 +130,6 @@ export function CVSection() {
       const { download_url } = await getCVDownloadURL(cv.id)
       window.open(download_url, '_blank', 'noopener,noreferrer')
     } catch (err) {
-      console.error(err)
       toast.error('Could not generate download link')
     }
   }
@@ -232,7 +230,7 @@ function ActiveCVCard({
       {cv.parsing_status === 'failed' && cv.parsing_error && (
         <div className="mb-3 flex items-start gap-2 p-2 bg-rose-50 border border-rose-100 rounded-md text-xs text-rose-700">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          <span>{cv.parsing_error}</span>
+          <span>We could not read this CV. Try uploading a clear PDF or Word document.</span>
         </div>
       )}
 

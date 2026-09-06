@@ -6,6 +6,7 @@ Includes timing information and request/response metadata.
 """
 
 import time
+import uuid
 from typing import Callable
 
 from fastapi import Request, Response
@@ -53,7 +54,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # Extract request metadata
         start_time = time.time()
-        request_id = getattr(request.state, "request_id", None)
+        request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+        request.state.request_id = request_id
 
         # Get client IP from headers or direct connection
         client_ip = (

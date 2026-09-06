@@ -1,4 +1,5 @@
 'use client'
+import { getUserErrorMessage } from '@/lib/errors'
 
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -31,7 +32,7 @@ const STATUS_META: Record<AlxEntryStatus, { label: string; className: string }> 
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
+  return getUserErrorMessage(error, fallback)
 }
 
 function formatDeadline(value: string | null) {
@@ -211,9 +212,7 @@ export default function AdminJobImportsPage() {
             </p>
             {result.stats.errors.length > 0 && (
               <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-red-700">
-                {result.stats.errors.map((message) => (
-                  <li key={message}>{message}</li>
-                ))}
+                <li>Some jobs could not be imported. Review the imported jobs before trying again.</li>
               </ul>
             )}
           </section>

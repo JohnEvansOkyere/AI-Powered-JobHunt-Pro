@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -64,7 +65,7 @@ function SignUpContent() {
       if (!result.session) { setEmailPending(true); return }
       router.replace('/auth/verify-phone')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not create your account.')
+      toast.error(getUserErrorMessage(error, 'Could not create your account.'))
     } finally { setLoading(false) }
   }
 

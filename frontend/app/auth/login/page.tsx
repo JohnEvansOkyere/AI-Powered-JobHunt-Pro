@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -28,7 +29,7 @@ export default function LoginPage() {
       void trackEvent({ event_name: 'login_completed', path: '/auth/login', metadata: { method: 'email_password' } })
       router.replace(accountDestination(result.user))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to sign in.')
+      toast.error(getUserErrorMessage(error, 'Failed to sign in.'))
     } finally { setLoading(false) }
   }
 

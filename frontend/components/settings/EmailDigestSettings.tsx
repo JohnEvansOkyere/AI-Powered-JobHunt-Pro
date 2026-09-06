@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import {
   getEmailDigestStatus,
   optInToEmailDigest,
@@ -97,7 +98,7 @@ export function EmailDigestSettings() {
       applyStatus(data)
       toast.success('Job match emails are on')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not turn on job match emails')
+      toast.error(getUserErrorMessage(err, 'Could not turn on job match emails'))
     } finally {
       setSaving(false)
     }
@@ -116,7 +117,7 @@ export function EmailDigestSettings() {
       applyStatus(data)
       toast.success('Email preferences saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save preferences')
+      toast.error(getUserErrorMessage(err, 'Could not save preferences'))
     } finally {
       setSaving(false)
     }
@@ -130,7 +131,7 @@ export function EmailDigestSettings() {
       applyStatus(data)
       toast.success('Job match emails turned off')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not turn off job match emails')
+      toast.error(getUserErrorMessage(err, 'Could not turn off job match emails'))
     } finally {
       setSaving(false)
     }
@@ -148,7 +149,7 @@ export function EmailDigestSettings() {
         toast(SKIP_REASONS[result.reason ?? ''] ?? 'Nothing to send right now')
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not send the test digest')
+      toast.error(getUserErrorMessage(err, 'Could not send the test digest'))
     } finally {
       setTesting(false)
     }
