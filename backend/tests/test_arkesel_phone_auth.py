@@ -7,13 +7,17 @@ import hashlib
 import hmac
 import json
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
-from app.integrations.arkesel import ArkeselSMSClient, verify_supabase_hook_signature
+from app.integrations.arkesel import (
+    ArkeselSMSClient,
+    SMSValidationError,
+    verify_supabase_hook_signature,
+)
 
 
 def _signed_headers(body: bytes, raw_secret: bytes) -> dict[str, str]:
@@ -61,8 +65,10 @@ def test_supabase_hook_signature_rejects_tampered_body():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("phone", ["+233241234567", "233241234567"])
 async def test_arkesel_sender_uses_v2_contract_without_plus(
     monkeypatch: pytest.MonkeyPatch,
+    phone: str,
 ):
     captured: dict = {}
 
@@ -93,7 +99,7 @@ async def test_arkesel_sender_uses_v2_contract_without_plus(
     monkeypatch.setattr("app.integrations.arkesel.httpx.AsyncClient", FakeAsyncClient)
 
     await ArkeselSMSClient().send_auth_code(
-        phone_e164="+233241234567",
+        phone_e164=phone,
         otp="123456",
     )
 
@@ -102,6 +108,31 @@ async def test_arkesel_sender_uses_v2_contract_without_plus(
     assert captured["json"]["sender"] == "VeloxaHire"
     assert captured["json"]["recipients"] == ["233241234567"]
     assert "123456" in captured["json"]["message"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "phone,otp,error_code",
+    [
+        ("0241234567", "123456", "invalid_phone_format"),
+        ("++233241234567", "123456", "invalid_phone_format"),
+        ("23324 1234567", "123456", "invalid_phone_format"),
+        ("2332412345678901", "123456", "invalid_phone_format"),
+        ("23324123456١", "123456", "invalid_phone_format"),
+        ("233241234567", "123", "invalid_otp_format"),
+        ("233241234567", "12345x", "invalid_otp_format"),
+        ("233241234567", "١٢٣٤٥٦", "invalid_otp_format"),
+    ],
+)
+async def test_arkesel_invalid_input_never_contacts_provider(
+    monkeypatch: pytest.MonkeyPatch, phone: str, otp: str, error_code: str,
+):
+    transport = MagicMock()
+    monkeypatch.setattr("app.integrations.arkesel.httpx.AsyncClient", transport)
+    with pytest.raises(SMSValidationError) as caught:
+        await ArkeselSMSClient().send_auth_code(phone_e164=phone, otp=otp)
+    assert caught.value.error_code == error_code
+    transport.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -126,11 +157,13 @@ def test_send_sms_hook_rejects_unsigned_request(client: TestClient):
 
 
 @pytest.mark.auth
+@pytest.mark.parametrize("phone", ["+233241234567", "233241234567"])
 def test_send_sms_hook_delivers_verified_supabase_otp(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    phone: str,
 ):
-    payload = {"user": {"phone": "+233241234567"}, "sms": {"otp": "123456"}}
+    payload = {"user": {"phone": phone}, "sms": {"otp": "012345"}}
     body = json.dumps(payload, separators=(",", ":")).encode()
     raw_secret = b"s" * 32
     monkeypatch.setattr(
@@ -138,10 +171,17 @@ def test_send_sms_hook_delivers_verified_supabase_otp(
         "SUPABASE_SEND_SMS_HOOK_SECRETS",
         f"v1,whsec_{base64.b64encode(raw_secret).decode()}",
     )
-    send = AsyncMock(return_value=None)
+    monkeypatch.setattr(settings, "ARKESEL_SMS_ENABLED", True)
+    monkeypatch.setattr(settings, "ARKESEL_API_KEY", "test-main-key")
+    monkeypatch.setattr(settings, "ARKESEL_SENDER_ID", "VeloxaHire")
+    provider_response = MagicMock(status_code=200)
+    provider_response.json.return_value = {"status": "success"}
+    transport = AsyncMock()
+    transport.__aenter__.return_value = transport
+    transport.post.return_value = provider_response
     monkeypatch.setattr(
-        "app.api.v1.endpoints.auth.arkesel_sms.send_auth_code",
-        send,
+        "app.integrations.arkesel.httpx.AsyncClient",
+        MagicMock(return_value=transport),
     )
 
     response = client.post(
@@ -151,7 +191,10 @@ def test_send_sms_hook_delivers_verified_supabase_otp(
     )
 
     assert response.status_code == 200
-    send.assert_awaited_once_with(phone_e164="+233241234567", otp="123456")
+    transport.post.assert_awaited_once()
+    sms = transport.post.call_args.kwargs["json"]
+    assert sms["recipients"] == ["233241234567"]
+    assert "012345" in sms["message"]
 
 
 @pytest.mark.auth
@@ -175,3 +218,37 @@ def test_send_sms_hook_rejects_invalid_payload_after_signature(
 
     assert response.status_code == 422
     assert response.json()["error"]["http_code"] == 422
+
+
+@pytest.mark.auth
+@pytest.mark.parametrize("validation_error", [True, False])
+def test_send_sms_hook_logs_safe_failure_without_sensitive_values(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, validation_error: bool,
+):
+    body = b'{"user":{"phone":"+233241234567"},"sms":{"otp":"012345"}}'
+    raw_secret = b"s" * 32
+    monkeypatch.setattr(
+        settings, "SUPABASE_SEND_SMS_HOOK_SECRETS",
+        f"v1,whsec_{base64.b64encode(raw_secret).decode()}",
+    )
+    error = (
+        SMSValidationError("invalid_phone_format") if validation_error
+        else RuntimeError("sensitive provider response +233241234567 012345")
+    )
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.auth.arkesel_sms.send_auth_code",
+        AsyncMock(side_effect=error),
+    )
+    log = MagicMock()
+    monkeypatch.setattr("app.api.v1.endpoints.auth.logger", log)
+    response = client.post(
+        "/api/v1/auth/hooks/send-sms", content=body,
+        headers=_signed_headers(body, raw_secret),
+    )
+    assert response.status_code == 502
+    assert response.json()["error"]["message"] == "Could not send the verification code."
+    log.error.assert_called_once_with(
+        "supabase_send_sms_hook_delivery_failed",
+        error_type=type(error).__name__,
+        error_code="invalid_phone_format" if validation_error else "sms_delivery_failed",
+    )

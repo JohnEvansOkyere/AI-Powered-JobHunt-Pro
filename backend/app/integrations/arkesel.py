@@ -18,7 +18,15 @@ logger = get_logger(__name__)
 
 ARKESEL_SMS_URL = "https://sms.arkesel.com/api/v2/sms/send"
 WEBHOOK_TOLERANCE_SECONDS = 5 * 60
-E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_RE = re.compile(r"^\+?[1-9][0-9]{7,14}$")
+
+
+class SMSValidationError(ValueError):
+    """Validation failure carrying a safe diagnostic code, never input values."""
+
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+        super().__init__(error_code)
 
 
 def _hook_secret_values(configured: str) -> list[str]:
@@ -82,12 +90,14 @@ class ArkeselSMSClient:
     """Minimal async client for Arkesel SMS API v2."""
 
     async def send_auth_code(self, *, phone_e164: str, otp: str) -> None:
+        # Supabase Auth normalizes phone numbers by removing the leading '+'.
+        # Accept both representations, keeping the country code mandatory.
         phone = (phone_e164 or "").strip()
         code = (otp or "").strip()
         if not E164_RE.fullmatch(phone):
-            raise ValueError("Invalid E.164 phone number")
-        if not code.isdigit() or not 4 <= len(code) <= 10:
-            raise ValueError("Invalid authentication code")
+            raise SMSValidationError("invalid_phone_format")
+        if not re.fullmatch(r"[0-9]{4,10}", code):
+            raise SMSValidationError("invalid_otp_format")
         if not settings.ARKESEL_SMS_ENABLED:
             raise RuntimeError("Arkesel SMS is disabled")
         if not settings.ARKESEL_API_KEY.strip() or not settings.ARKESEL_SENDER_ID.strip():

@@ -20,7 +20,11 @@ from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.rate_limit import HANDOFF_VERIFY_RATE_LIMIT, enforce_rate_limit
 from app.core.redis_client import get_async_redis
-from app.integrations.arkesel import arkesel_sms, verify_supabase_hook_signature
+from app.integrations.arkesel import (
+    SMSValidationError,
+    arkesel_sms,
+    verify_supabase_hook_signature,
+)
 from supabase import Client
 
 logger = get_logger(__name__)
@@ -170,6 +174,9 @@ async def send_phone_auth_sms(request: Request):
         logger.error(
             "supabase_send_sms_hook_delivery_failed",
             error_type=type(exc).__name__,
+            error_code=(
+                exc.error_code if isinstance(exc, SMSValidationError) else "sms_delivery_failed"
+            ),
         )
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
