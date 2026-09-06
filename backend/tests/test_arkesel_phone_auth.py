@@ -10,6 +10,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -145,6 +146,26 @@ async def test_arkesel_provider_failure_has_safe_diagnostic(
     assert failure.kwargs["error_code"] == error_code
     assert "[redacted-number]" in failure.kwargs["response_body"]
     assert "123456" not in failure.kwargs["response_body"]
+
+
+@pytest.mark.asyncio
+async def test_arkesel_timeout_has_safe_diagnostic(monkeypatch: pytest.MonkeyPatch):
+    transport = AsyncMock()
+    transport.__aenter__.return_value = transport
+    transport.post.side_effect = httpx.ReadTimeout("timed out")
+    monkeypatch.setattr(settings, "ARKESEL_SMS_ENABLED", True)
+    monkeypatch.setattr(settings, "ARKESEL_API_KEY", "test-main-key")
+    monkeypatch.setattr(settings, "ARKESEL_SENDER_ID", "Veloxa")
+    monkeypatch.setattr(settings, "ARKESEL_HTTP_TIMEOUT_SECONDS", 4.5)
+    monkeypatch.setattr("app.integrations.arkesel.httpx.AsyncClient", MagicMock(return_value=transport))
+    log = MagicMock()
+    monkeypatch.setattr("app.integrations.arkesel.logger", log)
+
+    with pytest.raises(ArkeselProviderError) as caught:
+        await ArkeselSMSClient().send_auth_code(phone_e164="+233241234567", otp="123456")
+
+    assert caught.value.error_code == "arkesel_timeout"
+    assert log.error.call_args.kwargs == {"timeout_seconds": 4.5}
 
 
 @pytest.mark.asyncio

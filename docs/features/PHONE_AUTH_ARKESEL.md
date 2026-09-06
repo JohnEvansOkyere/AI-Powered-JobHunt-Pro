@@ -94,6 +94,10 @@ bounded, redacted response preview so the actual provider reason is visible:
 `arkesel_provider_unavailable` (5xx). Phone numbers, OTPs, API keys, and
 secrets are redacted from the preview. A signature failure remains `401`,
 missing payload fields remain `422`, and SMS delivery failures remain `502`.
+The Arkesel client allows up to 4.5 seconds for the provider response, staying
+below Supabase HTTP Hook's five-second deadline. A timeout is logged as
+`arkesel_timeout`; check Arkesel SMS History before retrying because a message
+can be accepted and queued even if the response reaches the timeout.
 
 Deploy the updated backend before retrying signup; restarting an older checkout
 does not apply this fix. Tests use a mocked Arkesel transport. Actual SMS receipt
