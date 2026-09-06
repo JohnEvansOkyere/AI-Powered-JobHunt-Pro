@@ -115,8 +115,12 @@ Sidebar:
   Settings          → /dashboard/settings
   CV Editor         → /dashboard/cv-editor/[id]     (protected deep link opened from Job Match)
   Administration (shown to users.public.users.is_admin=true; backend-enforced)
-    └─ Analytics     → /dashboard/admin
-    └─ Users         → /dashboard/admin/users (suspend/reactivate or permanently revoke accounts)
+    └─ Admin overview → /dashboard/admin
+    └─ Signups & profiles → /dashboard/admin/registrations
+    └─ Users         → /dashboard/admin/users (profile progress, filters, pagination and account controls)
+    └─ Traffic & jobs → /dashboard/admin/traffic
+    └─ Acquisition   → /dashboard/admin/acquisition
+    └─ Activity      → /dashboard/admin/activity
 
 Public:
   Create account    → /auth/signup                   (name, email, password)
@@ -209,6 +213,8 @@ As of 2026-07-20:
 ---
 
 ## 10. Known Open Items
+
+Admin registrations/profile reporting is implemented locally (2026-09-06); deploy both apps together and verify a real admin session. Registrations use persisted platform accounts; profile status is current completion for the selected registration cohort. Behavioral report limits are labeled; full historical event/session pagination remains outside this change. See `docs/features/ADMIN_REPORTING.md`.
 
 Guided onboarding with required CV upload and corrected CV/profile matching is implemented locally on 2026-09-06. Deploy both apps and run a real authenticated CV-upload/parse/recommendation-generation smoke test; fixtures cannot prove production storage, providers or job availability. Tailored exports use the system layout, not the exact uploaded formatting; see `docs/features/CANDIDATE_ONBOARDING.md`.
 
@@ -375,3 +381,5 @@ Guided onboarding with required CV upload and corrected CV/profile matching is i
 | 2026-09-06 | Prepared required CV/profile onboarding and corrected matching for a scoped commit and push to feat/ecosystem-unification. Rechecked 76 focused backend tests, frontend type-check and diff whitespace; all passed. Included the onboarding browser regression and feature documentation. | Publish the onboarding and required-CV matching changes at the owner's request. |
 | 2026-09-06 | Fixed signed SMS destination selection in backend/app/api/v1/endpoints/auth.py: prefer sms.phone, then legacy user.new_phone and user.phone; reject malformed fields before providers. Added regression tests for existing email users, changed numbers, field precedence and invalid payloads, plus PHONE_AUTH_ARKESEL.md troubleshooting and section 10 deployment notes. Reproduced the empty-current-phone 502 before the fix; all 52 focused auth tests and whitespace checks pass afterward. No live SMS, account mutation, push or deployment; the reported production error still needs Auth response/log confirmation. | Restore one-time phone verification for an existing admin account without deleting the account or bypassing verification. |
 | 2026-09-06 | Prepared the SMS phone-verification destination fix, regression tests and feature documentation for a scoped commit and push on feat/ecosystem-unification; retained unrelated existing MEMORY notes outside the commit. The preceding 52 focused authentication tests passed. | Publish the existing-account verification fix at the owner's request. |
+| 2026-09-06 | Added backend admin registration/cohort reporting and SQL profile scoring, paginated/filterable user reporting with missing fields, frontend Signups & profiles plus separate traffic/acquisition/activity pages and shared admin navigation. Updated admin API types, DashboardLayout, ADMIN_REPORTING.md and regression/browser checks. Before: tracked signup events and a capped account-control list; after: persisted signup counts, current complete/partial/not-started profiles, daily registrations and user drill-down. Fifteen isolated PostgreSQL/auth tests, frontend type-check/build and synthetic 1440/390px browser acceptance passed. Preserved concurrent UI/SEO work; no deployment. | Give the owner detailed signup and profile-adoption visibility with clear report pages and usable account follow-up. |
+| 2026-09-06 | Prepared admin signup/profile reporting, separated analytics pages, user filters/pagination, documentation and regression checks for a scoped commit and push on feat/ecosystem-unification. Selected only admin-related navigation and MEMORY changes; retained concurrent public UI, SEO and security-review work. | Publish the completed admin reporting changes at the owner's request. |

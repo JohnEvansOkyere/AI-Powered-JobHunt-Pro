@@ -1,8 +1,8 @@
 'use client'
 import { getUserErrorMessage } from '@/lib/errors'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   AlertTriangle,
   BarChart3,
@@ -25,6 +25,7 @@ import {
   type AdminUser,
 } from '@/lib/api/admin'
 import { signOut } from '@/lib/auth'
+import AdminNav from '@/components/admin/AdminNav'
 
 type UserFilter = 'all' | 'active' | 'suspended'
 
@@ -64,8 +65,10 @@ function UserRow({
         <p className="mt-1 truncate text-sm text-neutral-500">{user.phone || user.email || 'No contact'}</p>
         <p className="mt-1 text-xs text-neutral-400">Joined {formatWhen(user.created_at)}</p>
       </div>
-      <div><StatusBadge active={user.is_active} /></div>
+      <div><StatusBadge active={user.is_active} /><p className="mt-2 text-xs text-neutral-500">Last login: {formatWhen(user.last_login_at)}</p><p className="mt-1 text-xs text-neutral-500">{user.phone_verified ? 'Phone verified' : 'Phone unverified'} · {user.email_verified ? 'Email verified' : 'Email unverified'}</p></div>
       <div className="text-sm text-neutral-500">
+        <p className="mb-2 text-sm font-semibold">{user.profile_completion}% · {user.profile_status === 'complete' ? 'Complete' : user.profile_status === 'partial' ? 'Partial' : 'Not started'}</p>
+        <details className="mb-2 text-xs"><summary className="cursor-pointer text-brand-turquoise-700">Profile details</summary><p className="mt-2">{user.missing_fields.length ? `Missing: ${user.missing_fields.join(', ')}` : 'All scored fields filled.'}</p><p className="mt-2">Profile updated: {formatWhen(user.profile_updated_at)}</p></details>
         {user.is_admin ? <span className="inline-flex items-center gap-1.5 font-semibold text-brand-turquoise-700"><ShieldCheck className="h-4 w-4" /> Admin</span> : 'Candidate'}
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -91,33 +94,51 @@ function UserRow({
   )
 }
 
-export default function AdminUsersPage() {
+function AdminUsersPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const params = useSearchParams()
+  const profile = ['complete', 'partial', 'not_started'].includes(params.get('profile') || '') ? params.get('profile')! : 'all'
+  const days = [7, 30, 90].includes(Number(params.get('days'))) ? Number(params.get('days')) : 0
+  const page = Math.max(1, Math.floor(Number(params.get('page')) || 1))
+  const changeQuery = (key: string, value: string) => {
+    const next = new URLSearchParams(params.toString())
+    next.set(key, value)
+    if (key !== 'page') next.delete('page')
+    router.replace(`?${next.toString()}`)
+  }
+  const requestId = useRef(0)
+  const [filteredTotal, setFilteredTotal] = useState(0)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [counts, setCounts] = useState({ total: 0, active: 0, suspended: 0 })
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<UserFilter>('all')
+  const filter: UserFilter = params.get('status') === 'active' ? 'active' : params.get('status') === 'suspended' ? 'suspended' : 'all'
+  const appliedSearch = params.get('search') || ''
+  useEffect(() => { setSearch(appliedSearch) }, [appliedSearch])
   const [loading, setLoading] = useState(true)
   const [busyUserId, setBusyUserId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
   const loadUsers = async () => {
+    const id = ++requestId.current
     setLoading(true)
     setError('')
     try {
-      const result = await getAdminUsers(search, filter)
+      const result = await getAdminUsers(appliedSearch, filter, profile, days, page)
+      if (id !== requestId.current) return
+      setFilteredTotal(result.filtered_total)
       setUsers(result.users)
       setCounts({ total: result.total, active: result.active, suspended: result.suspended })
     } catch (requestError) {
+      if (id !== requestId.current) return
       if ((requestError as { status?: number })?.status === 401 || (requestError as { status?: number })?.status === 403) {
         router.replace('/dashboard')
         return
       }
       setError(getErrorMessage(requestError, 'Could not load users.'))
     } finally {
-      setLoading(false)
+      if (id === requestId.current) setLoading(false)
     }
   }
 
@@ -131,11 +152,11 @@ export default function AdminUsersPage() {
       void loadUsers()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user, filter])
+  }, [authLoading, user, filter, profile, days, page, appliedSearch])
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
-    void loadUsers()
+    changeQuery('search', search.trim())
   }
 
   const handleToggleStatus = async (target: AdminUser) => {
@@ -189,13 +210,14 @@ export default function AdminUsersPage() {
       </header>
 
       <main className="mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
+        <AdminNav days={days || 30} />
         <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-medium">
               <button onClick={() => router.push('/dashboard/admin')} className="inline-flex items-center gap-1.5 text-neutral-500 hover:text-neutral-900"><BarChart3 className="h-4 w-4" /> Analytics</button>
               <span className="text-neutral-300">/</span><span className="text-neutral-900">Users</span>
             </div>
-            <p className="text-sm text-neutral-500">Control who can access the platform. Suspension blocks authenticated API access; revoke permanently deletes the account and its stored data.</p>
+            <p className="text-sm text-neutral-500">Review registrations, profile progress and account access. Account totals below cover all time; the list follows your filters.</p>
           </div>
           <button onClick={() => void loadUsers()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-3 py-2 text-sm font-semibold text-white hover:bg-neutral-800"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
         </div>
@@ -211,18 +233,26 @@ export default function AdminUsersPage() {
         <section className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-neutral-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <form onSubmit={handleSearch} className="flex flex-1 gap-2 sm:max-w-xl">
-              <label className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-neutral-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, phone or email" className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-100" /></label>
+              <label className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-neutral-400" /><input aria-label="Search users" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, phone or email" className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-turquoise-500 focus:ring-2 focus:ring-brand-turquoise-100" /></label>
               <button type="submit" className="rounded-xl bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-200">Search</button>
             </form>
-            <select value={filter} onChange={(event) => setFilter(event.target.value as UserFilter)} className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 outline-none focus:border-brand-turquoise-500"><option value="all">All statuses</option><option value="active">Active only</option><option value="suspended">Suspended only</option></select>
+            <select aria-label="Account status" value={filter} onChange={(event) => changeQuery('status', event.target.value)} className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 outline-none focus:border-brand-turquoise-500"><option value="all">All statuses</option><option value="active">Active only</option><option value="suspended">Suspended only</option></select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 px-5 py-4">
+            <label className="text-sm">Profile <select aria-label="Profile completion" value={profile} onChange={e => changeQuery('profile', e.target.value)} className="ml-2 rounded-lg border border-neutral-200 bg-white px-3 py-2"><option value="all">All profiles</option><option value="complete">Complete</option><option value="partial">Partially filled</option><option value="not_started">Not started</option></select></label>
+            <label className="text-sm">Registered <select aria-label="Registration period" value={days} onChange={e => changeQuery('days', e.target.value)} className="ml-2 rounded-lg border border-neutral-200 bg-white px-3 py-2"><option value={0}>All time</option>{[7, 30, 90].map(d => <option key={d} value={d}>Last {d} days</option>)}</select></label>
           </div>
 
           {error && <div className="mx-5 mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {notice && <div className="mx-5 mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
-          <div className="hidden border-b border-neutral-100 px-5 py-3 text-xs font-bold uppercase tracking-wide text-neutral-400 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(150px,0.8fr)_minmax(120px,0.7fr)_minmax(230px,1fr)]"><span>User</span><span>Status</span><span>Access</span><span className="text-right">Actions</span></div>
-          {loading ? <div className="p-8 text-center text-sm text-neutral-500">Loading user accounts…</div> : users.length === 0 ? <div className="p-10 text-center"><Users className="mx-auto h-8 w-8 text-neutral-300" /><p className="mt-3 text-sm font-medium text-neutral-600">No users match this filter.</p></div> : users.map((target) => <UserRow key={target.id} user={target} busy={busyUserId === target.id} onToggleStatus={handleToggleStatus} onRevoke={handleRevoke} />)}
+          <div className="hidden border-b border-neutral-100 px-5 py-3 text-xs font-bold uppercase tracking-wide text-neutral-400 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(150px,0.8fr)_minmax(120px,0.7fr)_minmax(230px,1fr)]"><span>User</span><span>Status</span><span>Profile / access</span><span className="text-right">Actions</span></div>
+          {loading ? <div role="status" className="p-8 text-center text-sm text-neutral-500">Loading user accounts…</div> : error ? null : users.length === 0 ? <div className="p-10 text-center"><Users className="mx-auto h-8 w-8 text-neutral-300" /><p className="mt-3 text-sm font-medium text-neutral-600">No users match this filter.</p></div> : users.map((target) => <UserRow key={target.id} user={target} busy={busyUserId === target.id} onToggleStatus={handleToggleStatus} onRevoke={handleRevoke} />)}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 p-5 text-sm"><p>{filteredTotal} matching accounts · Page {page} of {Math.max(1, Math.ceil(filteredTotal / 25))}</p><div className="flex gap-2"><button disabled={loading || page <= 1} onClick={() => changeQuery('page', String(page - 1))} className="rounded-lg border border-neutral-200 px-3 py-2 disabled:opacity-40">Previous</button><button disabled={loading || page * 25 >= filteredTotal} onClick={() => changeQuery('page', String(page + 1))} className="rounded-lg border border-neutral-200 px-3 py-2 disabled:opacity-40">Next</button></div></div>
         </section>
       </main>
     </div>
   )
 }
+
+export default function Page() { return <Suspense fallback={<p className="p-8">Loading users…</p>}><AdminUsersPage /></Suspense> }

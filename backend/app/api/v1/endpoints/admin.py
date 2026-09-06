@@ -22,6 +22,7 @@ from app.services.ats_sync_status_service import get_sync_status_async
 from app.api.v1.endpoints.users import _current_user_uuid, _delete_account_data
 from app.core.supabase_client import get_supabase_service_client
 from app.core.logging import get_logger
+from app.services.admin_reporting import profile_checks, profile_score, profile_status
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -68,11 +69,18 @@ async def admin_me(current_user: dict = Depends(require_admin)) -> dict:
 async def admin_users(
     search: str = Query(default="", max_length=120),
     status_filter: str = Query(default="all", alias="status", pattern="^(all|active|suspended)$"),
+    profile: str = Query(default="all", pattern="^(all|complete|partial|not_started)$"),
+    days: int = Query(default=0, ge=0, le=90),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ) -> dict:
     """List candidate accounts for the admin user-control surface."""
-    query = db.query(User)
+    score = profile_score()
+    query = db.query(User).outerjoin(UserProfile, UserProfile.user_id == User.id)
+    if days:
+        query = query.filter(User.created_at >= _range_start(days))
     if search.strip():
         term = f"%{search.strip()}%"
         query = query.filter(
@@ -87,12 +95,73 @@ async def admin_users(
     elif status_filter == "suspended":
         query = query.filter(User.is_active.is_(False))
 
-    users = query.order_by(User.created_at.desc()).limit(500).all()
+    if profile == "complete":
+        query = query.filter(score == 100)
+    elif profile == "partial":
+        query = query.filter(score > 0, score < 100)
+    elif profile == "not_started":
+        query = query.filter(score == 0)
+
+    filtered_total = query.count()
+    checks = profile_checks()
+    rows = query.add_columns(
+        score.label("completion"), UserProfile.updated_at,
+        *[check.label(f"field_{index}") for index, (_, _, check) in enumerate(checks)],
+    ).order_by(User.created_at.desc(), User.id).offset((page - 1) * page_size).limit(page_size).all()
+    users = []
+    for row in rows:
+        item = _user_payload(row[0])
+        item.update({
+            "profile_completion": row[1],
+            "profile_status": profile_status(row[1]),
+            "profile_updated_at": _iso(row[2]),
+            "missing_fields": [label for (label, _, _), filled in zip(checks, row[3:]) if not filled],
+        })
+        users.append(item)
     return {
-        "users": [_user_payload(user) for user in users],
+        "users": users,
+        "filtered_total": filtered_total,
+        "page": page,
+        "page_size": page_size,
         "total": db.query(User).count(),
         "active": db.query(User).filter(User.is_active.is_(True)).count(),
         "suspended": db.query(User).filter(User.is_active.is_(False)).count(),
+    }
+
+
+@router.get("/registrations")
+async def admin_registrations(
+    days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+) -> dict:
+    """Persisted account registrations and current completion for that cohort."""
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=days)
+    score = profile_score()
+    cohort = db.query(User).outerjoin(UserProfile, UserProfile.user_id == User.id).filter(
+        User.created_at >= start, User.created_at <= end,
+    )
+    counts = cohort.with_entities(
+        func.count(User.id),
+        func.count(User.id).filter(score == 100),
+        func.count(User.id).filter((score > 0) & (score < 100)),
+        func.count(User.id).filter(score == 0),
+    ).one()
+    daily_rows = cohort.with_entities(
+        func.date_trunc("day", func.timezone("UTC", User.created_at)).label("day"),
+        func.count(User.id).label("signups"),
+    ).group_by("day").order_by("day").all()
+    by_day = {row.day.date(): int(row.signups) for row in daily_rows}
+    return {
+        "range": {"days": days, "start": _iso(start), "end": _iso(end)},
+        "total_accounts": db.query(User).count(),
+        "signups": counts[0], "complete": counts[1], "partial": counts[2], "not_started": counts[3],
+        "daily": [
+            {"day": (start.date() + timedelta(days=i)).isoformat(),
+             "signups": by_day.get(start.date() + timedelta(days=i), 0)}
+            for i in range((end.date() - start.date()).days + 1)
+        ],
     }
 
 
