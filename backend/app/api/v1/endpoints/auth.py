@@ -25,6 +25,7 @@ from app.integrations.arkesel import (
     arkesel_sms,
     verify_supabase_hook_signature,
 )
+from app.integrations.moolre import moolre_sms
 from supabase import Client
 
 logger = get_logger(__name__)
@@ -168,16 +169,28 @@ async def send_phone_auth_sms(request: Request):
             },
         )
 
-    try:
-        await arkesel_sms.send_auth_code(phone_e164=phone, otp=otp)
-    except Exception as exc:
-        logger.error(
-            "supabase_send_sms_hook_delivery_failed",
-            error_type=type(exc).__name__,
-            error_code=(
-                exc.error_code if isinstance(exc, SMSValidationError) else "sms_delivery_failed"
-            ),
-        )
+    providers = {"arkesel": arkesel_sms, "moolre": moolre_sms}
+    provider_names = [name.strip().lower() for name in settings.SMS_PROVIDERS.split(",") if name.strip()]
+    failures: list[str] = []
+    for provider_name in provider_names:
+        provider = providers.get(provider_name)
+        if provider is None:
+            logger.warning("supabase_send_sms_unknown_provider", provider=provider_name)
+            continue
+        try:
+            await provider.send_auth_code(phone_e164=phone, otp=otp)
+            return Response(status_code=status.HTTP_200_OK)
+        except Exception as exc:
+            failures.append(provider_name)
+            logger.error(
+                "supabase_send_sms_provider_failed",
+                provider=provider_name,
+                error_type=type(exc).__name__,
+                error_code=(exc.error_code if isinstance(exc, SMSValidationError) else "sms_delivery_failed"),
+            )
+
+    logger.error("supabase_send_sms_hook_delivery_failed", providers=failures or provider_names)
+    if failures:
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
@@ -187,8 +200,10 @@ async def send_phone_auth_sms(request: Request):
                 }
             },
         )
-
-    return Response(status_code=status.HTTP_200_OK)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"error": {"http_code": 503, "message": "No SMS provider is configured."}},
+    )
 
 
 @router.get("/me", response_model=UserResponse)

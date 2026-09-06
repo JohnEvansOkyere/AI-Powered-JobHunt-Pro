@@ -60,6 +60,16 @@ Existing email/password accounts can still use the legacy option on the sign-in
 page during migration. New registration verifies by phone but collects an email
 for account communication and email alerts.
 
+## Provider failover
+
+The hook supports an ordered `SMS_PROVIDERS` chain (default
+`arkesel,moolre`). It calls one provider for an OTP and moves to the next only
+when the first provider fails; it never sends through both after one success.
+Moolre uses `MOOLRE_VAS_KEY`, `MOOLRE_SENDER_ID`, and its `X-API-VASKEY` API
+contract. Configure `MOOLRE_SMS_ENABLED=true` and put `moolre` first when
+Moolre should be the active provider. Keep only providers with verified
+credentials in the chain; a provider with missing credentials is skipped.
+
 ## Troubleshooting delivery failures
 
 The 2026-09-06 production logs showed a signed hook reaching SMS delivery and

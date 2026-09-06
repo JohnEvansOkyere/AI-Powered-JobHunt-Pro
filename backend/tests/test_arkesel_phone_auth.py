@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import json
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 from fastapi.testclient import TestClient
@@ -231,6 +231,7 @@ def test_send_sms_hook_logs_safe_failure_without_sensitive_values(
         settings, "SUPABASE_SEND_SMS_HOOK_SECRETS",
         f"v1,whsec_{base64.b64encode(raw_secret).decode()}",
     )
+    monkeypatch.setattr(settings, "SMS_PROVIDERS", "arkesel")
     error = (
         SMSValidationError("invalid_phone_format") if validation_error
         else RuntimeError("sensitive provider response +233241234567 012345")
@@ -247,8 +248,12 @@ def test_send_sms_hook_logs_safe_failure_without_sensitive_values(
     )
     assert response.status_code == 502
     assert response.json()["error"]["message"] == "Could not send the verification code."
-    log.error.assert_called_once_with(
-        "supabase_send_sms_hook_delivery_failed",
+    assert call(
+        "supabase_send_sms_provider_failed",
+        provider="arkesel",
         error_type=type(error).__name__,
         error_code="invalid_phone_format" if validation_error else "sms_delivery_failed",
-    )
+    ) in log.error.call_args_list
+    assert call(
+        "supabase_send_sms_hook_delivery_failed", providers=["arkesel"]
+    ) in log.error.call_args_list
