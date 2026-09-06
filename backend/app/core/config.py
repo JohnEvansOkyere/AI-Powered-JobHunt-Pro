@@ -80,6 +80,14 @@ class Settings(BaseSettings):
         default="",
         description="Supabase Auth Hook secret(s), including v1,whsec_ prefix; separate rotations with |.",
     )
+    SMS_PROVIDERS: str = Field(
+        default="arkesel,moolre",
+        description="Ordered OTP SMS providers; the next configured provider is tried after failure.",
+    )
+    MOOLRE_SMS_ENABLED: bool = Field(default=False)
+    MOOLRE_API_URL: str = Field(default="https://api.moolre.com/open/sms/send")
+    MOOLRE_VAS_KEY: str = Field(default="")
+    MOOLRE_SENDER_ID: str = Field(default="")
 
     @property
     def auth_supabase_url(self) -> str:
@@ -563,6 +571,17 @@ class Settings(BaseSettings):
             if missing:
                 errors.append(
                     "Arkesel phone auth is enabled but required settings are missing: "
+                    + ", ".join(missing)
+                )
+        if self.MOOLRE_SMS_ENABLED:
+            required_moolre = {
+                "MOOLRE_VAS_KEY": self.MOOLRE_VAS_KEY,
+                "MOOLRE_SENDER_ID": self.MOOLRE_SENDER_ID,
+            }
+            missing = [name for name, value in required_moolre.items() if not value.strip()]
+            if missing:
+                errors.append(
+                    "Moolre phone auth is enabled but required settings are missing: "
                     + ", ".join(missing)
                 )
 
