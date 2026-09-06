@@ -19,7 +19,7 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 
 ## 2. VeloxaHire — What It Does
 
-- Authenticates new candidates with passwordless Supabase phone OTP delivered through a signed Arkesel SMS hook; legacy email/password sign-in remains temporarily available for existing accounts
+- Creates candidate accounts with name, email and password, verifies a phone once through Supabase's signed SMS hook, and uses email/password for subsequent logins
 - Stores rich career profiles and CVs (parsed into structured JSON)
 - Scrapes jobs from ~12 public sources (Adzuna, Remotive, RemoteOK, Jooble, etc.)
 - Mirrors recruiter-posted jobs from VeloxaRecruit ATS via a scheduled sync
@@ -37,7 +37,7 @@ The products cooperate but are **not collapsed**. Each has its own database, aut
 | Database | Supabase (PostgreSQL) — RLS **not** relied on server-side; enforce in app code |
 | Cache / Queue | Redis, Celery (worker + beat), APScheduler (in-process, legacy) |
 | Frontend | Next.js App Router (React 18, TypeScript), Tailwind CSS, Framer Motion |
-| Auth | Supabase Auth phone OTP + Arkesel SMS delivery; bearer token validated per request via `/auth/v1/user`; legacy email/password login retained for existing users |
+| Auth | Supabase email/password with one-time phone verification and Arkesel/Moolre SMS delivery; protected APIs require authoritative phone confirmation plus an active account |
 | AI | OpenAI (embeddings + GPT-4o), Grok, Gemini, Groq as fallbacks |
 | Storage | Supabase bucket `cvs` for original uploads; tailored CV drafts are private JSONB and DOCX is rendered in memory |
 | Hosting | Backend: Render. Frontend: Vercel |
@@ -117,6 +117,11 @@ Sidebar:
     └─ Users         → /dashboard/admin/users (suspend/reactivate or permanently revoke accounts)
 
 Public:
+  Create account    → /auth/signup                   (name, email, password)
+  Verify account    → /auth/verify-phone             (signed-in account, one phone verification)
+  Sign in           → /auth/login                    (email and password)
+  Reset password    → /auth/reset-password           (registered phone only, SMS code, new password)
+  Set up email      → /auth/setup-login              (existing phone-only account transition)
   Browse Jobs       → /jobs                          (anonymous browse/search/filter)
   Remote Jobs       → /remote-jobs                    (SEO landing page with current remote roles)
   Job Detail        → /jobs/[id]                     (anonymous SEO-indexed detail + public apply link)
@@ -143,7 +148,8 @@ As of 2026-07-20:
 - Backend `GET /api/v1/jobs/{job_id}` is public for non-archived jobs, so public detail pages work without login.
 - Public Apply links remain open. Candidates can leave to the recruiter/source application page without creating an account.
 - Signup is the upgrade path for recommendations, saved jobs, match scoring, CV/profile setup, alerts, and application tracking.
-- New candidate registration is passwordless phone verification: the form collects and normalizes the candidate's telephone number, Supabase generates/verifies the OTP and owns the session, and its signed Send SMS HTTP hook delivers the code through Arkesel. Source implementation exists; live operation still requires migration `020`, deployed secrets, Phone Auth enabled, and the hook configured in Supabase.
+- Password recovery is public at `/auth/reset-password`, but its password update requires a separate five-minute, single-use server reset grant earned by verifying an SMS code sent to the current verified phone. Only the phone is collected; no email input or app session is required. Redis limits fail closed; local/Supabase ownership and active-account checks run server-side.
+- Registration collects name, email and password, then opens `/auth/verify-phone` to collect and verify the phone on the same Supabase account using `phone_change`. Successful verification continues automatically; later logins use email/password without SMS. Protected pages and FastAPI APIs reject unverified phone accounts. Exact signup flow requires Email enabled with Confirm email off, Phone enabled with Confirm phone on, migration `020`, and the signed SMS hook. Existing phone-only users add credentials through `/auth/setup-login` without losing their user ID/profile.
 - Tailored CV generation, editing, revision history, preview, and export are registered-user features. The backend requires an active Supabase-authenticated owner of the source CV and generated draft; phone OTP produces the same Supabase JWT used by these ownership checks. The normal public external Apply link remains open.
 - `/dashboard/jobs` remains the authenticated dashboard job browser.
 
@@ -156,8 +162,9 @@ As of 2026-07-20:
 | FastAPI entrypoint | `backend/app/main.py` |
 | Auth dependency (required) | `backend/app/api/v1/dependencies.py::get_current_user` |
 | Auth dependency (optional) | `backend/app/api/v1/dependencies.py::get_optional_user` |
-| Phone OTP UI and client | `frontend/app/auth/signup/page.tsx`, `frontend/app/auth/login/page.tsx`, `frontend/lib/auth.ts` |
+| Email/password and one-time phone verification | `frontend/app/auth/signup/page.tsx`, `frontend/app/auth/login/page.tsx`, `frontend/app/auth/verify-phone/page.tsx`, `frontend/app/auth/setup-login/page.tsx`, `frontend/lib/auth.ts` |
 | Arkesel auth delivery hook | `backend/app/api/v1/endpoints/auth.py::send_phone_auth_sms`, `backend/app/integrations/arkesel.py` |
+| SMS password recovery | `backend/app/api/v1/endpoints/password_reset.py`, `backend/app/services/password_reset.py`, `frontend/app/auth/reset-password/page.tsx`, `docs/features/SMS_PASSWORD_RESET.md` |
 | Jobs search endpoint | `backend/app/api/v1/endpoints/jobs.py::search_jobs` |
 | ATS sync service | `backend/app/services/ats_job_sync_service.py` |
 | Celery periodic tasks | `backend/app/tasks/periodic_tasks.py` |
@@ -187,7 +194,8 @@ As of 2026-07-20:
 - Apply without account (external link)
 - After applying, invite to register — **don't block apply with a gate**
 - Profile completion is required for AI recommendations, not for browsing or applying
-- Candidate registration/login should be passwordless: collect a telephone number and verify possession with an Arkesel SMS code
+- Candidate registration collects name, email and password first, then verifies a phone once on the next page; verified users automatically continue and later sign in with email/password only
+- Forgot-password recovery asks only for the registered phone, verifies an SMS code, then collects a new password. Routine login remains email/password.
 - Recruiter jobs (source='recruiter') show "Recruiter" emerald badge on cards
 - Recommendations mix scraped + recruiter jobs (if they match the profile)
 - Signed-in navigation uses Overview, Job matches, Explore jobs, Applications, Profile and Settings; existing route URLs are unchanged. The overview prioritizes actual matched roles and application counts, with restrained forest-green styling and explicit request-failure states.
@@ -198,7 +206,8 @@ As of 2026-07-20:
 
 | Item | Status |
 |---|---|
-| Replace candidate email/password auth with Arkesel phone OTP | Implemented in source 2026-09-05 using Supabase phone OTP/session ownership plus a signed HTTP Send SMS Hook to Arkesel. New registration is phone-only; login defaults to phone OTP and retains a legacy email option for existing accounts. Production remains incomplete until migration `020` is applied, the backend is deployed with Arkesel and hook secrets, Phone Auth is enabled without auto-confirm, the hook URL is configured in Supabase, CAPTCHA is enabled, and a real SMS/verification/session smoke test passes. |
+| SMS password reset deployment | Implemented locally 2026-09-06: phone-only request, dedicated SMS code, single-use reset grant and same-identity password update. 67 focused tests with isolated Redis, browser acceptance and 27-route build passed. Requires available Redis, canonical Auth service key and configured SMS provider; deploy both apps and verify hosted delivery/new-password login/refresh revocation. Background SMS is best effort on worker restart; access JWTs retain their normal expiry. See SMS_PASSWORD_RESET.md. |
+| Email/password login with one-time phone verification | Implemented locally 2026-09-06, superseding recurring passwordless SMS login. Deploy frontend/backend together; enable Email with Confirm email off and Phone with Confirm phone on, retain migration `020` and the signed hook. Browser fixture flows and focused backend tests pass; hosted configuration, real SMS and production account transition remain unverified. Existing phone-only accounts have a same-identity credential setup route. |
 | Post-apply profile CTA for logged-in users | Not built — only anonymous modal exists |
 | Phone OTP hook format fix deployment | On 2026-09-06, owner logs show signature verification passing but SMS delivery failing with ValueError/502. Reproduced locally with Supabase's digits-only international phone format; sender now accepts country-code numbers with or without a leading plus and logs safe validation codes. All 25 focused Arkesel/handoff/auth-config tests pass. Deploy this backend fix and verify real SMS receipt plus Supabase code/session completion; live success remains unverified. |
 | Sync observability dashboard (last sync, jobs imported/updated/archived) | Backend ops endpoint implemented 2026-06-20; broader visual admin dashboard now built at `/dashboard/admin`, ATS sync detail remains a follow-up |
@@ -345,3 +354,7 @@ As of 2026-07-20:
 | 2026-09-06 | Fixed the successful Supabase Send SMS Hook response to return `application/json` instead of a bare HTTP 200 with no Content-Type. Production now reaches SMS delivery, but Supabase rejected the provider-success response as `Invalid Content-Type: Missing Content-Type header`. | Allow Supabase to accept the delivered OTP and complete the pending phone-auth request. |
 | 2026-09-06 | Added safe Arkesel failure diagnostics: classify HTTP 401/403/429/4xx/5xx responses, log the provider's bounded redacted response preview, propagate a provider-specific error code through the Supabase hook, and cover credential, authorization, and rate-limit cases with tests. | Isolate whether Arkesel failures come from rejected credentials, an unapproved sender/account, request validation, rate limiting, or provider downtime while Moolre is disabled. |
 | 2026-09-06 | Increased the Arkesel HTTP timeout from 3.5 to a configurable 4.5 seconds, kept below Supabase's five-second HTTP Hook deadline, and added `arkesel_timeout` diagnostics. Arkesel SMS History showed messages queued as `SUBMITTING` even while the shorter client timeout caused the hook to return 502. | Allow the successful Arkesel submission response more time to arrive without exceeding Supabase's hook deadline, and prevent ambiguous timeout errors from being mistaken for credential failures. |
+| 2026-09-06 | Replaced recurring SMS login with name/email/password signup and a separate one-time phone verification page. Updated auth pages/client and ProtectedRoute, added reusable account/code forms and same-user credential setup for existing phone-only accounts, and enforced authoritative phone confirmation in backend dependencies. Added backend/browser regressions, updated PHONE_AUTH_ARKESEL.md and current navigation/access decisions. Preserved pre-existing onboarding edits. All 39 focused backend tests, TypeScript checking, synthetic browser flows at desktop/390/360px, and an isolated 26-route production build passed. No deployment or live SMS. | Let users verify their phone once, continue automatically and use email/password for all later logins. Document required Supabase Confirm email off / Confirm phone on configuration and preserve existing profiles during account transition. |
+| 2026-09-06 | Checked password reset in current source: reset-email and update-password helpers exist in frontend/lib/auth.ts, but no reset route, reset request form or login recovery link exists. Recorded the gap in section 10; no runtime changes. | Answer whether password reset is implemented after the email/password auth change. |
+| 2026-09-06 | Implemented phone-only SMS password reset: login recovery link/page/client, three backend recovery endpoints, authoritative verified-phone checks, Redis HMAC codes and single-use grants with atomic expiry/attempt/rate/replay controls, canonical Auth password-only updates, provider reset messages, bounded requests, safe validation logs and no-store responses. Added security/browser tests and fixture, SMS_PASSWORD_RESET.md and current navigation/access notes. All 67 focused tests using isolated Redis, 1440/390/360px browser flows through real routes/Redis with mocked external adapters, type-check and isolated 27-route production build passed. No deployment, live SMS or real account mutation. | Provide production-oriented SMS recovery using only the registered phone, as explicitly corrected by the owner; protect reset ownership and prevent code/grant reuse while keeping routine email/password login. |
+| 2026-09-06 | Prepared the signup/login and SMS password-reset changes for a scoped commit and push on feat/ecosystem-unification. Staged only the verification changes in the shared ProtectedRoute; left the existing profile setup, profile utility, profile-gate and onboarding-script edits outside the commit. Adjusted the auth browser regression to accept authenticated dashboard arrival with or without the independent profile gate. | Push the authorized authentication work while preserving unrelated in-progress onboarding changes. |

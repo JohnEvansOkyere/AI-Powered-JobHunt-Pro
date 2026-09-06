@@ -1,7 +1,8 @@
-# Passwordless phone authentication with Arkesel
+# Email/password accounts with one-time phone verification
 
-VeloxaHire uses Supabase Auth to generate and verify phone OTPs and to issue the
-same JWT sessions already accepted by the FastAPI backend. Arkesel is the SMS
+VeloxaHire creates accounts with name, email and password, then uses Supabase
+Auth to verify a phone number once. Future sign-ins use email and password.
+Supabase owns the account and JWT session. Arkesel is the SMS
 delivery provider; it never creates the session and the Arkesel API key never
 goes to the browser.
 
@@ -37,7 +38,16 @@ closed if Arkesel is enabled with incomplete credentials.
 6. Return to Supabase Authentication > Providers and enable Phone. Keep phone
    confirmations enabled; the Send SMS hook replaces the built-in provider.
 7. Apply `migrations/020_add_phone_auth_identity.sql`.
-8. Test with an authorised Ghana number.
+8. Enable the Email provider and **turn off Confirm email** for the requested
+   direct signup → phone verification flow. Keep **Confirm phone on**. With email
+   confirmation enabled, Supabase creates no signup session; the UI safely shows
+   a check-email message instead of attempting an unauthenticated phone update.
+   Turning off Confirm email auto-confirms emails in Supabase; this is not proof
+   of mailbox ownership. Phone possession is the registration verification here.
+9. Allow the frontend `/auth/verify-phone` and `/auth/setup-login` URLs in Auth
+   redirect settings. Keep secure email-change confirmation for existing-account
+   email changes; the account setup page handles a pending confirmation.
+10. Deploy frontend and backend together and test with an authorised Ghana number.
 
 Supabase applies its own OTP request limits. Production should also enable
 Supabase CAPTCHA to control automated SMS spend. The hook verifies all three
@@ -45,20 +55,75 @@ Standard Webhooks headers and fails closed when its secret is absent or wrong.
 
 ## Candidate flow
 
-1. Registration collects a required email address and normalizes Ghana local format such as `024 123 4567` to
-   `+233241234567` (international E.164 is also accepted).
-2. `signInWithOtp` asks Supabase to create the pending phone identity.
-3. Supabase signs a Send SMS Hook event containing its generated OTP.
-4. The backend verifies that signature and sends the OTP using Arkesel SMS v2.
-5. `verifyOtp` verifies the code with Supabase and establishes the session.
-6. The client stores the collected email as authenticated `contact_email` metadata. It is used for email alerts and account communication; it is not the OTP identity.
+Password recovery is a separate phone-only SMS flow. See
+[SMS_PASSWORD_RESET.md](SMS_PASSWORD_RESET.md) for security, setup and verification.
+
+1. `/auth/signup` collects full name, email and password (at least eight characters)
+   and calls `signUp({ email, password })`. Supabase password policy still applies.
+   Handoff details remain on this same user. Passwords are never stored in profile
+   metadata or analytics.
+2. The new session opens `/auth/verify-phone`. This separate page collects the
+   number and normalizes Ghana local format such as `024 123 4567` to E.164.
+3. Authenticated `updateUser({ phone })` requests a code for the existing account.
+   It does not call `signInWithOtp` or create another phone identity.
+4. The signed Send SMS hook delivers the code through the configured providers.
+5. `verifyOtp({ phone, token, type: 'phone_change' })` confirms the number and the
+   client refreshes its session, then continues automatically to `/dashboard`.
+   The existing profile-completion gate can then open `/profile/setup`.
+6. Every later login calls `signInWithPassword({ email, password })`. Confirmed
+   users proceed without SMS. An interrupted signup resumes phone verification
+   after password login; merely visiting/reloading that page sends no SMS.
+
+The UI blocks protected pages until `phone` and `phone_confirmed_at` exist.
+FastAPI independently enforces the same requirement on protected APIs. Standard
+JWTs omit the confirmation timestamp, so the backend fetches the authoritative
+Supabase Auth user even when the token's signature can be verified locally. It
+does not trust editable `user_metadata.phone_verified` or a local profile flag.
+Suspended/revoked-account checks and resource ownership checks still apply.
+Anonymous job browsing remains available. This does not add a new Supabase
+Storage/PostgREST policy; existing direct-access policies remain separate.
+
+SMS requests retain Supabase's provider-side rate limits and the signature-protected
+hook. The UI adds a 60-second retry/resend cooldown, including ambiguous delivery
+failures. Provider errors, duplicate numbers and invalid/expired codes remain
+visible without replacing or merging accounts. No new schema migration is needed;
+migration `020` and the complete setup script already sync phone confirmation on
+Auth user insert/update.
 
 Phone verification is account authentication only. It does not opt the user
 into WhatsApp or promotional SMS alerts.
 
-Existing email/password accounts can still use the legacy option on the sign-in
-page during migration. New registration verifies by phone but collects an email
-for account communication and email alerts.
+Existing email/password users sign in normally and verify a phone once if needed.
+Existing phone-only users follow **Set up email sign-in** from `/auth/login`.
+`/auth/setup-login` uses one recovery OTP with `shouldCreateUser: false`, then
+updates the same authenticated user with an email and password. Already-signed-in
+phone users go straight to credential setup. If Supabase requires an email-change
+confirmation, the page waits for it; contact email metadata alone is never treated
+as an email login identity. Existing profiles/CVs stay attached to the same user ID.
+
+API contracts: [Supabase phone updates](https://supabase.com/docs/guides/auth/phone-login),
+[password signup/session behavior](https://supabase.com/docs/guides/auth/passwords),
+and [authenticated user updates](https://supabase.com/docs/reference/javascript/auth-updateuser).
+
+## Verification evidence — 2026-09-06
+
+- 39 focused backend tests passed across phone-verification enforcement, signed
+  SMS delivery, shared Auth configuration and authentication (live health tests
+  excluded). Coverage includes metadata spoofing, missing confirmation, repeat
+  verified requests, revoked/suspended accounts and Auth lookup failure.
+- `npm run type-check` passed. An isolated production build with synthetic
+  public configuration passed for all 26 routes; the existing dev server and
+  environment files were left intact.
+- `frontend/scripts/verify-account-auth.cjs` passed with synthetic Supabase/API
+  responses: signup without phone input, same-user phone change, invalid code,
+  automatic session and reload, repeat password login without SMS, unverified
+  route guard, existing phone-account conversion, pending email confirmation
+  across reload, provider error/retry throttle, and 1440/390/360px layouts.
+  Browser tests found no runtime errors. These are fixture tests, not proof of
+  hosted SMS delivery, production Auth settings or production database writes.
+- No deployment or real SMS was performed. Existing onboarding edits were
+  preserved. Before release, verify the configured signup session, actual phone
+  change OTP, same Auth user ID, repeat password login and old-account conversion.
 
 ## Provider failover
 

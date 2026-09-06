@@ -32,8 +32,8 @@ def _verify_supabase_jwt_locally(token: str) -> dict | None:
     """
     Verify a Supabase access token without a network call when SUPABASE_JWT_SECRET is set.
 
-    Supabase access tokens are JWTs whose subject is the user ID. Local validation avoids
-    turning a temporary Supabase Auth network problem into a dashboard-wide 401 loop.
+    Supabase access tokens are JWTs whose subject is the user ID. Tokens without
+    a trusted phone-confirmation timestamp still require an Auth user lookup.
     """
     jwt_secret = (getattr(settings, "auth_supabase_jwt_secret", "") or "").strip()
     if not jwt_secret:
@@ -93,7 +93,9 @@ async def get_current_user(
         raise _unauthorized("Invalid authentication credentials")
 
     local_user = _verify_supabase_jwt_locally(token)
-    if local_user:
+    # Standard Supabase JWTs omit phone_confirmed_at. User metadata is editable
+    # and cannot establish verification; fetch the Auth user when it is absent.
+    if local_user and local_user.get("phone") and local_user.get("phone_confirmed_at"):
         user_data = local_user
     else:
         try:
@@ -162,6 +164,12 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been suspended. Contact support if you believe this is a mistake.",
+        )
+
+    if not user_data.get("phone") or not user_data.get("phone_confirmed_at"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Phone verification required",
         )
 
     return user_data

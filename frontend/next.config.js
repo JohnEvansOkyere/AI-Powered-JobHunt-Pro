@@ -4,6 +4,10 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/auth/reset-password',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
+      {
         source: '/auth/signup',
         headers: [
           {

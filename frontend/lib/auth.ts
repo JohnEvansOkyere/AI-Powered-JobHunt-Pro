@@ -5,7 +5,7 @@
  */
 
 import { createClient, setRememberSession } from './supabase/client'
-import type { User, Session, AuthError } from '@supabase/supabase-js'
+import type { User, Session } from '@supabase/supabase-js'
 
 export interface SignUpData {
   email: string
@@ -75,6 +75,42 @@ export async function verifyPhoneOtp(phone: string, token: string) {
   return data
 }
 
+/** Attach a phone to the email account without creating a second identity. */
+export async function requestPhoneVerification(value: string) {
+  const phone = normalizePhoneNumber(value)
+  const { error } = await createClient().auth.updateUser({ phone })
+  if (error) throw error
+  return phone
+}
+
+export async function confirmPhoneVerification(phone: string, token: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: normalizePhoneNumber(phone), token: token.trim(), type: 'phone_change',
+  })
+  if (error) throw error
+  if (!data.user?.phone_confirmed_at) throw new Error('Phone verification is incomplete. Try again.')
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError) throw refreshError
+  if (!refreshed.session) throw new Error('Please sign in to continue.')
+  return refreshed
+}
+
+export function accountDestination(user: User): string {
+  if (!user.email) return '/auth/setup-login'
+  if (!user.phone || !user.phone_confirmed_at) return '/auth/verify-phone'
+  return '/dashboard'
+}
+
+/** Upgrade a legacy phone account in place; Supabase owns email confirmation. */
+export async function setEmailPassword(email: string, password: string) {
+  const { data, error } = await createClient().auth.updateUser({
+    email: email.trim().toLowerCase(), password,
+  }, { emailRedirectTo: `${window.location.origin}/auth/setup-login` })
+  if (error) throw error
+  return data
+}
+
 /** Persist the email collected during phone registration as account metadata. */
 export async function saveContactEmail(email: string) {
   const supabase = createClient()
@@ -91,10 +127,11 @@ export async function saveContactEmail(email: string) {
 export async function signUp(data: SignUpData) {
   const supabase = createClient()
   const { data: authData, error } = await supabase.auth.signUp({
-    email: data.email,
+    email: data.email.trim().toLowerCase(),
     password: data.password,
     options: {
       data: data.metadata,
+      emailRedirectTo: `${window.location.origin}/auth/verify-phone`,
     },
   })
 
@@ -109,7 +146,7 @@ export async function signIn(data: SignInData) {
   setRememberSession(Boolean(data.remember))
   const supabase = createClient()
   const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email: data.email,
+    email: data.email.trim().toLowerCase(),
     password: data.password,
   })
 
@@ -158,19 +195,6 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'linkedin'
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
     },
-  })
-
-  if (error) throw error
-  return data
-}
-
-/**
- * Reset password (send reset email)
- */
-export async function resetPassword(email: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/reset-password`,
   })
 
   if (error) throw error

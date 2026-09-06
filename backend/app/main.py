@@ -91,6 +91,7 @@ def create_application() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Retry-After", "X-Request-ID"],
     )
 
     # Request body size limit (prevent memory exhaustion DoS; 10MB default)
@@ -121,11 +122,17 @@ def create_application() -> FastAPI:
         """Handle FastAPI validation errors with detailed logging."""
         request_id = getattr(request.state, "request_id", "unknown")
 
+        # Validation errors contain raw inputs (including passwords/OTPs).
+        # Auth endpoints must not echo or log them, even in debug mode.
+        errors = exc.errors()
+        if request.url.path.startswith("/api/v1/auth/"):
+            errors = [{"loc": error["loc"], "type": error["type"]} for error in errors]
+
         logger.error(
             "validation_error",
             method=request.method,
             path=request.url.path,
-            errors=exc.errors(),
+            errors=errors,
             request_id=request_id,
         )
 
@@ -135,7 +142,7 @@ def create_application() -> FastAPI:
                 "error": {
                     "code": "VALIDATION_ERROR",
                     "message": "Request validation failed",
-                    "details": exc.errors() if settings.DEBUG else {},
+                    "details": errors if settings.DEBUG else {},
                     "request_id": request_id,
                 }
             }

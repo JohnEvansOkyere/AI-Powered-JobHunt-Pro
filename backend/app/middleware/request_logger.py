@@ -65,7 +65,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         user_agent = request.headers.get("User-Agent", "unknown")
 
         # Extract query params
-        query_params = dict(request.query_params) if request.query_params else {}
+        query_params = (
+            dict(request.query_params)
+            if request.query_params and not request.url.path.startswith("/api/v1/auth/")
+            else {}
+        )
 
         # Log incoming request
         logger.info(

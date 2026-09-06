@@ -10,6 +10,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { accountDestination } from '@/lib/auth'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -26,6 +27,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     if (!user) {
       router.push('/auth/login')
+    } else if (accountDestination(user) !== '/dashboard') {
+      router.replace(accountDestination(user))
     }
   }, [user, loading, router])
 
@@ -37,7 +40,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  if (!user) {
+  if (!user || accountDestination(user) !== '/dashboard') {
     return null
   }
 

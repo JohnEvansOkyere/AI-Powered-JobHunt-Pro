@@ -133,7 +133,7 @@ def verify_supabase_hook_signature(
 class ArkeselSMSClient:
     """Minimal async client for Arkesel SMS API v2."""
 
-    async def send_auth_code(self, *, phone_e164: str, otp: str) -> None:
+    async def send_auth_code(self, *, phone_e164: str, otp: str, purpose: str = "verification") -> None:
         # Supabase Auth normalizes phone numbers by removing the leading '+'.
         # Accept both representations, keeping the country code mandatory.
         phone = (phone_e164 or "").strip()
@@ -151,6 +151,8 @@ class ArkeselSMSClient:
             f"Your VeloxaHire verification code is {code}. "
             "It expires shortly. Do not share this code."
         )
+        if purpose == "password_reset":
+            message = f"Your VeloxaHire password reset code is {code}. It expires in 5 minutes. Do not share it. Ignore this SMS if you did not request a reset."
         # Arkesel's v2 API expects recipients as international numbers. Keep
         # the leading '+' even when Supabase supplied its digits-only form.
         recipient = phone if phone.startswith("+") else f"+{phone}"

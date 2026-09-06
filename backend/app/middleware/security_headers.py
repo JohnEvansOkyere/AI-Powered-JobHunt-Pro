@@ -34,6 +34,9 @@ class SecurityHeadersMiddleware:
                 add_header("Referrer-Policy", "no-referrer")
                 add_header("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
                 add_header("Cross-Origin-Opener-Policy", "same-origin")
+                if scope.get('path', '').startswith('/api/v1/auth/password-reset/'):
+                    add_header('Cache-Control', 'no-store')
+                    add_header('Pragma', 'no-cache')
                 if settings.is_production:
                     add_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
