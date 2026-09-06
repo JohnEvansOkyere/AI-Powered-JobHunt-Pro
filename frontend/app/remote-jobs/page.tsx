@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { ArrowRight, Briefcase, Globe2, MapPin } from 'lucide-react'
 import type { Job, JobSearchResponse } from '@/lib/api/jobs'
 import { cleanJobDescription } from '@/lib/text'
+import PublicFooter from '@/components/layout/PublicFooter'
+import { isIndexableJob, publicApplyUrl } from '@/lib/job-seo'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 function applyHref(job: Job) {
-  return job.job_link || job.source_url || ''
+  return publicApplyUrl(job)
 }
 
 function postedLabel(value?: string | null) {
@@ -37,20 +39,14 @@ async function getRemoteJobs(): Promise<Job[]> {
   try {
     const response = await fetch(
       `${API_URL}/api/v1/jobs/?remote_type=remote&page=1&page_size=12`,
-      { cache: 'no-store' },
+      { cache: 'no-store', signal: AbortSignal.timeout(8000) },
     )
 
-    if (!response.ok) return []
+    if (!response.ok) { console.warn('seo.remote_jobs.fetch_failed', { status: response.status }); return [] }
     const data = (await response.json()) as JobSearchResponse
-    return data.jobs.filter(
-      (job) =>
-        job.processing_status === 'processed' &&
-        Boolean(job.title.trim()) &&
-        Boolean(job.company.trim()) &&
-        Boolean(cleanJobDescription(job.description).trim()) &&
-        Boolean(applyHref(job)),
-    )
+    return data.jobs.filter(isIndexableJob)
   } catch {
+    console.warn('seo.remote_jobs.fetch_unavailable')
     return []
   }
 }
@@ -193,9 +189,9 @@ export default async function RemoteJobsPage() {
           </div>
         ) : (
           <div className="mt-7 rounded-2xl border border-dashed border-neutral-300 bg-white p-8 text-center">
-            <h2 className="font-semibold text-neutral-900">Remote listings are refreshing</h2>
+            <h2 className="font-semibold text-neutral-900">Remote listings are unavailable here right now</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-neutral-600">
-              Browse the full catalogue while the latest remote roles load, or create a profile so
+              Browse the full catalogue, or create a profile so
               VeloxaHire can surface relevant roles as they arrive.
             </p>
           </div>
@@ -230,6 +226,7 @@ export default async function RemoteJobsPage() {
           </div>
         </div>
       </section>
+      <PublicFooter />
     </main>
   )
 }

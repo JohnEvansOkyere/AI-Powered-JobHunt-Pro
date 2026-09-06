@@ -6,7 +6,7 @@ Handles job listing, searching, filtering, and scraping operations.
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc
+from sqlalchemy import and_, or_, desc, func
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -29,6 +29,7 @@ from app.services.job_scraper_service import JobScraperService
 from app.tasks.job_scraping import scrape_jobs_task
 from pydantic import BaseModel, Field, field_serializer
 from app.services.alx_job_importer import ALX_SOURCE
+from app.services.public_jobs import active_job_filters
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -54,6 +55,7 @@ class JobResponse(BaseModel):
     source_url: Optional[str] = None  # New field for external jobs
     posted_date: Optional[datetime]
     scraped_at: datetime
+    application_deadline: Optional[datetime] = None
     added_by_user_id: Optional[uuid.UUID] = None  # User who added external job
     normalized_title: Optional[str]
     normalized_location: Optional[str]
@@ -74,7 +76,7 @@ class JobResponse(BaseModel):
     match_score: Optional[float] = None  # Relevance score (0-100)
     match_reasons: Optional[List[str]] = None  # Match reasons
     
-    @field_serializer('posted_date', 'scraped_at', 'created_at', 'updated_at')
+    @field_serializer('posted_date', 'scraped_at', 'created_at', 'updated_at', 'application_deadline')
     def serialize_datetime(self, dt: datetime, _info):
         """Serialize datetime to ISO format string."""
         return dt.isoformat() if dt else None
@@ -170,7 +172,7 @@ async def search_jobs(
     """
     await enforce_rate_limit(request, PUBLIC_JOB_SEARCH_RATE_LIMIT)
 
-    query = db.query(Job)
+    query = db.query(Job).filter(*active_job_filters())
     
     # Text search (sanitize length to avoid expensive full scans; max 100 chars)
     if q:
@@ -199,12 +201,7 @@ async def search_jobs(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported scope '{scope}'. Supported: {sorted(LOCAL_JOB_SCOPES)}",
             )
-        query = query.filter(Job.source.in_(LOCAL_JOB_SOURCES)).filter(
-            or_(
-                Job.application_deadline.is_(None),
-                Job.application_deadline >= datetime.now(timezone.utc),
-            )
-        )
+        query = query.filter(Job.source.in_(LOCAL_JOB_SOURCES))
     
     # Location filter
     if location:
@@ -287,24 +284,28 @@ async def get_job_sitemap(
     await enforce_rate_limit(request, PUBLIC_JOB_SITEMAP_RATE_LIMIT)
 
     jobs = (
-        db.query(Job)
+        db.query(Job.id, Job.updated_at)
         .filter(
+            *active_job_filters(),
             Job.processing_status == "processed",
             Job.posted_date.isnot(None),
-            Job.title.isnot(None),
-            Job.company.isnot(None),
-            Job.description.isnot(None),
-            Job.description != "",
+            func.trim(Job.title) != "",
+            func.trim(Job.company) != "",
+            func.trim(Job.description) != "",
             or_(
-                and_(Job.job_link.isnot(None), Job.job_link != ""),
-                and_(Job.source_url.isnot(None), Job.source_url != ""),
+                func.lower(func.trim(Job.job_link)).like("https://%"),
+                func.lower(func.trim(Job.job_link)).like("http://%"),
+                func.lower(func.trim(Job.source_url)).like("https://%"),
+                func.lower(func.trim(Job.source_url)).like("http://%"),
             ),
         )
         .order_by(desc(Job.updated_at))
-        .limit(50000)
+        .limit(49000)
         .all()
     )
 
+    if len(jobs) == 49000:
+        logger.warning("seo.sitemap.capacity_reached", limit=49000)
     return [JobSitemapEntry(id=job.id, updated_at=job.updated_at) for job in jobs]
 
 
@@ -324,7 +325,7 @@ async def get_job(
 
     job = (
         db.query(Job)
-        .filter(Job.id == job_id, Job.processing_status != "archived")
+        .filter(Job.id == job_id, *active_job_filters())
         .first()
     )
 

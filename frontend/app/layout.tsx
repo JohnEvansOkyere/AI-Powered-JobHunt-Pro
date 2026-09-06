@@ -6,6 +6,7 @@ import './dashboard.css'
 import { Toaster } from 'react-hot-toast'
 import { Suspense } from 'react'
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker'
+import { SITE_URL, serializeJsonLd } from '@/lib/site'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -19,7 +20,7 @@ const fraunces = Fraunces({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://veloxahire.org'),
+  metadataBase: new URL(SITE_URL),
   title: 'AI Job Search & Personalized Job Matching | VeloxaHire',
   description:
     'Browse remote and recruiter-posted jobs, then use your CV and profile to find the roles most worth your time with VeloxaHire.',
@@ -62,6 +63,13 @@ export default function RootLayout({
     >
       <body className="antialiased bg-cream-100 text-ink-900" suppressHydrationWarning>
         <Suspense fallback={null}><AnalyticsTracker /></Suspense>
+        <script id="site-identity" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd({
+          '@context': 'https://schema.org',
+          '@graph': [
+            { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'VeloxaHire', url: SITE_URL, logo: `${SITE_URL}/logo.png` },
+            { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'VeloxaHire', url: SITE_URL, inLanguage: 'en', publisher: { '@id': `${SITE_URL}/#organization` } },
+          ],
+        }) }} />
         {children}
         <Toaster
           position="top-right"

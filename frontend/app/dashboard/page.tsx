@@ -161,7 +161,7 @@ function DashboardContent() {
                       className="ws-match-row"
                       href={
                         item.job
-                          ? `/jobs/${item.job_id}`
+                          ? `/jobs/${item.job_id}?from=overview`
                           : "/dashboard/recommendations"
                       }
                       key={item.id}

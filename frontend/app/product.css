@@ -951,13 +951,16 @@
   margin-top: 24px;
   font-size: 12px;
 }
-.vh-pagination button {
+.vh-pagination button,
+.vh-pagination a,
+.vh-pagination [aria-disabled] {
   padding: 9px 12px;
   border: 1px solid #cbd4c5;
   border-radius: 5px;
   background: #fff;
 }
-.vh-pagination button:disabled {
+.vh-pagination button:disabled,
+.vh-pagination [aria-disabled] {
   opacity: 0.4;
   cursor: not-allowed;
 }

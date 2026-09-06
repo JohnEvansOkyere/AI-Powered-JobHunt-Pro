@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -12,7 +12,9 @@ import {
   Globe,
   RefreshCw,
 } from "lucide-react";
-import { searchJobs, type Job, type JobSearchParams } from "@/lib/api/jobs";
+import { type Job, type JobSearchParams, type JobSearchResponse } from "@/lib/api/jobs";
+import { jobSearchHref } from '@/lib/job-search';
+import PublicFooter from '@/components/layout/PublicFooter';
 import { cleanJobDescription } from "@/lib/text";
 import { useAuth } from "@/hooks/useAuth";
 import PublicHeader from "@/components/layout/PublicHeader";
@@ -52,27 +54,17 @@ function applyUrl(job: Job) {
   }
 }
 
-export default function JobsClient() {
+export default function JobsClient({ filters, data }: { filters: JobSearchParams; data: JobSearchResponse | null }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialQuery = searchParams.get("q") || "";
-  const initialLocation = searchParams.get("location") || "";
   const { isAuthenticated } = useAuth();
-  const [query, setQuery] = useState(initialQuery);
-  const [location, setLocation] = useState(initialLocation);
-  const [filters, setFilters] = useState<JobSearchParams>({
-    q: initialQuery,
-    location: initialLocation,
-    page: 1,
-    page_size: 20,
-  });
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [query, setQuery] = useState(filters.q || '');
+  const [location, setLocation] = useState(filters.location || '');
+  const jobs = data?.jobs || [];
+  const total = data?.total || 0;
+  const totalPages = Math.max(1, data?.total_pages || 1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [retry, setRetry] = useState(0);
+  const [loading, startTransition] = useTransition();
+  const failed = data === null;
   const [showPrompt, setShowPrompt] = useState(false);
   const selected = jobs.find((job) => job.id === selectedId) || jobs[0];
   const page = filters.page || 1;
@@ -84,49 +76,12 @@ export default function JobsClient() {
     filters.min_posted_days,
   );
 
-  useEffect(() => {
-    setQuery(initialQuery);
-    setLocation(initialLocation);
-    setFilters((current) => ({
-      ...current,
-      q: initialQuery,
-      location: initialLocation,
-      page: 1,
-    }));
-  }, [initialQuery, initialLocation]);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setFailed(false);
-    searchJobs(filters)
-      .then((response) => {
-        if (!active) return;
-        setJobs(response.jobs);
-        setTotal(response.total);
-        setTotalPages(Math.max(1, response.total_pages));
-        setSelectedId(response.jobs[0]?.id || null);
-      })
-      .catch(() => {
-        if (!active) return;
-        setJobs([]);
-        setFailed(true);
-        setTotal(0);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [filters, retry]);
-
   const updateFilter = (patch: Partial<JobSearchParams>) =>
-    setFilters((current) => ({ ...current, ...patch, page: 1 }));
+    startTransition(() => router.push(jobSearchHref({ ...filters, ...patch, page: 1 }), { scroll: false }));
   const clearFilters = () => {
     setQuery("");
     setLocation("");
-    setFilters({ page: 1, page_size: 20 });
+    startTransition(() => router.push('/jobs', { scroll: false }));
   };
 
   return (
@@ -138,6 +93,7 @@ export default function JobsClient() {
             <form
               className="vh-search-form"
               role="search"
+              action="/jobs"
               onSubmit={(event) => {
                 event.preventDefault();
                 updateFilter({ q: query.trim(), location: location.trim() });
@@ -259,7 +215,7 @@ export default function JobsClient() {
               <p>Your search is still here. Please try again.</p>
               <button
                 className="vh-button"
-                onClick={() => setRetry((value) => value + 1)}
+                onClick={() => startTransition(() => router.refresh())}
               >
                 <RefreshCw size={16} />
                 Try again
@@ -415,25 +371,11 @@ export default function JobsClient() {
           )}
           {!loading && !failed && totalPages > 1 && (
             <nav className="vh-pagination" aria-label="Results pages">
-              <button
-                disabled={page <= 1}
-                onClick={() =>
-                  setFilters((current) => ({ ...current, page: page - 1 }))
-                }
-              >
-                Previous
-              </button>
+              {page > 1 ? <Link href={jobSearchHref({ ...filters, page: page - 1 })} prefetch={false}>Previous</Link> : <span aria-disabled="true">Previous</span>}
               <span>
                 Page {page} of {totalPages}
               </span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() =>
-                  setFilters((current) => ({ ...current, page: page + 1 }))
-                }
-              >
-                Next
-              </button>
+              {page < totalPages ? <Link href={jobSearchHref({ ...filters, page: page + 1 })} prefetch={false}>Next</Link> : <span aria-disabled="true">Next</span>}
             </nav>
           )}
           {!isAuthenticated && (
@@ -452,6 +394,7 @@ export default function JobsClient() {
           )}
         </section>
       </main>
+      <PublicFooter />
       <PostApplyModal
         open={showPrompt}
         onClose={() => setShowPrompt(false)}
