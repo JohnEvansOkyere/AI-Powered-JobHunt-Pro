@@ -49,7 +49,7 @@ export interface AdminOverview {
   }>
 }
 
-export interface AdminUser {
+export interface AdminAccount {
   id: string
   email: string | null
   phone: string | null
@@ -63,11 +63,35 @@ export interface AdminUser {
   updated_at: string | null
 }
 
+export interface AdminUser extends AdminAccount {
+  profile_completion: number
+  profile_status: 'complete' | 'partial' | 'not_started'
+  profile_updated_at: string | null
+  missing_fields: string[]
+}
+
 export interface AdminUsersResponse {
   users: AdminUser[]
   total: number
   active: number
   suspended: number
+  filtered_total: number
+  page: number
+  page_size: number
+}
+
+export interface AdminRegistrations {
+  range: { days: number; start: string; end: string }
+  total_accounts: number
+  signups: number
+  complete: number
+  partial: number
+  not_started: number
+  daily: Array<{ day: string; signups: number }>
+}
+
+export function getAdminRegistrations(days = 30) {
+  return apiClient.get<AdminRegistrations>(`/api/v1/admin/registrations?days=${days}`)
 }
 
 export function getAdminOverview(days = 30) {
@@ -78,14 +102,14 @@ export function getAdminIdentity() {
   return apiClient.get<{ is_admin: boolean; email: string }>('/api/v1/admin/me')
 }
 
-export function getAdminUsers(search = '', status: 'all' | 'active' | 'suspended' = 'all') {
-  const params = new URLSearchParams({ status })
+export function getAdminUsers(search = '', status: 'all' | 'active' | 'suspended' = 'all', profile = 'all', days = 0, page = 1) {
+  const params = new URLSearchParams({ status, profile, days: String(days), page: String(page), page_size: '25' })
   if (search.trim()) params.set('search', search.trim())
   return apiClient.get<AdminUsersResponse>(`/api/v1/admin/users?${params.toString()}`)
 }
 
 export function updateAdminUserStatus(userId: string, isActive: boolean) {
-  return apiClient.patch<{ user: AdminUser }>(`/api/v1/admin/users/${userId}/status`, { is_active: isActive })
+  return apiClient.patch<{ user: AdminAccount }>(`/api/v1/admin/users/${userId}/status`, { is_active: isActive })
 }
 
 export function revokeAdminUser(userId: string) {

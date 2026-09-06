@@ -3,6 +3,10 @@ const nextConfig = {
   reactStrictMode: true,
   async headers() {
     return [
+      ...['/auth/:path*', '/dashboard/:path*', '/profile/:path*', '/register'].map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
       {
         source: '/auth/reset-password',
         headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],

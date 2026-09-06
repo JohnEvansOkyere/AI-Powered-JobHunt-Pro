@@ -38,7 +38,8 @@ const navigation = [
 ]
 
 const adminNavigation = [
-  { name: 'Analytics', href: '/dashboard/admin', icon: BarChart3 },
+  { name: 'Admin overview', href: '/dashboard/admin', icon: BarChart3 },
+  { name: 'Signups & profiles', href: '/dashboard/admin/registrations', icon: Users },
   { name: 'Users', href: '/dashboard/admin/users', icon: Users },
   { name: 'Job imports', href: '/dashboard/admin/job-imports', icon: FileUp },
 ]

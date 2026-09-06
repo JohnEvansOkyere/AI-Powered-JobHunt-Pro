@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import PublicHeader from "@/components/layout/PublicHeader";
-import Link from "next/link";
+import JobDetailActions from "@/components/jobs/JobDetailActions";
+import JobDetailBackLink from "@/components/jobs/JobDetailBackLink";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
-  ArrowRight,
-  Bookmark,
   Briefcase,
   Building2,
   Clock,
@@ -13,18 +11,22 @@ import {
 } from "lucide-react";
 import type { Job } from "@/lib/api/jobs";
 import { cleanJobDescription } from "@/lib/text";
+import { SITE_URL, serializeJsonLd } from "@/lib/site";
+import { publicApplyUrl, isClosedJob, isIndexableJob, jobPosting } from "@/lib/job-seo";
+import PublicFooter from "@/components/layout/PublicFooter";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://veloxahire.org";
 
 async function getJob(id: string): Promise<Job | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
   const response = await fetch(`${API_URL}/api/v1/jobs/${id}`, {
     cache: "no-store",
   });
 
-  if (response.status === 404) return null;
+  if (response.status === 404 || response.status === 410) return null;
   if (!response.ok) throw new Error("Failed to load job");
-  return response.json();
+  const job: Job = await response.json();
+  return isClosedJob(job) ? null : job;
 }
 
 function formatDate(dateString?: string | null) {
@@ -38,28 +40,6 @@ function formatDate(dateString?: string | null) {
   }).format(date);
 }
 
-function applyHref(job: Job) {
-  return job.job_link || job.source_url || "";
-}
-
-function isIndexableJob(job: Job) {
-  return Boolean(
-    job.processing_status === "processed" &&
-    job.posted_date &&
-    job.title.trim() &&
-    job.company.trim() &&
-    cleanJobDescription(job.description).trim() &&
-    applyHref(job),
-  );
-}
-
-function serializeJsonLd(value: unknown) {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026");
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -69,6 +49,7 @@ export async function generateMetadata({
   if (!job) {
     return {
       title: "Job Not Found | VeloxaHire",
+      robots: { index: false, follow: true },
     };
   }
 
@@ -92,7 +73,7 @@ export async function generateMetadata({
           url: "/og-image.png",
           width: 1200,
           height: 630,
-          alt: "VeloxaRecruit — AI-Powered Recruitment",
+          alt: "VeloxaHire — Jobs and personalized matching",
         },
       ],
     },
@@ -105,45 +86,23 @@ export async function generateMetadata({
 
 export default async function JobDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { from?: string | string[] };
 }) {
   const job = await getJob(params.id);
   if (!job) notFound();
 
-  const applyUrl = applyHref(job);
+  const applyUrl = publicApplyUrl(job);
   const postedDate = job.posted_date || job.scraped_at;
-  const indexable = isIndexableJob(job);
-  const remoteType = (job.remote_type || job.remote_option || "").toLowerCase();
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.title,
-    description: cleanJobDescription(job.description),
-    datePosted: job.posted_date,
-    employmentType: job.job_type || undefined,
-    hiringOrganization: {
-      "@type": "Organization",
-      name: job.company,
-    },
-    jobLocation: job.location
-      ? {
-          "@type": "Place",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: job.location,
-          },
-        }
-      : undefined,
-    jobLocationType: remoteType.includes("remote") ? "TELECOMMUTE" : undefined,
-    url: `${SITE_URL}/jobs/${job.id}`,
-  };
+  const jsonLd = jobPosting(job);
 
   return (
     <div className="vh-site vh-job-page">
       <PublicHeader />
       <main id="main-content">
-        {indexable && (
+        {jsonLd && (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
@@ -151,13 +110,7 @@ export default async function JobDetailPage({
         )}
 
         <article className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-          <Link
-            href="/jobs"
-            className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 hover:text-neutral-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to jobs
-          </Link>
+          <JobDetailBackLink fromOverview={searchParams.from === "overview"} />
 
           <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
             <section className="rounded-lg border border-neutral-200 bg-white p-6 ">
@@ -199,6 +152,12 @@ export default async function JobDetailPage({
               </div>
 
               <div className="mt-8 border-t border-neutral-100 pt-8">
+                {job.application_deadline && (
+                  <p className="mb-4 text-sm font-semibold">Applications close: {formatDate(job.application_deadline)}</p>
+                )}
+                <p className="mb-4 text-sm text-neutral-600">
+                  Source: {job.source === 'recruiter' ? 'Recruiter posting' : job.source}. Check the original listing for current availability and eligibility before applying.
+                </p>
                 <h2 className="text-lg font-semibold text-neutral-900">
                   Job description
                 </h2>
@@ -219,51 +178,11 @@ export default async function JobDetailPage({
               )}
             </section>
 
-            <aside className="space-y-4">
-              <div className="rounded-lg border border-neutral-200 bg-white p-5 ">
-                {applyUrl ? (
-                  <a
-                    href={applyUrl}
-                    data-analytics="job_apply_click"
-                    data-job-id={job.id}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                    className="vh-button w-full"
-                  >
-                    Apply now
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                ) : (
-                  <p className="rounded-md bg-neutral-100 px-4 py-3 text-center text-sm font-semibold text-neutral-500">
-                    Apply link unavailable
-                  </p>
-                )}
-                <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  Applications open on the employer or recruiter page. Create a
-                  profile afterwards to track roles and get similar jobs.
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-brand-turquoise-100 bg-brand-turquoise-50 p-5">
-                <Bookmark className="h-5 w-5 text-brand-turquoise-700" />
-                <h2 className="mt-3 font-semibold text-neutral-900">
-                  Get roles like this ranked for you
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                  Upload your CV once and VeloxaHire will score matching jobs,
-                  save your shortlist, and keep track of applications.
-                </p>
-                <Link
-                  href="/auth/signup"
-                  className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-brand-turquoise-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-turquoise-700"
-                >
-                  Create free profile
-                </Link>
-              </div>
-            </aside>
+            <JobDetailActions jobId={job.id} applyUrl={applyUrl} />
           </div>
         </article>
       </main>
+      <PublicFooter />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | VeloxaHire',
+  alternates: { canonical: '/privacy' },
   description: 'How VeloxaHire collects, uses, protects, exports, and deletes candidate data.',
 }
 
@@ -57,8 +58,8 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-ink-900">Contact</h2>
             <p className="mt-2">
-              For privacy requests, use the account tools in Settings or contact the VeloxaHire team
-              through the contact details provided in the application.
+              For privacy requests, use the account tools in Settings or visit our{' '}
+              <Link href="/contact" className="underline">contact and support page</Link>.
             </p>
           </section>
         </div>

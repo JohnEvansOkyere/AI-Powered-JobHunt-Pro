@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const recruiterUrl =
   process.env.NEXT_PUBLIC_VELOXARECRUIT_URL ||
@@ -12,6 +13,7 @@ export const recruiterUrl =
 
 export default function PublicHeader() {
   const path = usePathname();
+  const { isAuthenticated, loading } = useAuth();
   const [open, setOpen] = useState(false);
   return (
     <header className="vh-header">
@@ -34,12 +36,22 @@ export default function PublicHeader() {
           <a href={recruiterUrl}>For employers</a>
         </nav>
         <div className="vh-nav-actions">
-          <Link href="/auth/login" className="vh-signin">
-            Sign in
-          </Link>
-          <Link href="/auth/signup" className="vh-button vh-small">
-            Create account
-          </Link>
+          {!loading && (
+            <>
+              <Link
+                href={isAuthenticated ? "/dashboard/profile" : "/auth/login"}
+                className="vh-signin"
+              >
+                {isAuthenticated ? "My profile" : "Sign in"}
+              </Link>
+              <Link
+                href={isAuthenticated ? "/dashboard" : "/auth/signup"}
+                className="vh-button vh-small"
+              >
+                {isAuthenticated ? "Dashboard" : "Create account"}
+              </Link>
+            </>
+          )}
           <button
             className="vh-menu-button"
             aria-label={open ? "Close navigation" : "Open navigation"}
@@ -64,9 +76,22 @@ export default function PublicHeader() {
             How it works
           </Link>
           <a href={recruiterUrl}>For employers</a>
-          <Link href="/auth/signup" onClick={() => setOpen(false)}>
-            Create account
-          </Link>
+          {!loading && (
+            <>
+              <Link
+                href={isAuthenticated ? "/dashboard/profile" : "/auth/login"}
+                onClick={() => setOpen(false)}
+              >
+                {isAuthenticated ? "My profile" : "Sign in"}
+              </Link>
+              <Link
+                href={isAuthenticated ? "/dashboard" : "/auth/signup"}
+                onClick={() => setOpen(false)}
+              >
+                {isAuthenticated ? "Dashboard" : "Create account"}
+              </Link>
+            </>
+          )}
         </nav>
       )}
     </header>

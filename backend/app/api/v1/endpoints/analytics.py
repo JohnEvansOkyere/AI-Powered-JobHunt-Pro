@@ -20,6 +20,18 @@ from app.models.analytics import AnalyticsEvent, AnalyticsSession
 
 router = APIRouter()
 EVENT_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,59}$")
+AI_REFERRERS = {
+    "chatgpt.com": "chatgpt", "chat.openai.com": "chatgpt",
+    "perplexity.ai": "perplexity", "claude.ai": "claude",
+    "gemini.google.com": "gemini", "copilot.microsoft.com": "copilot",
+}
+
+
+def _ai_source(value: str) -> Optional[str]:
+    host = value.lower().removeprefix("www.")
+    if host in AI_REFERRERS.values():
+        return host
+    return next((name for domain, name in AI_REFERRERS.items() if host == domain or host.endswith("." + domain)), None)
 
 
 class AnalyticsEventIn(BaseModel):
@@ -65,9 +77,14 @@ def _attribution(metadata: Dict[str, Any], referrer: Optional[str]) -> Dict[str,
     content = clean(metadata.get("utm_content") or metadata.get("content"))
     term = clean(metadata.get("utm_term") or metadata.get("term"))
 
+    if source and (ai_source := _ai_source(source)):
+        source, medium = ai_source, medium or "ai"
+
     if not source and referrer:
         host = (urlparse(referrer).hostname or "").lower().removeprefix("www.")
-        if "google." in host or "bing." in host or "duckduckgo." in host:
+        if ai_source := _ai_source(host):
+            source, medium = ai_source, medium or "ai"
+        elif "google." in host or "bing." in host or "duckduckgo." in host:
             source, medium = host.split(".", 1)[0], medium or "organic"
         elif "linkedin." in host:
             source, medium = "linkedin", medium or "social"

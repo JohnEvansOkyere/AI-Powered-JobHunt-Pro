@@ -39,6 +39,14 @@ The production preview is served from an isolated copy to avoid conflicting with
 
 ## Signed-in workspace follow-up
 
+### Job details opened from Overview (2026-09-06)
+
+- Overview recommendation links include `?from=overview`. Once the existing session resolves, job details show **Back to overview** linking to `/dashboard`; other signed-in detail visits return to `/dashboard/jobs`. Anonymous visitors return to `/jobs`, including when a shared URL has the Overview hint. Return destinations are fixed application paths.
+- The shared public header uses the existing auth hook: signed-in candidates see **My profile** and **Dashboard** on desktop and mobile. Anonymous visitors see **Sign in** and **Create account**. Account controls wait for session resolution.
+- Job details replace the signup card with **Your job matches** / **Back to job matches** for signed-in candidates and remove the instruction to create another profile. Anonymous signup prompts appear after session resolution. The job description, metadata and public Apply link remain server-rendered; no account/profile data is placed in public metadata and no authorization rules change.
+- Regression runner: `frontend/scripts/verify-job-detail-session.cjs`. Uses synthetic Supabase sessions, a local job/profile API fixture and an isolated frontend. Covers Overview navigation in both directions, browser Back, reload, direct job entry, desktop/mobile account controls, anonymous access and missing apply links. This does not prove deployed behavior or real session continuity in the owner's browser.
+- Verification: the isolated implementation passed TypeScript and all browser scenarios at 1440/390/360px, with no page errors or horizontal overflow. A later shared-workspace type check encountered concurrent SEO imports of a not-yet-present `PublicFooter` in the job list/detail pages; that separate work must finish before the combined workspace can pass.
+
 ### Guided account onboarding (2026-09-06)
 
 - After authentication and any required account verification, `/dashboard` and `/dashboard/recommendations` check the saved profile and active CV. Missing profile essentials or an active, successfully parsed CV opens `/profile/setup`. Read failures show a retry state rather than treating a failed request as missing data.

@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Terms of Service | VeloxaHire',
+  alternates: { canonical: '/terms' },
   description: 'Terms for using VeloxaHire candidate job discovery and recommendation tools.',
 }
 
@@ -39,7 +40,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-ink-900">Jobs And Applications</h2>
             <p className="mt-2">
-              Job listings may come from external job boards, user-provided URLs, or mirrored
+              Job listings may come from external job boards, curated imports, or mirrored
               recruiter postings. VeloxaHire does not guarantee that external listings remain open,
               accurate, or available. Applications submitted on external websites are governed by
               those websites' terms.
