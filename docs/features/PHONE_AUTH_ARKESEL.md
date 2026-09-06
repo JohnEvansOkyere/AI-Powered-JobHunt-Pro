@@ -59,3 +59,22 @@ into WhatsApp or promotional SMS alerts.
 Existing email/password accounts can still use the legacy option on the sign-in
 page during migration. New registration verifies by phone but collects an email
 for account communication and email alerts.
+
+## Troubleshooting delivery failures
+
+The 2026-09-06 production logs showed a signed hook reaching SMS delivery and
+returning `502` with `error_type=ValueError`. The sender previously required a
+leading `+`, whereas [Supabase Auth normalizes phone numbers by removing it](https://github.com/supabase/auth/blob/master/internal/api/phone.go).
+This mismatch is reproduced by a signed hook test using `233241234567`.
+The sender now accepts country-code numbers with or without `+`, sends digits
+to Arkesel, and still rejects local `0`-prefixed or malformed numbers.
+
+Validation failures now log `error_code=invalid_phone_format` or
+`invalid_otp_format`; other delivery failures use `sms_delivery_failed`.
+Phone numbers, OTPs, secrets, and provider response bodies are not included in
+these diagnostics. A signature failure remains `401`, missing payload fields
+remain `422`, and SMS delivery failures remain `502`.
+
+Deploy the updated backend before retrying signup; restarting an older checkout
+does not apply this fix. Tests use a mocked Arkesel transport. Actual SMS receipt
+and successful Supabase code verification still require a production smoke test.
