@@ -27,6 +27,7 @@ export interface PhoneOtpData {
   shouldCreateUser: boolean
   metadata?: {
     full_name?: string
+    contact_email?: string
     handoff_email?: string
     source?: string
     ats_job_id?: string
@@ -69,6 +70,16 @@ export async function verifyPhoneOtp(phone: string, token: string) {
     phone: normalizePhoneNumber(phone),
     token: token.trim(),
     type: 'sms',
+  })
+  if (error) throw error
+  return data
+}
+
+/** Persist the email collected during phone registration as account metadata. */
+export async function saveContactEmail(email: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.updateUser({
+    data: { contact_email: email.trim().toLowerCase() },
   })
   if (error) throw error
   return data

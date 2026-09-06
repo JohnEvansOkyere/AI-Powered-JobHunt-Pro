@@ -153,7 +153,6 @@ async def send_phone_auth_sms(request: Request):
         event = json.loads(body)
         phone = str(event["user"]["phone"])
         otp = str(event["sms"]["otp"])
-        await arkesel_sms.send_auth_code(phone_e164=phone, otp=otp)
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -164,6 +163,9 @@ async def send_phone_auth_sms(request: Request):
                 }
             },
         )
+
+    try:
+        await arkesel_sms.send_auth_code(phone_e164=phone, otp=otp)
     except Exception as exc:
         logger.error(
             "supabase_send_sms_hook_delivery_failed",

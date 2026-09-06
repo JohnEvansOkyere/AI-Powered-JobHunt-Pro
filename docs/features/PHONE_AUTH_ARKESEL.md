@@ -45,15 +45,17 @@ Standard Webhooks headers and fails closed when its secret is absent or wrong.
 
 ## Candidate flow
 
-1. Registration normalizes Ghana local format such as `024 123 4567` to
+1. Registration collects a required email address and normalizes Ghana local format such as `024 123 4567` to
    `+233241234567` (international E.164 is also accepted).
 2. `signInWithOtp` asks Supabase to create the pending phone identity.
 3. Supabase signs a Send SMS Hook event containing its generated OTP.
 4. The backend verifies that signature and sends the OTP using Arkesel SMS v2.
 5. `verifyOtp` verifies the code with Supabase and establishes the session.
+6. The client stores the collected email as authenticated `contact_email` metadata. It is used for email alerts and account communication; it is not the OTP identity.
 
 Phone verification is account authentication only. It does not opt the user
 into WhatsApp or promotional SMS alerts.
 
 Existing email/password accounts can still use the legacy option on the sign-in
-page during migration. New registration is phone-only.
+page during migration. New registration verifies by phone but collects an email
+for account communication and email alerts.

@@ -189,7 +189,13 @@ def _status_payload(
 
 def _account_email(db: Session, user_id: uuid.UUID) -> Optional[str]:
     user = db.get(User, user_id)
-    return (user.email or "").strip() if user and user.email else None
+    if not user:
+        return None
+    if user.email:
+        return user.email.strip()
+    metadata = user.user_metadata or {}
+    contact_email = metadata.get("contact_email")
+    return str(contact_email).strip() if contact_email else None
 
 
 @router_notifications.post("/opt-in", status_code=status.HTTP_200_OK)
