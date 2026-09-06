@@ -4,13 +4,14 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PublicHeader from "@/components/layout/PublicHeader";
-import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
+import { requestPhoneOtp, saveContactEmail, verifyPhoneOtp } from "@/lib/auth";
 import { apiClient } from "@/lib/api/client";
 import { toast } from "react-hot-toast";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Mail,
   Phone,
   ShieldCheck,
   User,
@@ -47,6 +48,7 @@ function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [normalizedPhone, setNormalizedPhone] = useState("");
   const [code, setCode] = useState("");
@@ -65,9 +67,12 @@ function SignUpContent() {
         if (cancelled || !result.valid) return;
         if (result.full_name) setFullName(result.full_name);
         if (result.phone) setPhone(result.phone);
-        if (result.email) setHandoffEmail(result.email);
+        if (result.email) {
+          setHandoffEmail(result.email);
+          setEmail(result.email);
+        }
         if (result.job_id) setHandoffJobId(result.job_id);
-        setHandoffPrefilled(Boolean(result.full_name || result.phone));
+        setHandoffPrefilled(Boolean(result.full_name || result.phone || result.email));
       })
       .catch(() => undefined);
     return () => {
@@ -85,6 +90,7 @@ function SignUpContent() {
         shouldCreateUser: true,
         metadata: {
           full_name: fullName.trim(),
+          contact_email: email.trim().toLowerCase(),
           handoff_email: handoffEmail || undefined,
           source: handoffPrefilled ? "veloxarecruit_apply_handoff" : undefined,
           ats_job_id: handoffJobId || undefined,
@@ -115,6 +121,7 @@ function SignUpContent() {
       const result = await verifyPhoneOtp(normalizedPhone, code);
       if (!result.session)
         throw new Error("Phone verified, but no session was created.");
+      await saveContactEmail(email);
       void trackEvent({
         event_name: "signup_completed",
         path: "/auth/signup",
@@ -155,7 +162,7 @@ function SignUpContent() {
             <p className="mt-2 text-neutral-500">
               {step === "verify"
                 ? `Enter the code sent to ${normalizedPhone}.`
-                : "Use your phone number. No password to create or remember."}
+                : "Add your email, then verify your phone by SMS. No password to create or remember."}
             </p>
 
             {handoffPrefilled && step === "details" && (
@@ -194,6 +201,32 @@ function SignUpContent() {
                 </div>
                 <div>
                   <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-sm font-medium text-neutral-700"
+                  >
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className={inputCls}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      inputMode="email"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-neutral-400">
+                    We’ll use this for application updates and email alerts.
+                  </p>
+                </div>
+                <div>
+                  <label
                     htmlFor="phone"
                     className="mb-1.5 block text-sm font-medium text-neutral-700"
                   >
@@ -220,7 +253,7 @@ function SignUpContent() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading || !fullName.trim() || !phone.trim()}
+                  disabled={loading || !fullName.trim() || !email.trim() || !phone.trim()}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-turquoise-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-turquoise-500/20 transition-all hover:bg-brand-turquoise-700 disabled:opacity-60"
                 >
                   {loading ? "Sending code…" : "Send verification code"}{" "}
