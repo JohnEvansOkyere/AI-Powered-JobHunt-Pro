@@ -159,15 +159,22 @@ class ArkeselSMSClient:
             "message": message,
             "recipients": [recipient],
         }
-        async with httpx.AsyncClient(timeout=3.5) as client:
-            response = await client.post(
-                ARKESEL_SMS_URL,
-                headers={
-                    "api-key": settings.ARKESEL_API_KEY.strip(),
-                    "Content-Type": "application/json",
-                },
-                json=payload,
+        try:
+            async with httpx.AsyncClient(timeout=settings.ARKESEL_HTTP_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    ARKESEL_SMS_URL,
+                    headers={
+                        "api-key": settings.ARKESEL_API_KEY.strip(),
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+        except httpx.TimeoutException as exc:
+            logger.error(
+                "arkesel_auth_sms_timeout",
+                timeout_seconds=settings.ARKESEL_HTTP_TIMEOUT_SECONDS,
             )
+            raise ArkeselProviderError("arkesel_timeout", "Arkesel did not respond before the hook deadline") from exc
 
         if response.status_code != 200:
             error_code = _arkesel_http_error_code(response.status_code)

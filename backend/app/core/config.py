@@ -76,6 +76,12 @@ class Settings(BaseSettings):
         alias="ARKESEL_SENDER_ID",
         description="Approved Arkesel SMS sender ID (maximum 11 characters).",
     )
+    ARKESEL_HTTP_TIMEOUT_SECONDS: float = Field(
+        default=4.5,
+        ge=1.0,
+        le=4.8,
+        description="Arkesel request timeout kept below Supabase's five-second hook limit.",
+    )
     SUPABASE_SEND_SMS_HOOK_SECRETS: str = Field(
         default="",
         description="Supabase Auth Hook secret(s), including v1,whsec_ prefix; separate rotations with |.",
