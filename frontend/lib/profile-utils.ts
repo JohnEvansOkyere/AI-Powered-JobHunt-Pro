@@ -6,6 +6,12 @@
 
 import type { UserProfile, UserProfileFormData } from '@/types/profile'
 
+/** Profile essentials; the active parsed CV is checked separately. */
+export function isMatchingProfileReady(profile: UserProfileFormData | null): boolean {
+  return Boolean(profile?.primary_job_title?.trim() && profile.seniority_level &&
+    profile.work_preference && profile.technical_skills?.some(({ skill }) => skill.trim()))
+}
+
 /**
  * Calculate profile completion percentage based on filled fields.
  *

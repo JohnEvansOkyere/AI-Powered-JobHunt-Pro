@@ -80,8 +80,13 @@ export default function ProfilePage() {
   const completionPercentage = calculateProfileCompletion(profile)
 
   const handleSectionSave = async (data: UserProfileFormData) => {
-    await saveProfile(data)
-    setEditing(null)
+    try {
+      await saveProfile(data)
+      setEditing(null)
+    } catch {
+      // useProfile shows the safe error. Keep edits open for retry, and consume
+      // the rejection so a failed save cannot trigger the runtime error overlay.
+    }
   }
 
   const enterEdit = (key: SectionKey) => {
@@ -159,7 +164,7 @@ export default function ProfilePage() {
               onClick={() => router.push('/profile/setup')}
               className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors underline-offset-2 hover:underline"
             >
-              Prefer a guided walkthrough? Run the full setup &rarr;
+              Review your matching details with guided setup &rarr;
             </button>
           </div>
         </div>

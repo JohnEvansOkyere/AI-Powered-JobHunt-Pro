@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { EmailDigestSettings } from '@/components/settings/EmailDigestSettings'
@@ -79,7 +80,7 @@ export default function SettingsPage() {
       setVerificationSent(true)
       toast.success('Verification code sent')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not send code')
+      toast.error(getUserErrorMessage(err, 'Could not send code'))
     } finally {
       setSaving(false)
     }
@@ -98,7 +99,7 @@ export default function SettingsPage() {
       await refreshStatus()
       toast.success('WhatsApp alerts are on')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not verify code')
+      toast.error(getUserErrorMessage(err, 'Could not verify code'))
     } finally {
       setSaving(false)
     }
@@ -114,7 +115,7 @@ export default function SettingsPage() {
       await refreshStatus()
       toast.success('Notification preferences saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save preferences')
+      toast.error(getUserErrorMessage(err, 'Could not save preferences'))
     } finally {
       setSaving(false)
     }
@@ -127,7 +128,7 @@ export default function SettingsPage() {
       await refreshStatus()
       toast.success('WhatsApp alerts turned off')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not opt out')
+      toast.error(getUserErrorMessage(err, 'Could not opt out'))
     } finally {
       setSaving(false)
     }
@@ -150,7 +151,7 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url)
       toast.success('Data export downloaded')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not export your data')
+      toast.error(getUserErrorMessage(err, 'Could not export your data'))
     } finally {
       setAccountAction(null)
     }
@@ -166,14 +167,14 @@ export default function SettingsPage() {
     try {
       const response = await deleteMyAccount()
       if (response.warning) {
-        toast.error(response.warning)
+        toast.error('Your account data was deleted, but account closure is incomplete. Please contact support.')
       } else {
         toast.success('Account data deleted')
       }
       await signOut().catch(() => undefined)
       window.location.href = '/'
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not delete your account')
+      toast.error(getUserErrorMessage(err, 'Could not delete your account'))
       setAccountAction(null)
     }
   }

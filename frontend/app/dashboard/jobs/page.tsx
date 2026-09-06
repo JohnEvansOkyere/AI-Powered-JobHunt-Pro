@@ -1,5 +1,6 @@
 'use client'
 
+import { getUserErrorMessage } from '@/lib/errors'
 import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -242,12 +243,7 @@ function JobsPageContent() {
         toast.success('Saved')
       }
     } catch (error: any) {
-      const detail = error?.response?.data?.detail
-      if (error?.response?.status === 400 && detail?.includes?.('maximum limit')) {
-        toast.error('You have reached the maximum number of saved jobs.')
-      } else {
-        toast.error(detail || 'Failed to save job')
-      }
+      toast.error(getUserErrorMessage(error, 'Failed to save job'))
     }
   }
 

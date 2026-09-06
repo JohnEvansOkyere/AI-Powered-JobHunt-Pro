@@ -53,6 +53,10 @@ class Settings(BaseSettings):
         default="",
         description="Canonical Supabase Auth anon/public key. Falls back to SUPABASE_KEY.",
     )
+    AUTH_SUPABASE_SERVICE_KEY: str = Field(
+        default="",
+        description="Server-only service key for canonical Auth administration; required when Auth uses a separate project.",
+    )
     AUTH_SUPABASE_JWT_SECRET: str = Field(
         default="",
         description="Canonical Supabase Auth JWT secret. Falls back to SUPABASE_JWT_SECRET.",
@@ -102,6 +106,14 @@ class Settings(BaseSettings):
     @property
     def auth_supabase_key(self) -> str:
         return self.AUTH_SUPABASE_KEY or self.SUPABASE_KEY
+
+    @property
+    def auth_supabase_service_key(self) -> str:
+        if self.AUTH_SUPABASE_SERVICE_KEY:
+            return self.AUTH_SUPABASE_SERVICE_KEY
+        if self.auth_supabase_url.rstrip('/') == self.SUPABASE_URL.rstrip('/'):
+            return self.SUPABASE_SERVICE_KEY
+        return ""
 
     @property
     def auth_supabase_jwt_secret(self) -> str:

@@ -79,6 +79,10 @@ export interface UploadCVResponse {
   updated_at: string
 }
 
+export function isCVReady(cv: CVDetail | null): boolean {
+  return Boolean(cv?.is_active && cv.parsing_status === 'completed' && cv.parsed_content && Object.keys(cv.parsed_content).length)
+}
+
 /**
  * Upload a CV file (PDF or DOCX)
  */
@@ -143,4 +147,3 @@ export async function getCVDownloadURL(cvId: string): Promise<{ download_url: st
   )
   return response as { download_url: string }
 }
-

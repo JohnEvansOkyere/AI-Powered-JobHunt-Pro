@@ -1,5 +1,7 @@
 # Recommendations V2 + WhatsApp Delivery — Implementation Plan
 
+Current implementation correction (2026-09-06): [Candidate onboarding](features/CANDIDATE_ONBOARDING.md) requires both profile essentials and an active parsed CV for generation, and fixes extraction of CV evidence from `parsed_content`. The older product proposal below is historical: editable CV tailoring has since been restored and currently uses uploaded CV content in a system export layout.
+
 Status: proposed
 Owner: TBD
 Target scope: refocus the product on job recommendations and delivery. Remove CV tailoring and cover-letter generation. Ship a three-tier recommendation UI and deliver Tier 1 picks to candidates via WhatsApp Business API.

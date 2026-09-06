@@ -33,6 +33,8 @@ from app.models.cv import CV
 from app.models.embeddings import JobEmbedding, UserEmbedding
 from app.models.job import Job
 from app.models.user_profile import UserProfile
+from app.services.matching_readiness import active_parsed_cv
+from app.utils.sanitizer import DataSanitizer
 
 logger = get_logger(__name__)
 
@@ -108,15 +110,32 @@ def user_embedding_text(profile: Optional[UserProfile], cv: Optional[CV]) -> str
         if profile.personal_branding_summary:
             parts.append(f"About: {profile.personal_branding_summary}")
 
-    if cv:
-        # The CV model varies between projects; pull fields defensively.
-        # We only want parsed text snippets, not file blobs.
-        cv_summary = getattr(cv, "summary", None) or getattr(cv, "extracted_text", None)
-        if cv_summary:
-            parts.append(f"CV summary: {cv_summary}")
-
-    text = "\n".join(p for p in parts if p and p.strip())
+    # Reserve half the budget for CV evidence even with a very long profile.
+    sanitizer = DataSanitizer()
+    profile_text = sanitizer.sanitize_text("\n".join(parts), max_length=3000)[:3000]
+    text = profile_text + "\n" + cv_matching_text(cv)
+    text = text.strip()
     return text[:USER_TEXT_CHAR_BUDGET]
+
+
+def cv_matching_text(cv: Optional[CV]) -> str:
+    """Use actual structured CV fields, excluding contact details and raw documents."""
+    if not cv or not cv.is_active or cv.parsing_status != "completed" or not isinstance(cv.parsed_content, dict):
+        return ""
+    content = DataSanitizer().sanitize_cv_data({
+        key: cv.parsed_content[key]
+        for key in ("summary", "skills", "experience", "education", "projects")
+        if key in cv.parsed_content
+    })
+    parts = []
+    if content.get("skills"):
+        parts.append("CV skills: " + json.dumps(content["skills"], ensure_ascii=False))
+    if content.get("summary"):
+        parts.append("CV summary: " + content["summary"])
+    for section in ("experience", "education", "projects"):
+        if content.get(section):
+            parts.append(f"CV {section}: " + json.dumps(content[section], ensure_ascii=False))
+    return "\n".join(parts)[:2999]
 
 
 def _maybe_json_list(raw: str) -> str:
@@ -215,12 +234,7 @@ async def upsert_user_embedding(
 ) -> EmbeddingUpsertResult:
     """Compute + cache the user embedding for one user."""
     profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
-    cv = (
-        db.query(CV)
-        .filter(CV.user_id == user_id)
-        .order_by(CV.created_at.desc())
-        .first()
-    )
+    cv = active_parsed_cv(db, user_id)
     text = user_embedding_text(profile, cv)
     if not text:
         logger.info("User %s has no profile/CV signal yet; no embedding produced.", user_id)

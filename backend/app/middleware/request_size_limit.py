@@ -42,10 +42,11 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             )
 
         content_length = request.headers.get("content-length")
+        max_size = min(self.max_size, 4096) if request.url.path.startswith('/api/v1/auth/password-reset/') else self.max_size
         if content_length:
             try:
                 size = int(content_length)
-                if size > self.max_size:
+                if size > max_size:
                     logger.warning(
                         "request_body_too_large",
                         content_length=size,

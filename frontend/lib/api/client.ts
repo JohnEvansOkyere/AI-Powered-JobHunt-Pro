@@ -5,6 +5,7 @@
  */
 
 import { getCurrentSession, signOut } from '../auth'
+import { apiError, connectionError, errorFields, UserFacingError } from '../errors'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
@@ -64,20 +65,17 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${token}`
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    let response: Response
+    try {
+      response = await fetch(url, { ...options, headers })
+    } catch {
+      throw connectionError()
+    }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        detail: response.statusText,
-      }))
-      const errorMessage = error.detail || error.message || response.statusText || 'Request failed'
-      await this.handleAuthFailure(response, errorMessage)
-      const errorWithStatus = new Error(errorMessage)
-      ;(errorWithStatus as any).status = response.status
-      throw errorWithStatus
+      const body: unknown = await response.json().catch(() => null)
+      await this.handleAuthFailure(response, errorFields(body).message || '')
+      throw apiError(response, body)
     }
 
     // Handle 204 No Content responses (no body to parse)
@@ -85,23 +83,12 @@ export class ApiClient {
       return undefined as T
     }
 
-    // Check if response has content
-    const contentType = response.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return response.json()
-    }
-
-    // If no content type or empty response, return undefined
-    const text = await response.text()
-    if (!text || text.trim() === '') {
-      return undefined as T
-    }
-
-    // Try to parse as JSON
     try {
+      const text = await response.text()
+      if (!text.trim()) return undefined as T
       return JSON.parse(text)
     } catch {
-      return undefined as T
+      throw new UserFacingError('We could not read the response. Please try again.', response.status)
     }
   }
 
@@ -113,12 +100,22 @@ export class ApiClient {
     const token = await this.getAuthToken()
     const headers: Record<string, string> = {}
     if (token) headers.Authorization = `Bearer ${token}`
-    const response = await fetch(`${this.baseUrl}${endpoint}`, { headers })
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }))
-      throw new Error(error.detail || 'Download failed')
+    let response: Response
+    try {
+      response = await fetch(`${this.baseUrl}${endpoint}`, { headers })
+    } catch {
+      throw connectionError()
     }
-    return response.blob()
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null)
+      await this.handleAuthFailure(response, errorFields(body).message || '')
+      throw apiError(response, body)
+    }
+    try {
+      return await response.blob()
+    } catch {
+      throw connectionError()
+    }
   }
 
   async post<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<T> {

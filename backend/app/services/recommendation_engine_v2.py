@@ -43,6 +43,7 @@ from app.models.embeddings import JobEmbedding, UserEmbedding
 from app.models.job import Job
 from app.models.job_recommendation import JobRecommendation
 from app.models.user_profile import UserProfile
+from app.services.matching_readiness import active_parsed_cv, matching_ready
 from app.services.embedding_pipeline import (
     upsert_user_embedding,
     user_embedding_text,
@@ -504,14 +505,9 @@ class RecommendationEngineV2:
 
     async def _run(self, user_id: str, stats: GenerationStats) -> None:
         profile = self.db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
-        cv = (
-            self.db.query(CV)
-            .filter(CV.user_id == user_id)
-            .order_by(CV.created_at.desc())
-            .first()
-        )
-        if not profile and not cv:
-            logger.info("User %s has no data; skipping.", user_id)
+        cv = active_parsed_cv(self.db, user_id)
+        if not matching_ready(profile, cv):
+            logger.info("User %s needs profile and parsed CV setup; skipping.", user_id)
             return
 
         # 1. Ensure user embedding is current.
@@ -539,7 +535,7 @@ class RecommendationEngineV2:
 
         # 3. Build profile context for scoring.
         target_titles = self._target_titles(profile)
-        top_skills = self._top_skills(profile)
+        top_skills = self._top_skills(profile, cv=cv)
 
         # 4. Compute sub-scores.
         interest_vecs = self._interest_centroid(user_id, model)
@@ -834,7 +830,7 @@ class RecommendationEngineV2:
                 out.extend(split_target_titles(title))
         return out
 
-    def _top_skills(self, profile: Optional[UserProfile], n: int = 15) -> List[str]:
+    def _top_skills(self, profile: Optional[UserProfile], n: int = 15, cv: Optional[CV] = None) -> List[str]:
         if not profile:
             return []
         raw = profile.technical_skills or []
@@ -850,7 +846,20 @@ class RecommendationEngineV2:
                 skills.append(str(item["skill"]))
             elif isinstance(item, str):
                 skills.append(item)
-        return skills[:n]
+        if cv and isinstance(cv.parsed_content, dict):
+            cv_skills = cv.parsed_content.get("skills", {})
+            technical = cv_skills.get("technical", []) if isinstance(cv_skills, dict) else cv_skills
+            if isinstance(technical, list):
+                # Reserve space for both candidate-entered and CV-derived skills.
+                skills = skills[:max(1, n // 2)] + [s for s in technical if isinstance(s, str)] + skills[max(1, n // 2):]
+        from app.utils.sanitizer import DataSanitizer
+        sanitizer = DataSanitizer()
+        unique = {}
+        for skill in skills:
+            clean = sanitizer.sanitize_text(skill, max_length=100).strip()
+            if clean:
+                unique.setdefault(clean.casefold(), clean)
+        return list(unique.values())[:n]
 
     def _interest_centroid(
         self, user_id: str, model: str
@@ -901,8 +910,10 @@ class RecommendationEngineV2:
         )
         from app.models.cv import CV as _CV
 
-        cv_rows = self.db.query(_CV.user_id).distinct().all()
-        user_ids = {str(r[0]) for r in rows} | {str(r[0]) for r in cv_rows}
+        cv_rows = self.db.query(_CV.user_id).filter(
+            _CV.is_active.is_(True), _CV.parsing_status == "completed", _CV.parsed_content.isnot(None)
+        ).distinct().all()
+        user_ids = {str(r[0]) for r in rows} & {str(r[0]) for r in cv_rows}
         return list(user_ids)
 
     # ---- Read path (used by API endpoint) --------------------------------

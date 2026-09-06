@@ -13,22 +13,22 @@ logger = get_logger(__name__)
 
 
 class MoolreSMSClient:
-    async def send_auth_code(self, *, phone_e164: str, otp: str) -> None:
+    async def send_auth_code(self, *, phone_e164: str, otp: str, purpose: str = "verification") -> None:
         if not settings.MOOLRE_SMS_ENABLED:
             raise RuntimeError("Moolre SMS is disabled")
         if not settings.MOOLRE_VAS_KEY.strip() or not settings.MOOLRE_SENDER_ID.strip():
             raise RuntimeError("Moolre SMS credentials are incomplete")
 
+        message = f"Your VeloxaHire verification code is {otp}. It expires shortly. Do not share this code."
+        if purpose == "password_reset":
+            message = f"Your VeloxaHire password reset code is {otp}. It expires in 5 minutes. Do not share it. Ignore this SMS if you did not request a reset."
         payload = {
             "type": 1,
             "senderid": settings.MOOLRE_SENDER_ID.strip(),
             "messages": [
                 {
                     "recipient": phone_e164.removeprefix("+"),
-                    "message": (
-                        f"Your VeloxaHire verification code is {otp}. "
-                        "It expires shortly. Do not share this code."
-                    ),
+                    "message": message,
                     "ref": f"veloxahire-{uuid.uuid4()}",
                 }
             ],

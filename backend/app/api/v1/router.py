@@ -9,6 +9,7 @@ from fastapi import APIRouter
 # Import route modules
 from app.api.v1.endpoints import (
     auth,
+    password_reset,
     profiles,
     users,
     cvs,
@@ -29,6 +30,7 @@ api_router = APIRouter()
 
 # Include endpoint routers
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
+api_router.include_router(password_reset.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
 api_router.include_router(cvs.router, prefix="/cvs", tags=["cvs"])

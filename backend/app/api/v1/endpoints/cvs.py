@@ -57,6 +57,11 @@ class CVResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer('parsing_error')
+    def serialize_parsing_error(self, value: Optional[str]):
+        # Stored parser/provider diagnostics are never public response copy.
+        return "We could not read this CV. Try uploading a clear PDF or Word document." if value else None
     
     @field_serializer('created_at', 'updated_at')
     def serialize_datetime(self, dt: datetime, _info):

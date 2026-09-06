@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
+from app.middleware.error_handler import http_exception_handler, validation_exception_handler
 from contextlib import asynccontextmanager
 import logging
 import asyncio
@@ -84,15 +86,6 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS Middleware (First - must be before other middleware to handle OPTIONS)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     # Request body size limit (prevent memory exhaustion DoS; 10MB default)
     app.add_middleware(RequestSizeLimitMiddleware)
 
@@ -109,37 +102,24 @@ def create_application() -> FastAPI:
             allowed_hosts=settings.ALLOWED_HOSTS,
         )
 
-    # Security headers for all API responses. Added last so it wraps errors too.
+    # CORS wraps error handling so browsers can read failures and request IDs.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Retry-After", "X-Request-ID"],
+    )
+
+    # Security headers wrap both errors and preflight responses.
     app.add_middleware(SecurityHeadersMiddleware)
 
     # Include API routes
     app.include_router(api_router, prefix="/api/v1")
 
-    # Global exception handler for validation errors
-    @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Handle FastAPI validation errors with detailed logging."""
-        request_id = getattr(request.state, "request_id", "unknown")
-
-        logger.error(
-            "validation_error",
-            method=request.method,
-            path=request.url.path,
-            errors=exc.errors(),
-            request_id=request_id,
-        )
-
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "Request validation failed",
-                    "details": exc.errors() if settings.DEBUG else {},
-                    "request_id": request_id,
-                }
-            }
-        )
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
     @app.get("/health")
     async def health_check():

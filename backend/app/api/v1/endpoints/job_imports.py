@@ -108,7 +108,7 @@ async def preview_alx_digest(
         logger.exception("Failed to parse ALX digest")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Could not read the digest PDF: {exc}",
+            detail="Could not read the digest PDF. Check the file and try again.",
         )
 
     if not parsed:
@@ -182,7 +182,7 @@ async def commit_alx_digest(
             job, created = service.upsert(values)
         except Exception as exc:
             db.rollback()
-            stats.errors.append(f"{entry.title} @ {entry.company}: {exc}")
+            stats.errors.append("A job could not be imported. Review the imported jobs before trying again.")
             logger.exception("Failed to import ALX entry %s", entry.apply_url)
             continue
 
