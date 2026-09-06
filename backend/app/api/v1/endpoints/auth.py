@@ -179,7 +179,8 @@ async def send_phone_auth_sms(request: Request):
             continue
         try:
             await provider.send_auth_code(phone_e164=phone, otp=otp)
-            return Response(status_code=status.HTTP_200_OK)
+            # Supabase requires a content type on successful HTTP hook responses.
+            return JSONResponse(status_code=status.HTTP_200_OK, content={})
         except Exception as exc:
             failures.append(provider_name)
             logger.error(
